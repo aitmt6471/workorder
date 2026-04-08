@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+<title>자재 출고 요청서</title>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="출고요청서">
+<link rel="manifest" href="/feeder-manifest.json">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#1a1a1a;font-size:14px;-webkit-tap-highlight-color:transparent}
+
+/* 헤더 */
+.header{background:#1a3a6b;color:#fff;padding:12px 16px;position:sticky;top:0;z-index:100}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.header-title{font-size:16px;font-weight:bold}
+.refresh-btn{background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.refresh-btn:active{background:rgba(255,255,255,.2)}
+.last-update{font-size:11px;color:#aac4ff;margin-bottom:8px}
+
+/* 날짜 + 시프트 선택 */
+.controls{display:flex;gap:8px;align-items:center}
+.date-select{flex:1;padding:8px 10px;border:1px solid rgba(255,255,255,.3);border-radius:8px;background:rgba(255,255,255,.15);color:#fff;font-size:14px;font-family:inherit;-webkit-appearance:none}
+.date-select option{color:#1a1a1a;background:#fff}
+.shift-btns{display:flex;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.3)}
+.shift-btn{padding:8px 16px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:13px;font-weight:bold;font-family:inherit;cursor:pointer;transition:.15s}
+.shift-btn.active.am{background:#f59e0b;color:#fff}
+.shift-btn.active.pm{background:#3b82f6;color:#fff}
+
+/* 메인 */
+.main{padding:12px}
+
+/* 라인 섹션 */
+.line-section{margin-bottom:16px}
+.line-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#1a3a6b;color:#fff;border-radius:10px 10px 0 0;cursor:pointer;user-select:none}
+.line-header-left{display:flex;align-items:center;gap:8px}
+.line-name{font-size:14px;font-weight:bold}
+.line-count{font-size:11px;color:#aac4ff}
+.line-toggle{font-size:14px;transition:.2s}
+.line-toggle.collapsed{transform:rotate(-90deg)}
+.line-body{border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;overflow:hidden}
+
+/* 자재 카드 */
+.mat-card{padding:14px 16px;border-bottom:1px solid #f0f0f0;background:#fff}
+.mat-card:last-child{border-bottom:none}
+.mat-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
+.mat-code{font-size:11px;color:#9ca3af;font-family:monospace}
+.mat-name{font-size:14px;font-weight:bold;line-height:1.3;margin-bottom:2px}
+.mat-remark{font-size:11px;color:#6b7280}
+.mat-qty-wrap{text-align:right;flex-shrink:0;margin-left:12px}
+.mat-qty{font-size:48px;font-weight:bold;color:#1a3a6b;line-height:1;white-space:nowrap}
+.mat-unit{font-size:14px;color:#6b7280;margin-top:2px;text-align:right}
+
+/* 빈 상태 */
+.empty-state{background:#fff;border-radius:10px;padding:40px 20px;text-align:center;color:#9ca3af}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty-msg{font-size:14px;line-height:1.5}
+.empty-sub{font-size:12px;margin-top:6px;color:#d1d5db}
+
+/* 로딩 */
+.loading{background:#fff;border-radius:10px;padding:40px;text-align:center;color:#9ca3af;font-size:14px}
+
+/* 토스트 */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
+.toast.show{opacity:1}
+
+/* 하단 상태 바 */
+.status-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#6b7280}
+.status-shift.am{color:#92400e;font-weight:bold}
+.status-shift.pm{color:#1e40af;font-weight:bold}
+.auto-badge{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:2px 8px;border-radius:10px;font-size:11px}
+
+/* 체크 완료 상태 */
+.mat-card.checked{background:#f0fdf4;border-left:4px solid #22c55e}
+.mat-card.checked .mat-code,
+.mat-card.checked .mat-name,
+.mat-card.checked .mat-remark,
+.mat-card.checked .mat-qty,
+.mat-card.checked .mat-unit{text-decoration:line-through;color:#9ca3af!important;opacity:.65}
+.check-btn{width:100%;margin-top:12px;padding:12px;border:2px solid #e5e7eb;border-radius:10px;background:#fff;color:#6b7280;font-size:15px;font-weight:bold;font-family:inherit;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent}
+.check-btn:active{transform:scale(.97)}
+.check-btn.checked{border-color:#22c55e;background:#22c55e;color:#fff}
+
+/* 인쇄 */
+@media print{
+  .header,.status-bar,.toast{display:none!important}
+  .line-body{display:block!important}
+  .mat-qty{font-size:36px}
+  body{background:#fff}
+  .check-btn{display:none!important}
+}
+
+/* 큰 화면 대응 */
+@media(min-width:480px){
+  .mat-qty{font-size:56px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="header-title">자재 출고 요청서</div>
+    <button class="refresh-btn" onclick="loadData()" title="새로고침">&#x21bb;</button>
+  </div>
+  <div class="last-update" id="last-update">로딩 중...</div>
+  <div class="controls">
+    <select class="date-select" id="date-sel" onchange="onDateChange()">
+      <option value="">날짜 선택...</option>
+    </select>
+    <div class="shift-btns">
+      <button class="shift-btn am" id="btn-am" onclick="selectShift('am')">오전</button>
+      <button class="shift-btn pm" id="btn-pm" onclick="selectShift('pm')">오후</button>
+    </div>
+  </div>
+</div>
+
+<div class="main" id="main">
+  <div class="loading">데이터 불러오는 중...</div>
+</div>
+
+<div class="status-bar">
+  <span id="status-info">반장이 확정한 자재 목록</span>
+  <span class="auto-badge">5분 자동갱신</span>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var currentShift = 'am';
+var currentDate = '';
+var confirmedData = null;
+var checkedItems = {}; // key: code_line → true/false
+
+function toggleCheck(ck){
+  checkedItems[ck] = !checkedItems[ck];
+  var card = document.getElementById('card-'+ck);
+  var btn  = card && card.querySelector('.check-btn');
+  if(!card) return;
+  if(checkedItems[ck]){
+    card.classList.add('checked');
+    btn.classList.add('checked');
+    btn.textContent = '✅ 챙김 완료';
+  } else {
+    card.classList.remove('checked');
+    btn.classList.remove('checked');
+    btn.textContent = '☐ 챙겼어요';
+  }
+}
+
+// ── 날짜 유틸 ─────────────────────────────────────────────────
+function todayStr(){
+  var d = new Date();
+  return d.getFullYear()
+    + String(d.getMonth()+1).padStart(2,'0')
+    + String(d.getDate()).padStart(2,'0');
+}
+function fmtDisplay(s){
+  var d = new Date(s.slice(0,4)+'-'+s.slice(4,6)+'-'+s.slice(6,8));
+  var days=['일','월','화','수','목','금','토'];
+  return (parseInt(s.slice(4,6)))+'/'+(parseInt(s.slice(6,8)))+'('+days[d.getDay()]+')';
+}
+
+// ── 날짜 목록 로드 ────────────────────────────────────────────
+function loadDates(){
+  fetch('https://aitechn8n.ngrok.app/webhook/confirmed', {headers:{'ngrok-skip-browser-warning':'true'}})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var dates = (data.dates || []).sort().reverse();
+      var sel = document.getElementById('date-sel');
+      var today = todayStr();
+
+      // 날짜 옵션 빌드: 확정된 날짜 + 오늘 기본
+      var allDates = dates.slice();
+      if(allDates.indexOf(today) < 0) allDates.unshift(today);
+      allDates.sort().reverse();
+
+      sel.innerHTML = allDates.map(function(d){
+        var label = fmtDisplay(d) + (d===today?' (오늘)':'');
+        return '<option value="'+d+'"'+( d===today?' selected':'')+'>'+label+'</option>';
+      }).join('');
+
+      if(!currentDate) currentDate = today;
+      loadData();
+    })
+    .catch(function(){
+      // 서버 없으면 오늘 날짜만
+      var today = todayStr();
+      var sel = document.getElementById('date-sel');
+      sel.innerHTML = '<option value="'+today+'">'+fmtDisplay(today)+' (오늘)</option>';
+      currentDate = today;
+      loadData();
+    });
+}
+
+// ── 확정 데이터 로드 ──────────────────────────────────────────
+function loadData(){
+  if(!currentDate) currentDate = todayStr();
+  document.getElementById('last-update').textContent = '갱신 중...';
+
+  fetch('https://aitechn8n.ngrok.app/webhook/confirmed?date='+currentDate, {headers:{'ngrok-skip-browser-warning':'true'}})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      confirmedData = data;
+      renderMain();
+      var now = new Date();
+      document.getElementById('last-update').textContent =
+        now.getHours()+'시'+String(now.getMinutes()).padStart(2,'0')+'분 갱신';
+    })
+    .catch(function(){
+      showToast('서버 연결 실패');
+      document.getElementById('last-update').textContent = '연결 실패';
+      document.getElementById('main').innerHTML =
+        '<div class="empty-state"><div class="empty-icon">⚠️</div>'
+        +'<div class="empty-msg">서버에 연결할 수 없습니다</div>'
+        +'<div class="empty-sub">n8n 서버(aitechn8n.ngrok.app)가 실행 중인지 확인하세요</div></div>';
+    });
+}
+
+// ── 날짜/시프트 변경 ──────────────────────────────────────────
+function onDateChange(){
+  currentDate = document.getElementById('date-sel').value;
+  loadData();
+}
+
+function selectShift(sh){
+  currentShift = sh;
+  document.getElementById('btn-am').classList.toggle('active', sh==='am');
+  document.getElementById('btn-pm').classList.toggle('active', sh==='pm');
+  renderMain();
+}
+
+// ── 메인 렌더링 ───────────────────────────────────────────────
+function renderMain(){
+  var main = document.getElementById('main');
+  var statusInfo = document.getElementById('status-info');
+
+  // 시프트 버튼 상태
+  document.getElementById('btn-am').classList.toggle('active', currentShift==='am');
+  document.getElementById('btn-pm').classList.toggle('active', currentShift==='pm');
+
+  if(!confirmedData){
+    main.innerHTML = '<div class="loading">데이터 없음</div>';
+    return;
+  }
+
+  var items = confirmedData[currentShift] || [];
+  var shiftLabel = currentShift==='am' ? '오전 ☀️' : '오후 🌙';
+  statusInfo.innerHTML = '<span class="status-shift '+currentShift+'">'+shiftLabel+'</span>'
+    +' · '+items.length+'종 자재';
+
+  if(!items.length){
+    main.innerHTML = '<div class="empty-state">'
+      +'<div class="empty-icon">'+(currentShift==='am'?'☀️':'🌙')+'</div>'
+      +'<div class="empty-msg">'+shiftLabel+' 확정된 자재 없음</div>'
+      +'<div class="empty-sub">반장이 mrp_calculator에서 확정해주세요</div>'
+      +'</div>';
+    return;
+  }
+
+  // 라인별 그룹
+  var lines = {};
+  items.forEach(function(item){
+    var ln = item.line || '미분류';
+    if(!lines[ln]) lines[ln] = [];
+    lines[ln].push(item);
+  });
+
+  var html = '';
+  Object.keys(lines).sort().forEach(function(ln, idx){
+    var mats = lines[ln];
+    html += '<div class="line-section">'
+      +'<div class="line-header" onclick="toggleLine(\'line-'+idx+'\')">'
+      +'<div class="line-header-left">'
+      +'<span class="line-name">'+esc(ln)+'</span>'
+      +'<span class="line-count">'+mats.length+'종</span>'
+      +'</div>'
+      +'<span class="line-toggle" id="toggle-'+idx+'">▼</span>'
+      +'</div>'
+      +'<div class="line-body" id="line-'+idx+'">';
+
+    mats.forEach(function(m){
+      var ck = ((m.code||'')+'_'+ln).replace(/[^a-zA-Z0-9_\-]/g,'_');
+      var isChecked = checkedItems[ck];
+      html += '<div class="mat-card'+(isChecked?' checked':'')+'" id="card-'+ck+'">'
+        +'<div class="mat-top">'
+        +'<div>'
+        +'<div class="mat-code">'+esc(m.code||'')+'</div>'
+        +'<div class="mat-name">'+esc(m.name||'')+'</div>'
+        +(m.remark?'<div class="mat-remark">'+esc(m.remark)+'</div>':'')
+        +'</div>'
+        +'<div class="mat-qty-wrap">'
+        +'<div class="mat-qty">'+fmtQty(m.qty)+'</div>'
+        +'<div class="mat-unit">'+esc(m.unit||'EA')+'</div>'
+        +'</div>'
+        +'</div>'
+        +'<button class="check-btn'+(isChecked?' checked':'')+'" onclick="toggleCheck(\''+ck+'\')">'
+        +(isChecked?'✅ 챙김 완료':'☐ 챙겼어요')
+        +'</button>'
+        +'</div>';
+    });
+
+    html += '</div></div>';
+  });
+
+  // 하단 여백 (status-bar 가림 방지)
+  html += '<div style="height:60px"></div>';
+  main.innerHTML = html;
+}
+
+// ── 라인 접기/펼치기 ──────────────────────────────────────────
+function toggleLine(id){
+  var body = document.getElementById(id);
+  var idx = id.replace('line-','');
+  var toggle = document.getElementById('toggle-'+idx);
+  if(!body) return;
+  var collapsed = body.style.display === 'none';
+  body.style.display = collapsed ? '' : 'none';
+  toggle.classList.toggle('collapsed', !collapsed);
+}
+
+// ── 유틸 ──────────────────────────────────────────────────────
+function fmtQty(n){
+  var v = parseFloat(n) || 0;
+  return (v%1===0) ? Number(v).toLocaleString() : Number(v).toFixed(2);
+}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function showToast(msg){
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 2500);
+}
+
+// ── 초기화 + 자동 갱신 ───────────────────────────────────────
+selectShift('am');
+loadDates();
+setInterval(loadData, 5 * 60 * 1000);
+</script>
+</body>
+</html>
