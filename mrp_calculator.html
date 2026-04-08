@@ -19,7 +19,7 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#1a1a1a;fon
 /* PC: 2컬럼 */
 @media(min-width:768px){
   .page{flex-direction:row}
-  .col-left{width:340px;flex-shrink:0}
+  .col-left{width:460px;flex-shrink:0}
   .col-right{flex:1;min-width:0}
 }
 
@@ -130,17 +130,22 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#1a1a1a;fon
 .date-refresh{background:none;border:1px solid rgba(255,255,255,.3);color:#fff;border-radius:50%;width:28px;height:28px;font-size:13px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center}
 
 /* ── 작업지시 카드 내부 ── */
-.wo-line{margin-bottom:8px}
-.wo-line-title{font-size:10px;font-weight:bold;color:#1a3a6b;padding:2px 0 3px;border-bottom:1px solid #e0e8f0;margin-bottom:4px;text-transform:uppercase;letter-spacing:.5px}
-.wo-item{padding:5px 0;border-bottom:1px solid #f5f5f5;display:flex;flex-direction:column;gap:3px}
-.wo-item:last-child{border-bottom:none}
-.wo-code{font-size:10px;color:#9ca3af;font-family:monospace}
-.wo-name{font-size:12px;font-weight:600;color:#1a1a1a;line-height:1.3}
-.wo-qty{font-size:11px;color:#0d6efd;font-weight:normal;margin-left:4px}
-.wo-btns{display:flex;gap:4px;margin-top:2px}
-.wo-btn{padding:7px 14px;border:1px solid;border-radius:6px;font-size:13px;font-weight:bold;cursor:pointer;font-family:inherit;transition:.1s;min-height:40px}
+.wo-line{margin-bottom:10px;border:1px solid #dce8f7;border-radius:8px;overflow:hidden}
+.wo-line-title{font-size:20px;font-weight:bold;color:#fff;background:#1a3a6b;padding:6px 10px;letter-spacing:.3px}
+.wo-row{display:flex;align-items:stretch;border-bottom:1px solid #eef3f9;min-height:60px}
+.wo-row:last-child{border-bottom:none}
+.wo-info{flex:1;padding:12px 14px;display:flex;flex-direction:column;justify-content:center;gap:5px;min-width:0}
+.wo-code{font-size:20px;color:#444;font-family:inherit;font-weight:600;word-break:break-all}
+.wo-code-label{font-size:12px;color:#888;font-weight:normal}
+.wo-name{font-size:20px;font-weight:600;color:#1a1a1a;line-height:1.4;word-break:break-all;font-family:inherit}
+.wo-name-label{font-size:12px;color:#888;font-weight:normal}
+.wo-qty-row{font-size:20px;font-weight:700;color:#1a3a6b;margin-top:2px;font-family:inherit}
+.wo-qty-label{font-size:12px;color:#888;font-weight:normal;margin-right:3px}
+.wo-btns{display:flex;flex-direction:column;gap:6px;padding:10px 10px;justify-content:center;background:#fafcff;border-left:1px solid #eef3f9;flex-shrink:0;width:88px}
+.wo-btn{padding:10px 0;border:1px solid;border-radius:8px;font-size:16px;font-weight:bold;cursor:pointer;font-family:inherit;transition:.15s;width:100%;text-align:center;-webkit-tap-highlight-color:transparent}
 .wo-btn-am{border-color:#ffc107;background:#fff;color:#856404}.wo-btn-am.active{background:#ffc107;color:#000}
 .wo-btn-pm{border-color:#0d6efd;background:#fff;color:#0d6efd}.wo-btn-pm.active{background:#0d6efd;color:#fff}
+.wo-readonly{color:#bbb;font-size:11px;text-align:center;padding:8px;display:flex;align-items:center;justify-content:center;width:70px;background:#fafcff;border-left:1px solid #eef3f9}
 .wo-actions{display:flex;gap:5px;margin-top:8px;padding-top:8px;border-top:1px solid #eee}
 .wo-empty{text-align:center;color:#ccc;padding:14px 8px;font-size:12px}
 </style>
@@ -525,7 +530,8 @@ function loadWorkOrders(){
   if(body) body.innerHTML='<div class="wo-empty">로드 중...</div>';
 
   fetch(N8N_BASE+'/webhook/workorders?from='+woDate+'&to='+woDate, {headers:{'ngrok-skip-browser-warning':'true'}})
-    .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function(r){ if(!r.ok) throw new Error(r.status); return r.text(); })
+    .then(function(text){ return (text&&text.trim()) ? JSON.parse(text) : {orders:[]}; })
     .then(function(data){
       woData=data.orders||[];
       renderWO();
@@ -546,6 +552,7 @@ function renderWO(){
   var today=_todayYMD(), isPast=(woDate<today);
   var lines={};
   woData.forEach(function(wo){
+    if(wo.line_name==='사출') return; // 사출 라인 제외
     var k=wo.line_name||wo.line_code||'미지정';
     if(!lines[k]) lines[k]=[];
     lines[k].push(wo);
@@ -555,17 +562,22 @@ function renderWO(){
     var items=lines[ln].map(function(wo){
       var key=wo.wo_no+'_'+wo.seq;
       var amActive=woAssign[key]==='am', pmActive=woAssign[key]==='pm';
-      var btns=isPast
-        ? '<span style="color:#bbb;font-size:10px">읽기전용</span>'
-        : '<button class="wo-btn wo-btn-am'+(amActive?' active':'')+'" onclick="toggleWO(\''+wo.wo_no+'\',\''+wo.seq+'\',\'am\')">오전</button>'
-          +'<button class="wo-btn wo-btn-pm'+(pmActive?' active':'')+'" onclick="toggleWO(\''+wo.wo_no+'\',\''+wo.seq+'\',\'pm\')">오후</button>';
-      return '<div class="wo-item">'
-        +'<div class="wo-code">'+esc(wo.item_code)+'</div>'
-        +'<div class="wo-name">'+esc(wo.item_name)+'<span class="wo-qty">'+fmt(wo.qty)+' '+esc(wo.unit)+'</span></div>'
-        +'<div class="wo-btns">'+btns+'</div>'
+      var btnsHtml=isPast
+        ? '<div class="wo-readonly">읽기전용</div>'
+        : '<div class="wo-btns">'
+          +'<button class="wo-btn wo-btn-am'+(amActive?' active':'')+'" onclick="toggleWO(\''+wo.wo_no+'\',\''+wo.seq+'\',\'am\')">오전</button>'
+          +'<button class="wo-btn wo-btn-pm'+(pmActive?' active':'')+'" onclick="toggleWO(\''+wo.wo_no+'\',\''+wo.seq+'\',\'pm\')">오후</button>'
+          +'</div>';
+      return '<div class="wo-row">'
+        +'<div class="wo-info">'
+        +'<div class="wo-code"><span class="wo-code-label">품번 </span>'+esc(wo.item_code)+'</div>'
+        +'<div class="wo-name"><span class="wo-name-label">품명 </span>'+esc(wo.item_name)+'</div>'
+        +'<div class="wo-qty-row"><span class="wo-qty-label">수량</span>'+fmt(wo.qty)+'</div>'
+        +'</div>'
+        +btnsHtml
         +'</div>';
     }).join('');
-    return '<div class="wo-line"><div class="wo-line-title">'+esc(ln)+'</div>'+items+'</div>';
+    return '<div class="wo-line"><div class="wo-line-title">라인명: '+esc(ln)+'</div>'+items+'</div>';
   }).join('');
 
   if(!isPast){
