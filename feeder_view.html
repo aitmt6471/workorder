@@ -9,91 +9,99 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="출고요청서">
 <link rel="manifest" href="/feeder-manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
+:root{--primary:#3b82f6;--primary-dark:#1e40af;--text-main:#1e3a8a;--bg:#f1f5f9}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#1a1a1a;font-size:14px;-webkit-tap-highlight-color:transparent}
+body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#1a1a1a;font-size:14px;-webkit-tap-highlight-color:transparent}
 
-/* 헤더 */
-.header{background:#1a3a6b;color:#fff;padding:12px 16px;position:sticky;top:0;z-index:100}
-.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
-.header-title{font-size:16px;font-weight:bold}
-.refresh-btn{background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.refresh-btn:active{background:rgba(255,255,255,.2)}
-.last-update{font-size:11px;color:#aac4ff;margin-bottom:8px}
+.bg-blobs{position:fixed;top:0;left:0;width:100%;height:100%;z-index:-1;overflow:hidden;pointer-events:none}
+.blob{position:absolute;border-radius:40% 60% 70% 30%/40% 50% 60% 50%;filter:blur(60px);opacity:.35;animation:morphBlob 20s ease-in-out infinite alternate}
+.blob-1{background:#dbeafe;width:500px;height:500px;top:-10%;left:-10%;animation-duration:20s}
+.blob-2{background:#e0e7ff;width:400px;height:400px;bottom:-5%;right:-5%;border-radius:60% 40% 30% 70%/60% 30% 70% 40%;animation-duration:18s;animation-direction:alternate-reverse}
+.blob-3{background:#cbd5e1;width:300px;height:300px;top:40%;left:20%;border-radius:30% 70% 70% 30%/30% 30% 70% 70%;animation-duration:25s;opacity:.15}
+@keyframes morphBlob{0%{border-radius:40% 60% 70% 30%/40% 50% 60% 50%;transform:translate(0,0)}100%{border-radius:60% 40% 30% 70%/60% 30% 70% 40%;transform:translate(40px,40px) rotate(15deg)}}
 
-/* 날짜 + 시프트 선택 */
+.header{background:#ffffff;color:#111;padding:14px 18px;position:sticky;top:0;z-index:100;text-align:center;border-bottom:1px solid #e5e7eb;box-shadow:0 2px 8px rgba(0,0,0,.06)}
+.header-brand{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px}
+.header-title{font-size:17px;font-weight:800;letter-spacing:-.02em}
+.refresh-btn{background:#f3f4f6;border:1px solid #d1d5db;color:#374151;border-radius:50%;width:34px;height:34px;font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.2s;flex-shrink:0}
+.refresh-btn:active{background:#e5e7eb;transform:rotate(30deg)}
+.last-update{font-size:11px;color:#6b7280;margin-bottom:8px;text-align:center}
+
 .controls{display:flex;gap:8px;align-items:center}
-.date-select{flex:1;padding:8px 10px;border:1px solid rgba(255,255,255,.3);border-radius:8px;background:rgba(255,255,255,.15);color:#fff;font-size:14px;font-family:inherit;-webkit-appearance:none}
+.date-select{flex:1;padding:9px 12px;border:1px solid #d1d5db;border-radius:14px;background:#fff;color:#111;font-size:14px;font-family:inherit;-webkit-appearance:none;transition:.2s}
 .date-select option{color:#1a1a1a;background:#fff}
-.shift-btns{display:flex;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.3)}
-.shift-btn{padding:8px 16px;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:13px;font-weight:bold;font-family:inherit;cursor:pointer;transition:.15s}
-.shift-btn.active.am{background:#f59e0b;color:#fff}
-.shift-btn.active.pm{background:#3b82f6;color:#fff}
+.shift-btns{display:flex;border-radius:14px;overflow:hidden;border:1px solid #d1d5db}
+.shift-btn{padding:9px 18px;border:none;background:#f9fafb;color:#374151;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;transition:.2s}
+.shift-btn.active.am{background:#f59e0b;color:#fff;box-shadow:0 4px 12px rgba(245,158,11,.3)}
+.shift-btn.active.pm{background:#1e3a8a;color:#fff;box-shadow:0 4px 12px rgba(30,58,138,.3)}
 
-/* 메인 */
-.main{padding:12px}
+.main{padding:14px}
 
-/* 라인 섹션 */
 .line-section{margin-bottom:16px}
-.line-header{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;background:#1a3a6b;color:#fff;border-radius:10px 10px 0 0;cursor:pointer;user-select:none}
+.line-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:linear-gradient(135deg,#1e3a8a,#1e40af);color:#fff;border-radius:16px 16px 0 0;cursor:pointer;user-select:none;position:relative}
+.line-header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,#3b82f6,#6366f1)}
 .line-header-left{display:flex;align-items:center;gap:8px}
-.line-name{font-size:14px;font-weight:bold}
-.line-count{font-size:11px;color:#aac4ff}
+.line-name{font-size:15px;font-weight:800}
+.line-count{font-size:11px;color:#93c5fd}
 .line-toggle{font-size:14px;transition:.2s}
 .line-toggle.collapsed{transform:rotate(-90deg)}
-.line-body{border:1px solid #e5e7eb;border-top:none;border-radius:0 0 10px 10px;overflow:hidden}
+.line-body{border:1px solid rgba(59,130,246,.15);border-top:none;border-radius:0 0 16px 16px;overflow:hidden;backdrop-filter:blur(8px)}
 
-/* 자재 카드 */
-.mat-card{padding:14px 16px;border-bottom:1px solid #f0f0f0;background:#fff}
-.mat-card:last-child{border-bottom:none}
-.mat-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px}
-.mat-code{font-size:11px;color:#9ca3af;font-family:monospace}
-.mat-name{font-size:14px;font-weight:bold;line-height:1.3;margin-bottom:2px}
-.mat-remark{font-size:11px;color:#6b7280}
-.mat-qty-wrap{text-align:right;flex-shrink:0;margin-left:12px}
-.mat-qty{font-size:48px;font-weight:bold;color:#1a3a6b;line-height:1;white-space:nowrap}
-.mat-unit{font-size:14px;color:#6b7280;margin-top:2px;text-align:right}
-
-/* 빈 상태 */
-.empty-state{background:#fff;border-radius:10px;padding:40px 20px;text-align:center;color:#9ca3af}
-.empty-icon{font-size:48px;margin-bottom:12px}
-.empty-msg{font-size:14px;line-height:1.5}
-.empty-sub{font-size:12px;margin-top:6px;color:#d1d5db}
-
-/* 로딩 */
-.loading{background:#fff;border-radius:10px;padding:40px;text-align:center;color:#9ca3af;font-size:14px}
-
-/* 토스트 */
-.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;z-index:9999;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap}
-.toast.show{opacity:1}
-
-/* 하단 상태 바 */
-.status-bar{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;padding:8px 16px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#6b7280}
-.status-shift.am{color:#92400e;font-weight:bold}
-.status-shift.pm{color:#1e40af;font-weight:bold}
-.auto-badge{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:2px 8px;border-radius:10px;font-size:11px}
-
-/* 체크 완료 상태 */
-.mat-card.checked{background:#f0fdf4;border-left:4px solid #22c55e}
-.mat-card.checked .mat-code,
-.mat-card.checked .mat-name,
-.mat-card.checked .mat-remark,
-.mat-card.checked .mat-qty,
-.mat-card.checked .mat-unit{text-decoration:line-through;color:#9ca3af!important;opacity:.65}
-.check-btn{width:100%;margin-top:12px;padding:12px;border:2px solid #e5e7eb;border-radius:10px;background:#fff;color:#6b7280;font-size:15px;font-weight:bold;font-family:inherit;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent}
+.mat-table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+.mat-table thead tr{background:#1e3a8a}
+.mat-table.am thead tr{background:#f59e0b}
+.mat-table.pm thead tr{background:#1e3a8a}
+.mat-table thead th{padding:10px 12px;text-align:left;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
+.mat-table thead th.num{width:36px;text-align:center}
+.mat-table thead th.qty{text-align:right}
+.mat-table tbody tr{border-bottom:1px solid #e8edf4;transition:.15s}
+.mat-table tbody tr:last-child{border-bottom:none}
+.mat-table tbody tr:nth-child(odd){background:#ffffff}
+.mat-table tbody tr:nth-child(even){background:#eef3fa}
+.mat-table tbody tr:hover{background:#dde8f5}
+.mat-table tbody tr.checked-row td{text-decoration:line-through;color:#9ca3af!important;opacity:.65;background:#f0fdf4}
+.mat-table td{padding:9px 12px;font-size:13px;vertical-align:middle}
+.mat-table td.num{text-align:center;color:#94a3b8;font-size:12px}
+.mat-table td.code{font-family:monospace;font-size:12px;color:#475569;white-space:nowrap}
+.mat-table td.name{font-weight:600;color:#111}
+.mat-table td.remark{font-size:11px;color:#64748b}
+.mat-table td.unit{color:#64748b;white-space:nowrap}
+.mat-table td.qty{text-align:right;font-weight:800;font-size:15px;color:#1e3a8a;white-space:nowrap}
+.check-btn{width:100%;margin-top:0;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#64748b;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:.2s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
 .check-btn:active{transform:scale(.97)}
 .check-btn.checked{border-color:#22c55e;background:#22c55e;color:#fff}
 
-/* 인쇄 */
+.empty-state{background:rgba(255,255,255,.8);backdrop-filter:blur(12px);border-radius:20px;padding:40px 20px;text-align:center;color:#94a3b8}
+.empty-icon{font-size:48px;margin-bottom:12px}
+.empty-msg{font-size:14px;line-height:1.5}
+.empty-sub{font-size:12px;margin-top:6px;color:#cbd5e1}
+
+.loading{background:rgba(255,255,255,.8);backdrop-filter:blur(12px);border-radius:20px;padding:40px;text-align:center;color:#94a3b8;font-size:14px}
+
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#1e3a8a,#1e40af);color:#fff;padding:12px 24px;border-radius:20px;font-size:13px;z-index:9999;opacity:0;transition:.3s;pointer-events:none;white-space:nowrap;box-shadow:0 8px 24px rgba(30,58,138,.3)}
+.toast.show{opacity:1}
+
+.status-bar{position:fixed;bottom:0;left:0;right:0;background:rgba(255,255,255,.9);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-top:1px solid rgba(59,130,246,.1);padding:10px 18px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:#64748b;box-shadow:0 -4px 16px rgba(30,58,138,.08)}
+.status-shift.am{color:#92400e;font-weight:700}
+.status-shift.pm{color:#1e40af;font-weight:700}
+.auto-badge{background:linear-gradient(135deg,rgba(34,197,94,.15),rgba(22,163,74,.1));color:#166534;border:1px solid rgba(34,197,94,.3);padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
+
+
+.check-btn{width:100%;margin-top:12px;padding:13px;border:2px solid rgba(59,130,246,.2);border-radius:14px;background:rgba(255,255,255,.9);color:#64748b;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;transition:.2s;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent}
+.check-btn:active{transform:scale(.97)}
+.check-btn.checked{border-color:#22c55e;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 6px 18px rgba(34,197,94,.3)}
+
 @media print{
-  .header,.status-bar,.toast{display:none!important}
+  .header,.status-bar,.toast,.bg-blobs{display:none!important}
   .line-body{display:block!important}
   .mat-qty{font-size:36px}
   body{background:#fff}
   .check-btn{display:none!important}
 }
-
-/* 큰 화면 대응 */
 @media(min-width:480px){
   .mat-qty{font-size:56px}
 }
@@ -101,13 +109,19 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#1a1a1a;fon
 </head>
 <body>
 
+<div class="bg-blobs" aria-hidden="true">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
 <div class="header">
-  <div class="header-top">
+  <div class="header-brand">
+    <img src="ait-logo.png" alt="AIT" style="height:38px;width:auto;object-fit:contain">
     <div class="header-title">자재 출고 요청서</div>
-    <button class="refresh-btn" onclick="loadData()" title="새로고침">&#x21bb;</button>
   </div>
   <div class="last-update" id="last-update">로딩 중...</div>
-  <div class="controls">
+  <div class="controls" style="justify-content:center">
     <select class="date-select" id="date-sel" onchange="onDateChange()">
       <option value="">날짜 선택...</option>
     </select>
@@ -115,6 +129,7 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#1a1a1a;fon
       <button class="shift-btn am" id="btn-am" onclick="selectShift('am')">오전</button>
       <button class="shift-btn pm" id="btn-pm" onclick="selectShift('pm')">오후</button>
     </div>
+    <button class="refresh-btn" onclick="loadData()" title="새로고침">&#x21bb;</button>
   </div>
 </div>
 
@@ -124,7 +139,7 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#1a1a1a;fon
 
 <div class="status-bar">
   <span id="status-info">반장이 확정한 자재 목록</span>
-  <span class="auto-badge">5분 자동갱신</span>
+  <span class="auto-badge">1분 자동갱신</span>
 </div>
 
 <div class="toast" id="toast"></div>
@@ -133,21 +148,31 @@ body{font-family:'Malgun Gothic',sans-serif;background:#f0f2f5;color:#1a1a1a;fon
 var currentShift = 'am';
 var currentDate = '';
 var confirmedData = null;
-var checkedItems = {}; // key: code_line → true/false
+var checkedItems = {};
+
+var CHECKED_KEY = 'mrp_feeder_checked';
+
+function saveChecked(){
+  try{ localStorage.setItem(CHECKED_KEY, JSON.stringify(checkedItems)); }catch(e){}
+}
+function loadChecked(){
+  try{ checkedItems = JSON.parse(localStorage.getItem(CHECKED_KEY)||'{}'); }catch(e){ checkedItems={}; }
+}
 
 function toggleCheck(ck){
   checkedItems[ck] = !checkedItems[ck];
-  var card = document.getElementById('card-'+ck);
-  var btn  = card && card.querySelector('.check-btn');
-  if(!card) return;
+  saveChecked();
+  var row = document.getElementById('card-'+ck);
+  var btn = row && row.querySelector('.check-btn');
+  if(!row) return;
   if(checkedItems[ck]){
-    card.classList.add('checked');
+    row.classList.add('checked-row');
     btn.classList.add('checked');
-    btn.textContent = '✅ 챙김 완료';
+    btn.textContent = '✅';
   } else {
-    card.classList.remove('checked');
+    row.classList.remove('checked-row');
     btn.classList.remove('checked');
-    btn.textContent = '☐ 챙겼어요';
+    btn.textContent = '☐';
   }
 }
 
@@ -252,6 +277,9 @@ function renderMain(){
   statusInfo.innerHTML = '<span class="status-shift '+currentShift+'">'+shiftLabel+'</span>'
     +' · '+items.length+'종 자재';
 
+  // 008 라인 제외
+  items = items.filter(function(item){ return (item.line||'') !== '008'; });
+
   if(!items.length){
     main.innerHTML = '<div class="empty-state">'
       +'<div class="empty-icon">'+(currentShift==='am'?'☀️':'🌙')+'</div>'
@@ -261,50 +289,34 @@ function renderMain(){
     return;
   }
 
-  // 라인별 그룹
-  var lines = {};
-  items.forEach(function(item){
-    var ln = item.line || '미분류';
-    if(!lines[ln]) lines[ln] = [];
-    lines[ln].push(item);
+  var html = '<table class="mat-table '+currentShift+'">'
+    +'<thead><tr>'
+    +'<th class="num">#</th>'
+    +'<th>품목코드</th>'
+    +'<th>품목명</th>'
+    +'<th>비고</th>'
+    +'<th>단위</th>'
+    +'<th class="qty">총 소요량</th>'
+    +'<th></th>'
+    +'</tr></thead><tbody>';
+
+  items.forEach(function(m, i){
+    var ck = ((m.code||'')+'_'+(m.line||'')).replace(/[^a-zA-Z0-9_\-]/g,'_');
+    var isChecked = checkedItems[ck];
+    html += '<tr class="'+(isChecked?'checked-row':'')+'" id="card-'+ck+'">'
+      +'<td class="num">'+(i+1)+'</td>'
+      +'<td class="code">'+esc(m.code||'')+'</td>'
+      +'<td class="name">'+esc(m.name||'')+'</td>'
+      +'<td class="remark">'+esc(m.remark||'')+'</td>'
+      +'<td class="unit">'+esc(m.unit||'EA')+'</td>'
+      +'<td class="qty">'+fmtQty(m.qty)+'</td>'
+      +'<td><button class="check-btn'+(isChecked?' checked':'')+'" onclick="toggleCheck(\''+ck+'\')">'
+      +(isChecked?'✅':'☐')
+      +'</button></td>'
+      +'</tr>';
   });
 
-  var html = '';
-  Object.keys(lines).sort().forEach(function(ln, idx){
-    var mats = lines[ln];
-    html += '<div class="line-section">'
-      +'<div class="line-header" onclick="toggleLine(\'line-'+idx+'\')">'
-      +'<div class="line-header-left">'
-      +'<span class="line-name">'+esc(ln)+'</span>'
-      +'<span class="line-count">'+mats.length+'종</span>'
-      +'</div>'
-      +'<span class="line-toggle" id="toggle-'+idx+'">▼</span>'
-      +'</div>'
-      +'<div class="line-body" id="line-'+idx+'">';
-
-    mats.forEach(function(m){
-      var ck = ((m.code||'')+'_'+ln).replace(/[^a-zA-Z0-9_\-]/g,'_');
-      var isChecked = checkedItems[ck];
-      html += '<div class="mat-card'+(isChecked?' checked':'')+'" id="card-'+ck+'">'
-        +'<div class="mat-top">'
-        +'<div>'
-        +'<div class="mat-code">'+esc(m.code||'')+'</div>'
-        +'<div class="mat-name">'+esc(m.name||'')+'</div>'
-        +(m.remark?'<div class="mat-remark">'+esc(m.remark)+'</div>':'')
-        +'</div>'
-        +'<div class="mat-qty-wrap">'
-        +'<div class="mat-qty">'+fmtQty(m.qty)+'</div>'
-        +'<div class="mat-unit">'+esc(m.unit||'EA')+'</div>'
-        +'</div>'
-        +'</div>'
-        +'<button class="check-btn'+(isChecked?' checked':'')+'" onclick="toggleCheck(\''+ck+'\')">'
-        +(isChecked?'✅ 챙김 완료':'☐ 챙겼어요')
-        +'</button>'
-        +'</div>';
-    });
-
-    html += '</div></div>';
-  });
+  html += '</tbody></table>';
 
   // 하단 여백 (status-bar 가림 방지)
   html += '<div style="height:60px"></div>';
@@ -336,9 +348,10 @@ function showToast(msg){
 }
 
 // ── 초기화 + 자동 갱신 ───────────────────────────────────────
+loadChecked();
 selectShift('am');
 loadDates();
-setInterval(loadData, 5 * 60 * 1000);
+setInterval(loadData, 60 * 1000); // 1분 자동갱신
 </script>
 </body>
 </html>
