@@ -198,17 +198,6 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
   <!-- 왼쪽 패널 -->
   <div class="col-left">
 
-    <!-- 작업지시 자동 로드 -->
-    <div class="card">
-      <div class="ch">
-        작업지시 자동 로드
-        <span id="wo-status" style="font-size:11px;font-weight:normal;color:#888">날짜 선택</span>
-      </div>
-      <div class="cb" id="wo-body" style="padding:8px;max-height:340px;overflow-y:auto">
-        <div class="wo-empty">날짜 바에서 날짜를 선택하세요</div>
-      </div>
-    </div>
-
     <!-- 완제품 검색 -->
     <div class="card">
       <div class="ch">완제품 검색 &amp; 계획 추가</div>
@@ -227,6 +216,17 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
           <button class="btn btn-am" onclick="addPlan('am')" style="flex:1">오전 추가</button>
           <button class="btn btn-pm" onclick="addPlan('pm')" style="flex:1">오후 추가</button>
         </div>
+      </div>
+    </div>
+
+    <!-- 작업지시 자동 로드 -->
+    <div class="card">
+      <div class="ch">
+        작업지시 자동 로드
+        <span id="wo-status" style="font-size:11px;font-weight:normal;color:#888">날짜 선택</span>
+      </div>
+      <div class="cb" id="wo-body" style="padding:8px;max-height:340px;overflow-y:auto">
+        <div class="wo-empty">날짜 바에서 날짜를 선택하세요</div>
       </div>
     </div>
 
