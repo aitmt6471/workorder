@@ -51,30 +51,34 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
 .line-toggle.collapsed{transform:rotate(-90deg)}
 .line-body{border:1px solid rgba(59,130,246,.15);border-top:none;border-radius:0 0 16px 16px;overflow:hidden;backdrop-filter:blur(8px)}
 
-.mat-table{width:100%;border-collapse:collapse;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.08)}
-.mat-table thead tr{background:#1e3a8a}
-.mat-table.am thead tr{background:#f59e0b}
-.mat-table.pm thead tr{background:#1e3a8a}
-.mat-table thead th{padding:10px 12px;text-align:left;font-size:12px;font-weight:700;color:#fff;white-space:nowrap}
-.mat-table thead th.num{width:36px;text-align:center}
-.mat-table thead th.qty{text-align:right}
-.mat-table tbody tr{border-bottom:1px solid #e8edf4;transition:.15s}
-.mat-table tbody tr:last-child{border-bottom:none}
-.mat-table tbody tr:nth-child(odd){background:#ffffff}
-.mat-table tbody tr:nth-child(even){background:#eef3fa}
-.mat-table tbody tr:hover{background:#dde8f5}
-.mat-table tbody tr.checked-row td{text-decoration:line-through;color:#9ca3af!important;opacity:.65;background:#f0fdf4}
-.mat-table td{padding:9px 12px;font-size:13px;vertical-align:middle}
-.mat-table td.num{text-align:center;color:#94a3b8;font-size:12px}
-.mat-table td.code{font-family:monospace;font-size:12px;color:#475569;white-space:nowrap}
-.mat-table td.name{font-weight:600;color:#111}
-.mat-table td.remark{font-size:11px;color:#64748b}
-.mat-table td.unit{color:#64748b;white-space:nowrap}
-.mat-table td.qty{text-align:right;font-weight:800;font-size:15px;color:#1e3a8a;white-space:nowrap}
-.mat-table td.location{font-size:12px;color:#059669;font-weight:600;white-space:nowrap}
-.check-btn{width:100%;margin-top:0;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#64748b;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:.2s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
+.mat-list{display:flex;flex-direction:column;gap:10px}
+.mat-card{background:#fff;border-radius:16px;padding:14px;box-shadow:0 2px 8px rgba(0,0,0,.08);transition:.2s}
+.mat-card.checked-row{background:#f1f5f9;opacity:.75}
+.mat-card.checked-row .mat-card-left{display:none}
+.mat-card.checked-row .mat-card-info{opacity:.45}
+.mat-card.checked-row .mat-card-bottom{justify-content:flex-end;margin-top:6px}
+.mat-card.checked-row .mat-card-num{background:#94a3b8!important}
+.mat-card-header{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
+.mat-card-num{background:#1e3a8a;color:#fff;border-radius:50%;width:24px;height:24px;min-width:24px;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:2px}
+.mat-card.am .mat-card-num{background:#f59e0b}
+.mat-card-info{flex:1;min-width:0;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.mat-card-name{font-size:16px;font-weight:800;color:#111;font-family:monospace;letter-spacing:-.01em;word-break:break-word}
+.mat-card-meta{font-size:16px;color:#111;font-family:monospace;font-weight:800;letter-spacing:-.01em}
+.mat-card-bottom{display:flex;gap:8px;align-items:stretch;margin-bottom:0}
+.mat-card-left{display:flex;flex-direction:column;gap:6px;flex:1}
+.mat-card-stats{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px}
+.mat-stat{border-radius:10px;padding:8px 6px;text-align:center;background:#eef2fb;border:1px solid #dde5f5}
+.mat-stat:nth-child(2){background:#e8eef8;border-color:#d4dfef}
+.mat-stat:nth-child(3){background:#ffedd5;border-color:#fed7aa}
+.mat-stat:nth-child(3) .mat-stat-value{color:#92400e}
+.mat-stat:nth-child(4){background:#dcfce7;border-color:#bbf7d0}
+.mat-stat:nth-child(4) .mat-stat-value{color:#166534;font-size:13px}
+.mat-stat-label{font-size:10px;font-weight:600;margin-bottom:4px;color:#64748b;text-transform:uppercase;letter-spacing:.03em}
+.mat-stat-value{font-size:15px;font-weight:800;color:#1e3a8a;word-break:break-all}
+.mat-stat:nth-child(4) .mat-stat-value{font-size:13px}
+.check-btn{width:58px;min-width:58px;padding:8px 4px;border:2px solid #dde5f5;border-radius:14px;background:#fff;color:#64748b;font-size:11px;font-weight:700;font-family:inherit;cursor:pointer;transition:.2s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;-webkit-tap-highlight-color:transparent;line-height:1.2}
 .check-btn:active{transform:scale(.97)}
-.check-btn.checked{border-color:#22c55e;background:#22c55e;color:#fff}
+.check-btn.checked{border-color:#1e3a8a;background:#1e3a8a;color:#fff;box-shadow:0 4px 12px rgba(30,58,138,.25)}
 
 .empty-state{background:rgba(255,255,255,.8);backdrop-filter:blur(12px);border-radius:20px;padding:40px 20px;text-align:center;color:#94a3b8}
 .empty-icon{font-size:48px;margin-bottom:12px}
@@ -92,9 +96,6 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
 .auto-badge{background:linear-gradient(135deg,rgba(34,197,94,.15),rgba(22,163,74,.1));color:#166534;border:1px solid rgba(34,197,94,.3);padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600}
 
 
-.check-btn{width:100%;margin-top:12px;padding:13px;border:2px solid rgba(59,130,246,.2);border-radius:14px;background:rgba(255,255,255,.9);color:#64748b;font-size:15px;font-weight:700;font-family:inherit;cursor:pointer;transition:.2s;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent}
-.check-btn:active{transform:scale(.97)}
-.check-btn.checked{border-color:#22c55e;background:linear-gradient(135deg,#22c55e,#16a34a);color:#fff;box-shadow:0 6px 18px rgba(34,197,94,.3)}
 
 @media print{
   .header,.status-bar,.toast,.bg-blobs{display:none!important}
@@ -240,11 +241,11 @@ function toggleCheck(ck){
   if(checkedItems[ck]){
     row.classList.add('checked-row');
     btn.classList.add('checked');
-    btn.textContent = '✅';
+    btn.innerHTML = '✅ 출고완료';
   } else {
     row.classList.remove('checked-row');
     btn.classList.remove('checked');
-    btn.textContent = '☐';
+    btn.innerHTML = '☐ 출고완료';
   }
 
   // 완료 현황 업데이트
@@ -385,40 +386,37 @@ function renderMain(){
     return;
   }
 
-  var html = '<table class="mat-table '+currentShift+'">'
-    +'<thead><tr>'
-    +'<th class="num">#</th>'
-    +'<th>품목코드</th>'
-    +'<th>품목명</th>'
-    +'<th>비고</th>'
-    +'<th>단위</th>'
-    +'<th class="qty">필요소요량</th>'
-    +'<th class="qty">BOX적입량</th>'
-    +'<th class="qty">박스수</th>'
-    +'<th>적재위치</th>'
-    +'<th></th>'
-    +'</tr></thead><tbody>';
-
+  var html = '<div class="mat-list">';
   items.forEach(function(m, i){
     var ck = ((m.code||'')+'_'+(m.line||'')).replace(/[^a-zA-Z0-9_\-]/g,'_');
     var isChecked = checkedItems[ck];
-    html += '<tr class="'+(isChecked?'checked-row':'')+'" id="card-'+ck+'">'
-      +'<td class="num">'+(i+1)+'</td>'
-      +'<td class="code">'+esc(m.code||'')+'</td>'
-      +'<td class="name">'+esc(m.name||'')+'</td>'
-      +'<td class="remark">'+esc(m.remark||'')+'</td>'
-      +'<td class="unit">'+esc(m.unit||'EA')+'</td>'
-      +'<td class="qty">'+fmtQty(m.qty)+'</td>'
-      +'<td class="qty">'+(m.pack_qty>0?fmtQty(m.pack_qty):'-')+'</td>'
-      +'<td class="qty">'+(m.box_count>0?m.box_count:'-')+'</td>'
-      +'<td class="location">'+esc(m.location||'')+'</td>'
-      +'<td><button class="check-btn'+(isChecked?' checked':'')+'" onclick="toggleCheck(\''+ck+'\')">'
-      +(isChecked?'✅':'☐')
-      +'</button></td>'
-      +'</tr>';
+    var pq = m.pack_qty || 0;
+    var bc = m.box_count || 0;
+    html += '<div class="mat-card '+(isChecked?'checked-row ':'')+currentShift+'" id="card-'+ck+'">'
+      +'<div class="mat-card-header">'
+        +'<div class="mat-card-num">'+(i+1)+'</div>'
+        +'<div class="mat-card-info">'
+          +'<div class="mat-card-meta">'+esc(m.code||'')+'</div>'
+          +'<div class="mat-card-name">'+esc(m.name||'')+(m.remark?'<span style="color:#94a3b8"> · '+esc(m.remark)+'</span>':'')+(m.unit?' <span style="color:#94a3b8;font-size:11px">'+esc(m.unit)+'</span>':'')+'</div>'
+        +'</div>'
+      +'</div>'
+      +'<div class="mat-card-bottom">'
+        +'<div class="mat-card-left">'
+          +'<div class="mat-card-stats">'
+            +'<div class="mat-stat"><div class="mat-stat-label">필요소요량</div><div class="mat-stat-value">'+fmtQty(m.qty)+'</div></div>'
+            +'<div class="mat-stat"><div class="mat-stat-label">BOX적입량</div><div class="mat-stat-value">'+(pq>0?fmtQty(pq):'-')+'</div></div>'
+            +'<div class="mat-stat"><div class="mat-stat-label">박스수</div><div class="mat-stat-value">'+(bc>0?bc:'-')+'</div></div>'
+            +'<div class="mat-stat"><div class="mat-stat-label">적재위치</div><div class="mat-stat-value">'+(m.location?esc(m.location):'-')+'</div></div>'
+          +'</div>'
+        +'</div>'
+        +'<button class="check-btn'+(isChecked?' checked':'')+'" onclick="toggleCheck(\''+ck+'\')">'
+          +'<span style="font-size:18px">'+(isChecked?'✅':'☐')+'</span>'
+          +'<span>'+(isChecked?'완료':'출고')+'</span>'
+        +'</button>'
+      +'</div>'
+    +'</div>';
   });
-
-  html += '</tbody></table>';
+  html += '</div>';
 
   // 하단 여백 (status-bar 가림 방지)
   html += '<div style="height:60px"></div>';
