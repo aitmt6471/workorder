@@ -1266,7 +1266,9 @@ function clearConfirmedData(){
     woAssign={};
     woSplitQty={};
     directMats={am:[],pm:[]};
+    renderPlan('am'); renderPlan('pm');
     renderDirect('am'); renderDirect('pm');
+    calcAll();
     savePlans();
     renderWO();
     showToast('🗑 초기화 완료 — 피더뷰에서 삭제됩니다');
