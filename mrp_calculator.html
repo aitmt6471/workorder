@@ -1299,6 +1299,7 @@ function confirmToN8N(){
     saveResultData();
     var dateLabel = (parseInt(woDate.slice(4,6)))+'/'+parseInt(woDate.slice(6,8));
     sendNtfy('✅ 자재 출고 확정', dateLabel+' 확정 완료\nAM: '+amMats.length+'종 / PM: '+pmMats.length+'종\n피더뷰를 확인하세요');
+    fetch(N8N_BASE+'/webhook/mrp/push/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'📦 자재 출고 확정',body:dateLabel+' 확정 — AM: '+amMats.length+'종 / PM: '+pmMats.length+'종\n피더뷰를 확인하세요'})}).catch(function(){});
   })
   .catch(function(e){ showToast('❌ 확정 저장 실패: '+e.message,true); });
 }

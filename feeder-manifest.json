@@ -1,15 +1,24 @@
 {
   "name": "자재 출고 요청서",
   "short_name": "출고요청서",
-  "start_url": "/feeder",
+  "start_url": "https://aitmt6471.github.io/workorder/feeder_view.html",
+  "scope": "https://aitmt6471.github.io/workorder/",
   "display": "standalone",
-  "background_color": "#f0f2f5",
-  "theme_color": "#1a3a6b",
+  "background_color": "#1e3a8a",
+  "theme_color": "#1e3a8a",
+  "orientation": "portrait",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231a3a6b'/><text y='.9em' font-size='70' x='50%' text-anchor='middle'>📦</text></svg>",
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%231e3a8a'/><text y='330' x='256' font-size='210' text-anchor='middle' font-family='Arial,sans-serif' font-weight='800' fill='white'>AIT</text></svg>",
       "sizes": "any",
-      "type": "image/svg+xml"
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='80' fill='%231e3a8a'/><text y='330' x='256' font-size='210' text-anchor='middle' font-family='Arial,sans-serif' font-weight='800' fill='white'>AIT</text></svg>",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }
