@@ -21,7 +21,7 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
 
 .header{background:#ffffff;color:#111111;padding:14px 18px;display:flex;align-items:center;gap:14px;position:relative;overflow:hidden;border-bottom:1px solid #e5e7eb}
 .header::after{display:none}
-.header h1{font-size:17px;font-weight:800;letter-spacing:-.02em;color:#111111}
+.header h1{font-size:22px;font-weight:800;letter-spacing:-.02em;color:#111111}
 .header small{font-size:11px;color:#6b7280}
 
 .page{display:flex;flex-direction:column;gap:12px;padding:12px;min-height:calc(100vh - 56px)}
@@ -169,6 +169,35 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
 .wo-readonly{flex-shrink:0;width:92px;display:flex;align-items:center;justify-content:center;font-size:11px;color:#9ca3af;background:#f9fafb;border-left:1px solid #e5e7eb}
 .wo-actions{display:flex;gap:8px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(30,58,138,.1)}
 .wo-empty{text-align:center;color:#cbd5e1;padding:20px;font-size:13px}
+.line-filter-wrap{padding:6px 8px 2px;border-bottom:1px solid #f0f4fa}
+.line-filter-input{width:100%;padding:7px 12px;border:1px solid #d1d5db;border-radius:10px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box}
+.line-filter-input:focus{border-color:#1e3a8a;box-shadow:0 0 0 2px rgba(30,58,138,.1)}
+.wo-split-row{margin-top:8px;padding-top:8px;border-top:1px dashed #e5e7eb}
+.wo-split-c-row{display:flex;align-items:center;gap:5px;margin-bottom:5px;flex-wrap:wrap}
+.wo-split-tag{font-size:11px;font-weight:800;padding:2px 6px;border-radius:6px;white-space:nowrap}
+.am-tag{background:#fef3c7;color:#92400e}
+.pm-tag{background:#dbeafe;color:#1e3a8a}
+.wo-split-input{width:80px;padding:6px 8px;border:1px solid #d1d5db;border-radius:8px;font-size:15px;font-family:inherit;text-align:right;font-weight:700}
+.wo-split-input:focus{outline:none;border-color:#f59e0b}
+.wo-split-plus{font-size:13px;color:#94a3b8;font-weight:700}
+.wo-split-eq{font-size:12px;font-weight:700;color:#10b981;white-space:nowrap;margin-left:2px}
+.wo-split-eq.error{color:#ef4444}
+.wo-split-btn{width:100%;padding:6px 0;border:none;border-radius:8px;background:#cc0000;color:#fff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer}
+.wo-split-btn:active{background:#a80000}
+.wo-btn-assign{flex:1;padding:0;border:none;border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;background:linear-gradient(135deg,#f97316,#fb923c);color:#fff;-webkit-tap-highlight-color:transparent}
+.wo-btn-assign:active{background:linear-gradient(135deg,#ea580c,#f97316)}
+.wo-btn-cancel{flex:1;padding:0;border:2px solid #cbd5e1;border-radius:12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;width:100%;background:#f8fafc;color:#64748b;-webkit-tap-highlight-color:transparent}
+.wo-btn-cancel:active{background:#e2e8f0}
+.sw-content.split-active{border-left-color:#a855f7;background:rgba(168,85,247,.05)}
+.wo-priority-row{display:flex;align-items:center;gap:4px;margin-top:6px;padding-top:6px;border-top:1px dashed #e5e7eb}
+.wo-priority-badge{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:#fff3f3;color:#cc0000;border:1.5px solid #fca5a5;font-size:11px;font-weight:800;flex-shrink:0}
+.wo-priority-btns{display:flex;gap:3px;margin-left:auto}
+.wo-priority-btn{padding:4px 8px;border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;line-height:1;-webkit-tap-highlight-color:transparent}
+.wo-priority-btn.up{background:#cc0000}
+.wo-priority-btn.up:active{background:#a80000}
+.wo-priority-btn.down{background:#1e3a8a}
+.wo-priority-btn.down:active{background:#16306e}
+.sw-content.priority-top{border-left:4px solid #f59e0b!important}
 </style>
 </head>
 <body>
@@ -181,10 +210,17 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
 
 <div class="header">
   <img src="ait-logo.png" alt="AIT" style="height:36px;width:auto;object-fit:contain;flex-shrink:0">
-  <div style="display:flex;flex-direction:column;gap:2px">
+  <div style="display:flex;flex-direction:column;gap:2px;flex:1">
     <h1>생산계획 작업지시서</h1>
-    <small>BOM조회_Recent.xls &nbsp;|&nbsp; mg 단위 제외 &nbsp;|&nbsp; 완제품 1,219종</small>
   </div>
+  <button onclick="toggleNtfySetting()" title="푸시 알림 설정" style="background:none;border:none;font-size:20px;cursor:pointer;padding:2px 4px;color:#6b7280;flex-shrink:0">⚙️</button>
+</div>
+<div id="ntfy-panel" style="display:none;padding:8px 18px;background:#f8fafc;border-bottom:1px solid #e5e7eb;align-items:center;gap:8px;flex-wrap:wrap">
+  <span style="font-size:12px;color:#6b7280;white-space:nowrap">📱 ntfy 토픽</span>
+  <input id="mrp-ntfy-header-input" type="text" placeholder="예: ait-mrp-1234"
+    style="flex:1;min-width:140px;padding:6px 10px;border:1px solid #d1d5db;border-radius:10px;font-size:12px;font-family:inherit">
+  <button onclick="saveNtfyTopicHeader()"
+    style="padding:6px 14px;border:none;border-radius:10px;background:#1e3a8a;color:#fff;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer">저장</button>
 </div>
 
 <!-- 날짜 바 -->
@@ -219,11 +255,41 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
       </div>
     </div>
 
+    <!-- 부품 직접추가 -->
+    <div class="card">
+      <div class="ch">부품 직접추가 <span style="font-size:11px;font-weight:normal;color:#888">BOM 없이 직접 출고요청</span></div>
+      <div class="cb">
+        <div class="acw">
+          <input type="text" id="part-srch" placeholder="부품명 또는 품번 검색..." autocomplete="off">
+          <div class="dd" id="part-dd"></div>
+        </div>
+        <div class="irow" style="margin-top:7px">
+          <span class="lbl">수량</span>
+          <input type="number" id="part-qty" value="1" min="1">
+        </div>
+        <div class="brow">
+          <button class="btn btn-am" onclick="addDirect('am')" style="flex:1">오전 추가</button>
+          <button class="btn btn-pm" onclick="addDirect('pm')" style="flex:1">오후 추가</button>
+        </div>
+        <div style="margin-top:8px">
+          <div style="display:flex;gap:6px;margin-bottom:6px">
+            <button id="dtab-am" class="stab active" onclick="switchDirectTab('am')" style="flex:1">오전</button>
+            <button id="dtab-pm" class="stab" onclick="switchDirectTab('pm')" style="flex:1">오후</button>
+          </div>
+          <div id="direct-am"><table class="pt"><thead><tr><th>품번</th><th>품목명</th><th>수량</th><th></th></tr></thead><tbody id="dtb-am"><tr><td colspan="4" class="pempty">추가된 부품 없음</td></tr></tbody></table></div>
+          <div id="direct-pm" style="display:none"><table class="pt"><thead><tr><th>품번</th><th>품목명</th><th>수량</th><th></th></tr></thead><tbody id="dtb-pm"><tr><td colspan="4" class="pempty">추가된 부품 없음</td></tr></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
     <!-- 작업지시 자동 로드 -->
     <div class="card">
       <div class="ch">
         작업지시 자동 로드
         <span id="wo-status" style="font-size:11px;font-weight:normal;color:#888">날짜 선택</span>
+      </div>
+      <div class="line-filter-wrap">
+        <input class="line-filter-input" id="line-filter" type="text" placeholder="🔍 라인 검색..." oninput="filterLines(this.value)">
       </div>
       <div class="cb" id="wo-body" style="padding:8px;max-height:340px;overflow-y:auto">
         <div class="wo-empty">날짜 바에서 날짜를 선택하세요</div>
@@ -290,15 +356,15 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
       <div id="rpanel-am" class="rpanel active">
         <div class="sumbar am" id="sum-am" style="display:none"></div>
         <div style="overflow-x:auto"><table class="rt">
-          <thead><tr><th>#</th><th>품목코드</th><th>품목명</th><th>비고</th><th>단위</th><th>총 소요량</th></tr></thead>
-          <tbody id="rt-am"><tr><td colspan="6" class="nd">생산계획 입력 후 [소요량 계산] 클릭</td></tr></tbody>
+          <thead><tr><th>#</th><th>품목코드</th><th>품목명</th><th>비고</th><th>단위</th><th>필요소요량</th><th>BOX적입량</th><th>박스수</th></tr></thead>
+          <tbody id="rt-am"><tr><td colspan="8" class="nd">생산계획 입력 후 [소요량 계산] 클릭</td></tr></tbody>
         </table></div>
       </div>
       <div id="rpanel-pm" class="rpanel">
         <div class="sumbar pm" id="sum-pm" style="display:none"></div>
         <div style="overflow-x:auto"><table class="rt">
-          <thead><tr><th>#</th><th>품목코드</th><th>품목명</th><th>비고</th><th>단위</th><th>총 소요량</th></tr></thead>
-          <tbody id="rt-pm"><tr><td colspan="6" class="nd">생산계획 입력 후 [소요량 계산] 클릭</td></tr></tbody>
+          <thead><tr><th>#</th><th>품목코드</th><th>품목명</th><th>비고</th><th>단위</th><th>필요소요량</th><th>BOX적입량</th><th>박스수</th></tr></thead>
+          <tbody id="rt-pm"><tr><td colspan="8" class="nd">생산계획 입력 후 [소요량 계산] 클릭</td></tr></tbody>
         </table></div>
       </div>
     </div>
@@ -363,7 +429,7 @@ function clearConfirmHistory(){
 var MRP_SAVE_KEY = 'mrp_plans_';
 function savePlans(){
   if(!woDate) return;
-  try{ localStorage.setItem(MRP_SAVE_KEY+woDate, JSON.stringify({plans:plans,woAssign:woAssign})); }catch(e){}
+  try{ localStorage.setItem(MRP_SAVE_KEY+woDate, JSON.stringify({plans:plans,woAssign:woAssign,woSplitQty:woSplitQty,directMats:directMats})); }catch(e){}
 }
 function restorePlans(date){
   try{
@@ -371,9 +437,103 @@ function restorePlans(date){
     if(saved){
       plans=saved.plans||{am:[],pm:[]};
       woAssign=saved.woAssign||{};
-      renderPlan('am'); renderPlan('pm'); calcAll();
+      woSplitQty=saved.woSplitQty||{};
+      directMats=saved.directMats||{am:[],pm:[]};
+      renderPlan('am'); renderPlan('pm');
+      renderDirect('am'); renderDirect('pm');
+      calcAll();
     }
   }catch(e){}
+}
+
+/* ── 부품 직접추가 ── */
+var directMats = {am:[], pm:[]};
+var selPart = null, partAcIdx = -1, partAcMatches = [];
+var partList = [];
+function buildPartList(){
+  var seen={};
+  function addPart(m){ if(m.code&&!seen[m.code]){seen[m.code]=true;partList.push({code:m.code,name:m.name,remark:m.remark||'',unit:m.unit||'EA'});} }
+  Object.values(BD.bom2).forEach(function(mats){mats.forEach(addPart);});
+  Object.values(BD.bom3).forEach(function(subs){subs.forEach(addPart);});
+  partList.sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
+}
+document.addEventListener('DOMContentLoaded',function(){
+  if(typeof BD!=='undefined') buildPartList();
+});
+setTimeout(function(){ if(partList.length===0&&typeof BD!=='undefined') buildPartList(); },500);
+
+document.getElementById('part-srch').addEventListener('input',function(){
+  var q=this.value.trim().toLowerCase(), dd=document.getElementById('part-dd');
+  if(!q){dd.style.display='none';return;}
+  partAcMatches=partList.filter(function(p){
+    return p.name.toLowerCase().indexOf(q)>=0||p.code.toLowerCase().indexOf(q)>=0||(p.remark&&p.remark.toLowerCase().indexOf(q)>=0);
+  }).slice(0,60);
+  if(!partAcMatches.length){dd.style.display='none';return;}
+  dd.innerHTML=partAcMatches.map(function(p,i){
+    return '<div class="di" onclick="selPartItem('+i+')">'
+      +'<div>'+esc(p.name)+'</div>'
+      +'<div><span class="dc">['+p.code+']</span>'+(p.remark?' <span class="dr">'+esc(p.remark)+'</span>':'')+'</div>'
+      +'</div>';
+  }).join('');
+  dd.style.display='block'; partAcIdx=-1;
+});
+document.getElementById('part-srch').addEventListener('keydown',function(e){
+  var dd=document.getElementById('part-dd'),items=dd.querySelectorAll('.di');
+  if(e.key==='ArrowDown'){partAcIdx=Math.min(partAcIdx+1,items.length-1);hiAC(items);e.preventDefault();}
+  else if(e.key==='ArrowUp'){partAcIdx=Math.max(partAcIdx-1,0);hiAC(items);e.preventDefault();}
+  else if(e.key==='Enter'){if(partAcIdx>=0)selPartItem(partAcIdx);}
+  else if(e.key==='Escape')dd.style.display='none';
+});
+document.addEventListener('click',function(e){
+  var s=document.getElementById('part-srch'),dd=document.getElementById('part-dd');
+  if(s&&dd&&!s.contains(e.target)&&!dd.contains(e.target))dd.style.display='none';
+});
+function selPartItem(i){
+  selPart=partAcMatches[i];
+  document.getElementById('part-srch').value='['+selPart.code+'] '+selPart.name;
+  document.getElementById('part-dd').style.display='none';
+}
+function addDirect(sh){
+  if(!selPart){alert('부품을 검색하여 선택하세요.');return;}
+  var qty=parseFloat(document.getElementById('part-qty').value)||1;
+  if(qty<=0){alert('수량을 1 이상 입력하세요.');return;}
+  var existing=directMats[sh].find(function(m){return m.code===selPart.code;});
+  if(existing){existing.qty+=qty;}
+  else{directMats[sh].push({code:selPart.code,name:selPart.name,remark:selPart.remark,unit:selPart.unit,qty:qty});}
+  renderDirect(sh);
+  switchDirectTab(sh);
+  document.getElementById('part-srch').value='';
+  document.getElementById('part-qty').value='1';
+  selPart=null;
+  calcAll(); savePlans();
+}
+function delDirect(sh,i){directMats[sh].splice(i,1);renderDirect(sh);calcAll();savePlans();}
+function renderDirect(sh){
+  var tb=document.getElementById('dtb-'+sh);
+  if(!directMats[sh].length){tb.innerHTML='<tr><td colspan="4" class="pempty">추가된 부품 없음</td></tr>';return;}
+  tb.innerHTML=directMats[sh].map(function(p,i){
+    return '<tr>'
+      +'<td><code style="font-size:11px">'+p.code+'</code></td>'
+      +'<td>'+esc(p.name)+(p.remark?'<br><span style="font-size:10px;color:#6b7280">'+esc(p.remark)+'</span>':'')+'</td>'
+      +'<td><strong>'+p.qty+'</strong> '+p.unit+'</td>'
+      +'<td><button class="btn btn-danger" onclick="delDirect(\''+sh+'\','+i+')">×</button></td>'
+      +'</tr>';
+  }).join('');
+}
+function switchDirectTab(sh){
+  document.getElementById('dtab-am').classList.toggle('active',sh==='am');
+  document.getElementById('dtab-pm').classList.toggle('active',sh==='pm');
+  document.getElementById('direct-am').style.display=sh==='am'?'':'none';
+  document.getElementById('direct-pm').style.display=sh==='pm'?'':'none';
+}
+function mergeWithDirect(exploded,directs){
+  var agg={};
+  exploded.forEach(function(m){agg[m.code]=Object.assign({},m);});
+  directs.forEach(function(m){
+    if(agg[m.code])agg[m.code].qty+=m.qty;
+    else agg[m.code]=Object.assign({},m);
+  });
+  return Object.values(agg).sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
 }
 var selProd = null;
 var acIdx = -1, acMatches = [];
@@ -499,15 +659,39 @@ function explode(planList){
   return Object.values(agg).sort(function(a,b){return a.name.localeCompare(b.name,'ko');});
 }
 
+var packQtyData = {}; // { 품목코드: 적입량 }
+var locationData = {}; // { 품목코드: 적재위치 }
+
+function fetchPackQty(codes){
+  if(!codes||!codes.length) return;
+  fetch(N8N_BASE+'/webhook/pack-qty',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},
+    body:JSON.stringify({codes:codes})
+  })
+  .then(function(r){ return r.text(); })
+  .then(function(text){
+    if(!text||!text.trim()) throw new Error('empty response');
+    var data=JSON.parse(text);
+    packQtyData=data.items||{};
+    locationData=data.locations||{};
+    renderResult('am',resultData.am);
+    renderResult('pm',resultData.pm);
+  })
+  .catch(function(e){ console.warn('[적입량] 조회 실패 (WF4 비활성 또는 네트워크 오류):',e); });
+}
+
 function renderResult(sh, rows){
   var tb=document.getElementById('rt-'+sh);
   var sum=document.getElementById('sum-'+sh);
   if(!rows.length){
-    tb.innerHTML='<tr><td colspan="6" class="nd">BOM 데이터 없음</td></tr>';
+    tb.innerHTML='<tr><td colspan="8" class="nd">BOM 데이터 없음</td></tr>';
     sum.style.display='none'; return;
   }
   tb.innerHTML=rows.map(function(r,i){
     var utag=r.unit==='SET'?'<span class="tag tset">SET</span>':'<span class="tag tea">EA</span>';
+    var pq=packQtyData[r.code]||0;
+    var boxCount=pq>0?Math.ceil(r.qty/pq):'-';
     return '<tr>'
       +'<td style="color:#bbb">'+(i+1)+'</td>'
       +'<td><code style="font-size:11px">'+r.code+'</code></td>'
@@ -515,6 +699,8 @@ function renderResult(sh, rows){
       +'<td style="font-size:11px;color:#999">'+esc(r.remark)+'</td>'
       +'<td class="uc">'+utag+'</td>'
       +'<td class="qc">'+fmt(r.qty)+'</td>'
+      +'<td class="qc" style="color:#6b7280;font-size:12px">'+(pq>0?fmt(pq):'-')+'</td>'
+      +'<td class="qc" style="color:#1e3a8a;font-weight:800">'+(typeof boxCount==='number'?fmt(boxCount):'-')+'</td>'
       +'</tr>';
   }).join('');
   var tq=plans[sh].reduce(function(a,p){return a+p.qty;},0);
@@ -528,11 +714,21 @@ function renderResult(sh, rows){
 }
 
 function calcAll(){
-  if(!plans.am.length&&!plans.pm.length){alert('오전 또는 오후 생산계획을 먼저 입력하세요.');return;}
-  resultData.am=explode(plans.am);
-  resultData.pm=explode(plans.pm);
+  if(!plans.am.length&&!plans.pm.length&&!directMats.am.length&&!directMats.pm.length){
+    resultData={am:[],pm:[]};
+    renderResult('am',[]);
+    renderResult('pm',[]);
+    saveResultData();
+    return;
+  }
+  resultData.am=mergeWithDirect(explode(plans.am),directMats.am);
+  resultData.pm=mergeWithDirect(explode(plans.pm),directMats.pm);
   renderResult('am',resultData.am);
   renderResult('pm',resultData.pm);
+  // 적입량 조회 (BOM 전개 후 품목코드 수집)
+  var allCodes=[].concat(resultData.am,resultData.pm).map(function(r){return r.code;});
+  allCodes=allCodes.filter(function(c,i){ return c&&allCodes.indexOf(c)===i; });
+  if(allCodes.length) fetchPackQty(allCodes);
   // 결과 있는 탭으로 자동 전환
   switchResult(plans.am.length?'am':'pm');
   document.getElementById('result-tabs').scrollIntoView({behavior:'smooth'});
@@ -552,8 +748,12 @@ function doExport(){
   var rows=resultData[sh];
   if(!rows||!rows.length){alert('먼저 소요량 계산을 실행하세요.');return;}
   var label=sh==='am'?'오전':'오후';
-  var header=['#','품목코드','품목명','비고','단위','총 소요량'];
-  var data=[header].concat(rows.map(function(r,i){return [i+1,r.code,r.name,r.remark,r.unit,r.qty];}));
+  var header=['#','품목코드','품목명','비고','단위','필요소요량','BOX적입량','박스수'];
+  var data=[header].concat(rows.map(function(r,i){
+    var pq=packQtyData[r.code]||0;
+    var box=pq>0?Math.ceil(r.qty/pq):'';
+    return [i+1,r.code,r.name,r.remark,r.unit,r.qty,pq||'',box];
+  }));
   var csv=data.map(function(row){
     return row.map(function(c){
       var s=String(c===null||c===undefined?'':c);
@@ -576,9 +776,99 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
    n8n 연동: 작업지시 자동 로드 + 확정 전송
    ══════════════════════════════════════════════════════ */
 var N8N_BASE = 'https://aitechn8n.ngrok.app';
+var NTFY_TOPIC = localStorage.getItem('ntfy_topic') || '';
+
+/* ntfy 푸시 알림 전송 */
+function sendNtfy(title, body){
+  var topic = localStorage.getItem('ntfy_topic') || '';
+  if(!topic) return;
+  fetch('https://ntfy.sh/'+encodeURIComponent(topic), {
+    method:'POST',
+    body: body,
+    headers:{
+      'Title': title,
+      'Priority': 'high',
+      'Tags': 'package',
+      'Content-Type': 'text/plain; charset=utf-8'
+    }
+  }).catch(function(){});
+}
+
+function saveNtfyTopic(){
+  var val = (document.getElementById('mrp-ntfy-input')||{}).value || '';
+  val = val.trim();
+  localStorage.setItem('ntfy_topic', val);
+  NTFY_TOPIC = val;
+  showToast(val ? '📱 ntfy 토픽 저장: '+val : '📱 ntfy 알림 비활성화');
+}
+function saveNtfyTopicHeader(){
+  var val = (document.getElementById('mrp-ntfy-header-input')||{}).value || '';
+  val = val.trim();
+  localStorage.setItem('ntfy_topic', val);
+  NTFY_TOPIC = val;
+  document.getElementById('ntfy-panel').style.display='none';
+  showToast(val ? '📱 ntfy 토픽 저장: '+val : '📱 ntfy 알림 비활성화');
+}
+function toggleNtfySetting(){
+  var p=document.getElementById('ntfy-panel');
+  var inp=document.getElementById('mrp-ntfy-header-input');
+  var visible=p.style.display==='flex';
+  p.style.display=visible?'none':'flex';
+  if(!visible&&inp){ inp.value=localStorage.getItem('ntfy_topic')||''; inp.focus(); }
+}
 var woDate = null;
 var woData = [];
-var woAssign = {}; // key: wo_no+'_'+seq → 'am'|'pm'|null
+var woAssign = {}; // key: wo_no+'_'+seq → 'am'|'pm'|'split'|null
+var woSplitQty = {}; // key → am qty (remainder goes to pm)
+var lineFilter = '';
+var woPriority = {}; // key: lineKey → [wo_key_ordered...]
+
+function filterLines(val){
+  lineFilter = val || '';
+  renderWO();
+}
+
+/* 우선순위 저장/복원 */
+function savePriority(){
+  if(!woDate) return;
+  try{ localStorage.setItem('mrp_priority_'+woDate, JSON.stringify(woPriority)); }catch(e){}
+}
+function loadPriority(date){
+  woPriority={};
+  try{
+    var saved=JSON.parse(localStorage.getItem('mrp_priority_'+date)||'null');
+    if(saved&&typeof saved==='object') woPriority=saved;
+  }catch(e){}
+}
+function initPriorityDefaults(){
+  var lmap={};
+  woData.forEach(function(wo){
+    if(wo.line_name==='사출') return;
+    var k=wo.line_name||wo.line_code||'미지정';
+    if(!lmap[k]) lmap[k]=[];
+    lmap[k].push(wo.wo_no+'_'+wo.seq);
+  });
+  Object.keys(lmap).forEach(function(ln){
+    if(!woPriority[ln]){
+      woPriority[ln]=lmap[ln].slice();
+    } else {
+      lmap[ln].forEach(function(k){ if(woPriority[ln].indexOf(k)===-1) woPriority[ln].push(k); });
+      woPriority[ln]=woPriority[ln].filter(function(k){ return lmap[ln].indexOf(k)>=0; });
+    }
+  });
+}
+function movePriorityWO(ln,key,dir){
+  var order=woPriority[ln];
+  if(!order) return;
+  var idx=order.indexOf(key);
+  if(idx===-1) return;
+  var nIdx=idx+dir;
+  if(nIdx<0||nIdx>=order.length) return;
+  order.splice(idx,1);
+  order.splice(nIdx,0,key);
+  savePriority();
+  renderWO();
+}
 
 function _pad(n){ return String(n).padStart(2,'0'); }
 function _toYMD(d){ return d.getFullYear()+_pad(d.getMonth()+1)+_pad(d.getDate()); }
@@ -614,6 +904,8 @@ function selectWODate(date){
   woDate=date;
   plans={am:[],pm:[]};
   woAssign={};
+  woSplitQty={};
+  loadPriority(date);
   buildDateBar();
   loadWorkOrders();
   restorePlans(date);
@@ -633,6 +925,7 @@ function loadWorkOrders(){
     .then(function(text){ return (text&&text.trim()) ? JSON.parse(text) : {orders:[]}; })
     .then(function(data){
       woData=data.orders||[];
+      initPriorityDefaults();
       renderWO();
       if(status) status.textContent=woData.length+'건';
     })
@@ -710,9 +1003,27 @@ function renderWO(){
     lines[k].push(wo);
   });
 
+  // 라인별 우선순위 정렬
+  Object.keys(lines).forEach(function(ln){
+    var order=woPriority[ln];
+    if(order&&order.length){
+      lines[ln].sort(function(a,b){
+        var ka=a.wo_no+'_'+a.seq, kb=b.wo_no+'_'+b.seq;
+        var ia=order.indexOf(ka), ib=order.indexOf(kb);
+        if(ia===-1)ia=999; if(ib===-1)ib=999;
+        return ia-ib;
+      });
+    }
+  });
+
   var lnKeys=Object.keys(lines).sort();
+  // 라인 검색 필터
+  if(lineFilter){
+    var lf=lineFilter.toLowerCase();
+    lnKeys=lnKeys.filter(function(k){ return k.toLowerCase().indexOf(lf)>=0; });
+  }
   // 첫 로드 시 모든 라인 기본 열기
-  lnKeys.forEach(function(ln,i){ if(accOpen[ln]===undefined) accOpen[ln]=true; });
+  lnKeys.forEach(function(ln){ if(accOpen[ln]===undefined) accOpen[ln]=true; });
 
   var html=lnKeys.map(function(ln){
     var wos=lines[ln];
@@ -723,20 +1034,52 @@ function renderWO(){
     var isOpen=!!accOpen[ln];
     var items=wos.map(function(wo){
       var key=wo.wo_no+'_'+wo.seq;
-      var amA=woAssign[key]==='am', pmA=woAssign[key]==='pm';
-      var cls=amA?' am-active':pmA?' pm-active':'';
+      var isSplit=woAssign[key]==='split';
+      var amA=woAssign[key]==='am'||isSplit, pmA=woAssign[key]==='pm'||isSplit;
+      var priorityRank=(woPriority[ln]||[]).indexOf(key);
+      var topCls=priorityRank===0?' priority-top':'';
+      var cls=(isSplit?' split-active':amA?' am-active':pmA?' pm-active':'')+topCls;
+      var splitInfo=isSplit&&woSplitQty[key]
+        ? '<div class="wo-qty-row" style="color:#a855f7;font-size:14px"><span class="wo-qty-label">분할: </span>오전 '+fmt(woSplitQty[key].am)+' / 오후 '+fmt(woSplitQty[key].pm)+'</div>'
+        : amA
+          ? '<div class="wo-qty-row" style="color:#d97706;font-size:14px"><span class="wo-qty-label">오전 배정: </span>'+fmt(wo.qty)+'</div>'
+          : pmA
+            ? '<div class="wo-qty-row" style="color:#1e3a8a;font-size:14px"><span class="wo-qty-label">오후 배정: </span>'+fmt(wo.qty)+'</div>'
+            : '<div class="wo-qty-row"><span class="wo-qty-label">수량: </span>'+fmt(wo.qty)+'</div>';
+      var splitRow=(!isPast&&!(amA||pmA))
+        ? '<div class="wo-split-row">'
+          +'<div class="wo-split-c-row">'
+          +'<span class="wo-split-tag am-tag">AM</span>'
+          +'<input class="wo-split-input" id="spl-am-'+key+'" type="number" min="0" max="'+wo.qty+'" value="'+Math.floor(wo.qty/2)+'" onclick="event.stopPropagation()" oninput="event.stopPropagation();syncSplit(\''+key+'\',\'am\','+wo.qty+')">'
+          +'<span class="wo-split-plus">+</span>'
+          +'<span class="wo-split-tag pm-tag">PM</span>'
+          +'<input class="wo-split-input" id="spl-pm-'+key+'" type="number" min="0" max="'+wo.qty+'" value="'+(wo.qty-Math.floor(wo.qty/2))+'" onclick="event.stopPropagation()" oninput="event.stopPropagation();syncSplit(\''+key+'\',\'pm\','+wo.qty+')">'
+          +'<span class="wo-split-eq" id="spl-eq-'+key+'">=&nbsp;'+fmt(wo.qty)+'</span>'
+          +'</div>'
+          +'</div>'
+        : '';
+      var priorRow=(!isPast&&wos.length>1)
+        ? '<div class="wo-priority-row">'
+          +'<span class="wo-priority-badge">'+(priorityRank>=0?priorityRank+1:'-')+'</span>'
+          +'<span style="font-size:11px;color:#64748b;flex:1">우선순위</span>'
+          +'<div class="wo-priority-btns">'
+          +'<button class="wo-priority-btn up" onclick="event.stopPropagation();movePriorityWO(\''+esc(ln)+'\',\''+key+'\',-1)">▲</button>'
+          +'<button class="wo-priority-btn down" onclick="event.stopPropagation();movePriorityWO(\''+esc(ln)+'\',\''+key+'\',1)">▼</button>'
+          +'</div></div>'
+        : '';
       var btns=isPast
         ? '<div class="wo-readonly">읽기전용</div>'
-        : '<div class="wo-btns">'
-          +'<button class="wo-btn wo-btn-am'+(amA?' active':'')+'" onclick="toggleWO(\''+wo.wo_no+'\',\''+wo.seq+'\',\'am\')">오전</button>'
-          +'<button class="wo-btn wo-btn-pm'+(pmA?' active':'')+'" onclick="toggleWO(\''+wo.wo_no+'\',\''+wo.seq+'\',\'pm\')">오후</button>'
-          +'</div>';
+        : (amA||pmA)
+          ? '<div class="wo-btns"><button class="wo-btn-cancel" onclick="event.stopPropagation();cancelWO(\''+wo.wo_no+'\',\''+wo.seq+'\')">✕<br>취소</button></div>'
+          : '<div class="wo-btns"><button class="wo-btn-assign" onclick="event.stopPropagation();splitWO(\''+wo.wo_no+'\',\''+wo.seq+'\')">배정</button></div>';
       return '<div class="sw-wrap" data-key="'+key+'">'
         +'<div class="sw-inner">'
         +'<div class="sw-content'+cls+'">'
+        +priorRow
         +'<div class="wo-code"><span class="wo-code-label">품번: </span>'+esc(wo.item_code)+'</div>'
         +'<div class="wo-name"><span class="wo-name-label">품명: </span>'+esc(wo.item_name)+'</div>'
-        +'<div class="wo-qty-row"><span class="wo-qty-label">수량: </span>'+fmt(wo.qty)+'</div>'
+        +splitInfo
+        +splitRow
         +'</div>'
         +btns
         +'</div>'
@@ -766,7 +1109,13 @@ function renderWO(){
 /* 개별 토글 */
 function toggleWO(wo_no,seq,sh){
   var key=wo_no+'_'+seq;
-  if(woAssign[key]===sh){
+  if(woAssign[key]==='split'){
+    // 분할 해제 후 단일 시프트로
+    removePlanByWO(wo_no,seq);
+    delete woSplitQty[key];
+    woAssign[key]=sh;
+    addPlanFromWO(wo_no,seq,sh);
+  } else if(woAssign[key]===sh){
     woAssign[key]=null;
     removePlanByWO(wo_no,seq);
   } else {
@@ -775,6 +1124,68 @@ function toggleWO(wo_no,seq,sh){
     if(prev) removePlanByWO(wo_no,seq,prev);
     addPlanFromWO(wo_no,seq,sh);
   }
+  renderWO();
+}
+
+/* AM/PM 입력 연동: 한 쪽 변경 시 나머지 자동 계산 */
+function syncSplit(key,side,total){
+  var ai=document.getElementById('spl-am-'+key);
+  var pi=document.getElementById('spl-pm-'+key);
+  var eq=document.getElementById('spl-eq-'+key);
+  if(!ai||!pi) return;
+  var v=parseFloat(side==='am'?ai.value:pi.value)||0;
+  var other=total-v;
+  if(side==='am') pi.value=other>0?other:'';
+  else ai.value=other>0?other:'';
+  var sum=(parseFloat(ai.value)||0)+(parseFloat(pi.value)||0);
+  if(eq){
+    eq.textContent='= '+fmt(sum);
+    eq.className='wo-split-eq'+(Math.abs(sum-total)>0.001?' error':'');
+  }
+}
+
+/* 수량 배정: AM=0이면 오후 전체, PM=0이면 오전 전체, 둘 다 > 0이면 분할 */
+function splitWO(wo_no,seq){
+  var key=wo_no+'_'+seq;
+  var wo=woData.find(function(w){ return w.wo_no===wo_no&&String(w.seq)===String(seq); });
+  if(!wo) return;
+  var ai=document.getElementById('spl-am-'+key);
+  var pi=document.getElementById('spl-pm-'+key);
+  var amQty=ai?parseFloat(ai.value):NaN;
+  var pmQty=pi?parseFloat(pi.value):NaN;
+  if(isNaN(amQty)||amQty<0||isNaN(pmQty)||pmQty<0||Math.abs(amQty+pmQty-wo.qty)>0.001||(amQty+pmQty<=0)){
+    showToast('AM + PM 합계가 '+fmt(wo.qty)+'이어야 합니다',true); return;
+  }
+  removePlanByWO(wo_no,seq);
+  delete woSplitQty[key];
+  if(pmQty===0){
+    woAssign[key]='am';
+    addPlanFromWO(wo_no,seq,'am');
+    renderWO();
+    showToast('오전 배정 완료 — '+fmt(amQty));
+    return;
+  }
+  if(amQty===0){
+    woAssign[key]='pm';
+    addPlanFromWO(wo_no,seq,'pm');
+    renderWO();
+    showToast('오후 배정 완료 — '+fmt(pmQty));
+    return;
+  }
+  plans['am'].push({code:wo.item_code,name:wo.item_name,remark:wo.spec||'',unit:normUnit(wo.unit),qty:amQty,_wo:key});
+  plans['pm'].push({code:wo.item_code,name:wo.item_name,remark:wo.spec||'',unit:normUnit(wo.unit),qty:pmQty,_wo:key+'_split'});
+  woAssign[key]='split';
+  woSplitQty[key]={am:amQty,pm:pmQty};
+  renderPlan('am'); renderPlan('pm'); calcAll(); savePlans();
+  renderWO();
+  showToast('분할 완료 — AM:'+fmt(amQty)+' / PM:'+fmt(pmQty));
+}
+
+function cancelWO(wo_no,seq){
+  var key=wo_no+'_'+seq;
+  woAssign[key]=null;
+  delete woSplitQty[key];
+  removePlanByWO(wo_no,seq);
   renderWO();
 }
 
@@ -792,14 +1203,17 @@ function addPlanFromWO(wo_no,seq,sh){
   }
 }
 
-/* plans에서 제거 */
+/* plans에서 제거 (분할 포함) */
 function removePlanByWO(wo_no,seq,sh){
   var k=wo_no+'_'+seq;
   var sheets=sh?[sh]:['am','pm'];
+  var changed=false;
   sheets.forEach(function(s){
-    var idx=plans[s].findIndex(function(p){ return p._wo===k; });
-    if(idx>=0){ plans[s].splice(idx,1); renderPlan(s); calcAll(); savePlans(); }
+    var before=plans[s].length;
+    plans[s]=plans[s].filter(function(p){ return p._wo!==k && p._wo!==(k+'_split'); });
+    if(plans[s].length!==before){ renderPlan(s); changed=true; }
   });
+  if(changed){ calcAll(); savePlans(); }
 }
 
 /* 전체 배정 */
@@ -848,6 +1262,13 @@ function clearConfirmedData(){
     renderResult('am',[]);
     renderResult('pm',[]);
     try{ localStorage.removeItem(RESULT_KEY+woDate); }catch(e){}
+    plans={am:[],pm:[]};
+    woAssign={};
+    woSplitQty={};
+    directMats={am:[],pm:[]};
+    renderDirect('am'); renderDirect('pm');
+    savePlans();
+    renderWO();
     showToast('🗑 초기화 완료 — 피더뷰에서 삭제됩니다');
   })
   .catch(function(){ showToast('❌ 초기화 실패',true); });
@@ -857,8 +1278,8 @@ function clearConfirmedData(){
 function confirmToN8N(){
   if(!woDate){ showToast('날짜를 선택하세요',true); return; }
   if(!plans.am.length&&!plans.pm.length){ showToast('AM/PM 배정된 작업지시가 없습니다',true); return; }
-  var amMats=explode(plans.am);
-  var pmMats=explode(plans.pm);
+  var amMats=mergeWithDirect(explode(plans.am),directMats.am).map(function(m){var pq=packQtyData[m.code]||0;return Object.assign({},m,{pack_qty:pq,box_count:pq>0?Math.ceil(m.qty/pq):0,location:locationData[m.code]||''});});
+  var pmMats=mergeWithDirect(explode(plans.pm),directMats.pm).map(function(m){var pq=packQtyData[m.code]||0;return Object.assign({},m,{pack_qty:pq,box_count:pq>0?Math.ceil(m.qty/pq):0,location:locationData[m.code]||''});});
   if(!amMats.length&&!pmMats.length){
     showToast('❌ BOM 전개 실패 — 자재 데이터 없음',true);
     console.warn('[확정] plans.am=',plans.am,'plans.pm=',plans.pm,'amMats=',amMats,'pmMats=',pmMats);
@@ -872,7 +1293,13 @@ function confirmToN8N(){
     body:JSON.stringify(payload)
   })
   .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-  .then(function(){ showToast('✅ 확정 완료 — AM '+amMats.length+'종 / PM '+pmMats.length+'종 자재'); saveConfirmHistory(woDate,amMats.length,pmMats.length); saveResultData(); })
+  .then(function(){
+    showToast('✅ 확정 완료 — AM '+amMats.length+'종 / PM '+pmMats.length+'종 자재');
+    saveConfirmHistory(woDate,amMats.length,pmMats.length);
+    saveResultData();
+    var dateLabel = (parseInt(woDate.slice(4,6)))+'/'+parseInt(woDate.slice(6,8));
+    sendNtfy('✅ 자재 출고 확정', dateLabel+' 확정 완료\nAM: '+amMats.length+'종 / PM: '+pmMats.length+'종\n피더뷰를 확인하세요');
+  })
   .catch(function(e){ showToast('❌ 확정 저장 실패: '+e.message,true); });
 }
 
@@ -897,6 +1324,8 @@ function showToast(msg,isError){
   buildDateBar();
   selectWODate(_todayYMD());
   renderConfirmHistory();
+  var ni = document.getElementById('mrp-ntfy-input');
+  if(ni) ni.value = localStorage.getItem('ntfy_topic') || '';
 })();
 </script>
 </body>

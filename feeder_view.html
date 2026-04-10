@@ -71,6 +71,7 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
 .mat-table td.remark{font-size:11px;color:#64748b}
 .mat-table td.unit{color:#64748b;white-space:nowrap}
 .mat-table td.qty{text-align:right;font-weight:800;font-size:15px;color:#1e3a8a;white-space:nowrap}
+.mat-table td.location{font-size:12px;color:#059669;font-weight:600;white-space:nowrap}
 .check-btn{width:100%;margin-top:0;padding:6px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#64748b;font-size:12px;font-weight:700;font-family:inherit;cursor:pointer;transition:.2s;-webkit-tap-highlight-color:transparent;white-space:nowrap}
 .check-btn:active{transform:scale(.97)}
 .check-btn.checked{border-color:#22c55e;background:#22c55e;color:#fff}
@@ -119,6 +120,14 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
   <div class="header-brand">
     <img src="ait-logo.png" alt="AIT" style="height:38px;width:auto;object-fit:contain">
     <div class="header-title">자재 출고 요청서</div>
+    <button onclick="toggleNtfySetting()" title="푸시 알림 설정" style="background:none;border:none;font-size:18px;cursor:pointer;padding:2px 4px;color:#6b7280;flex-shrink:0">⚙️</button>
+  </div>
+  <div id="ntfy-panel" style="display:none;align-items:center;gap:6px;padding:6px 0 4px;justify-content:center;flex-wrap:wrap">
+    <span style="font-size:12px;color:#6b7280;white-space:nowrap">📱 ntfy 토픽</span>
+    <input id="ntfy-input" type="text" placeholder="예: ait-mrp-1234"
+      style="flex:1;min-width:140px;max-width:220px;padding:6px 10px;border:1px solid #d1d5db;border-radius:10px;font-size:13px;font-family:inherit">
+    <button onclick="saveNtfyTopic()"
+      style="padding:6px 14px;border:none;border-radius:10px;background:#1e3a8a;color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap">저장</button>
   </div>
   <div class="last-update" id="last-update">로딩 중...</div>
   <div class="controls" style="justify-content:center">
@@ -151,6 +160,9 @@ var confirmedData = null;
 var checkedItems = {};
 
 var CHECKED_KEY = 'mrp_feeder_checked';
+var N8N_BASE = 'https://aitechn8n.ngrok.app';
+var NTFY_TOPIC = localStorage.getItem('ntfy_topic') || '';
+var currentItems = [];
 
 function saveChecked(){
   try{ localStorage.setItem(CHECKED_KEY, JSON.stringify(checkedItems)); }catch(e){}
@@ -159,9 +171,69 @@ function loadChecked(){
   try{ checkedItems = JSON.parse(localStorage.getItem(CHECKED_KEY)||'{}'); }catch(e){ checkedItems={}; }
 }
 
+// ── ntfy 푸시 알림 ────────────────────────────────────────
+function sendNtfy(title, body){
+  var topic = localStorage.getItem('ntfy_topic') || '';
+  if(!topic) return;
+  fetch('https://ntfy.sh/'+encodeURIComponent(topic), {
+    method:'POST',
+    body: body,
+    headers:{
+      'Title': title,
+      'Priority': 'high',
+      'Tags': 'package',
+      'Content-Type': 'text/plain; charset=utf-8'
+    }
+  }).catch(function(){});
+}
+
+function saveNtfyTopic(){
+  var val = (document.getElementById('ntfy-input')||{}).value || '';
+  val = val.trim();
+  localStorage.setItem('ntfy_topic', val);
+  NTFY_TOPIC = val;
+  document.getElementById('ntfy-panel').style.display = 'none';
+  showToast(val ? '📱 ntfy 토픽 저장: '+val : '📱 ntfy 알림 비활성화');
+}
+
+function toggleNtfySetting(){
+  var p = document.getElementById('ntfy-panel');
+  var inp = document.getElementById('ntfy-input');
+  if(!p) return;
+  var visible = p.style.display !== 'none';
+  p.style.display = visible ? 'none' : 'flex';
+  if(!visible && inp){ inp.value = localStorage.getItem('ntfy_topic')||''; inp.focus(); }
+}
+
+// ── n8n 피더 체크 동기화 ──────────────────────────────────
+function postCheckToN8N(ck, checked){
+  fetch(N8N_BASE+'/webhook/feeder-check', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},
+    body: JSON.stringify({ date:currentDate, shift:currentShift, ck:ck, checked:checked })
+  }).catch(function(){});
+}
+
+function loadCheckedFromN8N(date, shift){
+  fetch(N8N_BASE+'/webhook/feeder-check?date='+date+'&shift='+shift, {headers:{'ngrok-skip-browser-warning':'true'}})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var items = data.items || {};
+      var changed = false;
+      Object.keys(items).forEach(function(ck){
+        var serverChecked = !!(items[ck] && items[ck].checked);
+        if(checkedItems[ck] !== serverChecked){ checkedItems[ck] = serverChecked; changed = true; }
+      });
+      if(changed){ saveChecked(); renderMain(); }
+    })
+    .catch(function(){});
+}
+
 function toggleCheck(ck){
   checkedItems[ck] = !checkedItems[ck];
   saveChecked();
+  postCheckToN8N(ck, checkedItems[ck]);
+
   var row = document.getElementById('card-'+ck);
   var btn = row && row.querySelector('.check-btn');
   if(!row) return;
@@ -173,6 +245,24 @@ function toggleCheck(ck){
     row.classList.remove('checked-row');
     btn.classList.remove('checked');
     btn.textContent = '☐';
+  }
+
+  // 완료 현황 업데이트
+  var total = currentItems.length;
+  var done = currentItems.filter(function(m){
+    var mck = ((m.code||'')+'_'+(m.line||'')).replace(/[^a-zA-Z0-9_\-]/g,'_');
+    return checkedItems[mck];
+  }).length;
+  var si = document.getElementById('status-info');
+  var shiftLabel = currentShift==='am'?'오전 ☀️':'오후 🌙';
+  si.innerHTML = '<span class="status-shift '+currentShift+'">'+shiftLabel+'</span>'
+    +' · <span id="done-count">'+done+'/'+total+'</span> 출고';
+
+  // 전체 완료 시 ntfy 전송
+  if(total > 0 && done === total){
+    var dateLabel = (parseInt(currentDate.slice(4,6)))+'/'+parseInt(currentDate.slice(6,8));
+    sendNtfy('📦 출고 완료', dateLabel+' '+shiftLabel.replace(/[☀️🌙]/g,'').trim()+' 전체 출고 완료 ('+total+'종)');
+    showToast('🎉 전체 출고 완료! 피드백 전송됨');
   }
 }
 
@@ -231,6 +321,7 @@ function loadData(){
     .then(function(data){
       confirmedData = data;
       renderMain();
+      loadCheckedFromN8N(currentDate, currentShift);
       var now = new Date();
       document.getElementById('last-update').textContent =
         now.getHours()+'시'+String(now.getMinutes()).padStart(2,'0')+'분 갱신';
@@ -273,12 +364,17 @@ function renderMain(){
   }
 
   var items = confirmedData[currentShift] || [];
-  var shiftLabel = currentShift==='am' ? '오전 ☀️' : '오후 🌙';
-  statusInfo.innerHTML = '<span class="status-shift '+currentShift+'">'+shiftLabel+'</span>'
-    +' · '+items.length+'종 자재';
-
   // 008 라인 제외
   items = items.filter(function(item){ return (item.line||'') !== '008'; });
+  currentItems = items;
+
+  var shiftLabel = currentShift==='am' ? '오전 ☀️' : '오후 🌙';
+  var done = items.filter(function(m){
+    var mck = ((m.code||'')+'_'+(m.line||'')).replace(/[^a-zA-Z0-9_\-]/g,'_');
+    return checkedItems[mck];
+  }).length;
+  statusInfo.innerHTML = '<span class="status-shift '+currentShift+'">'+shiftLabel+'</span>'
+    +' · <span id="done-count">'+done+'/'+items.length+'</span> 출고';
 
   if(!items.length){
     main.innerHTML = '<div class="empty-state">'
@@ -296,7 +392,10 @@ function renderMain(){
     +'<th>품목명</th>'
     +'<th>비고</th>'
     +'<th>단위</th>'
-    +'<th class="qty">총 소요량</th>'
+    +'<th class="qty">필요소요량</th>'
+    +'<th class="qty">BOX적입량</th>'
+    +'<th class="qty">박스수</th>'
+    +'<th>적재위치</th>'
     +'<th></th>'
     +'</tr></thead><tbody>';
 
@@ -310,6 +409,9 @@ function renderMain(){
       +'<td class="remark">'+esc(m.remark||'')+'</td>'
       +'<td class="unit">'+esc(m.unit||'EA')+'</td>'
       +'<td class="qty">'+fmtQty(m.qty)+'</td>'
+      +'<td class="qty">'+(m.pack_qty>0?fmtQty(m.pack_qty):'-')+'</td>'
+      +'<td class="qty">'+(m.box_count>0?m.box_count:'-')+'</td>'
+      +'<td class="location">'+esc(m.location||'')+'</td>'
       +'<td><button class="check-btn'+(isChecked?' checked':'')+'" onclick="toggleCheck(\''+ck+'\')">'
       +(isChecked?'✅':'☐')
       +'</button></td>'
