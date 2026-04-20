@@ -336,7 +336,7 @@ body{background:var(--bg);color:var(--text-main)}
 #racc-a>.racc-hd{background:#fffbeb}
 #racc-a{border-left:4px solid #f59e0b}
 #racc-b>.racc-hd{background:#fff7ed}
-#racc-b{border-left:4px solid #fb923c}
+#racc-b{border-left:4px solid #10b981}
 #racc-c>.racc-hd{background:#eff6ff}
 #racc-c{border-left:4px solid #3b82f6}
 #racc-d>.racc-hd{background:#f5f3ff}
@@ -441,7 +441,8 @@ body{background:var(--bg);color:var(--text-main)}
 <!-- 날짜 바 -->
 <div class="date-bar">
   <div class="date-scroll" id="date-bar"></div>
-  <input type="date" id="date-picker" onchange="onDatePickerChange()" title="날짜 직접 선택" style="border:1px solid #d1d5db;border-radius:8px;padding:3px 6px;font-size:12px;font-family:inherit;color:#374151;background:#fff;height:30px;flex-shrink:0;cursor:pointer;outline:none">
+  <input type="date" id="date-picker" onchange="onDatePickerChange()" style="display:none;position:fixed;opacity:0;pointer-events:none">
+  <button onclick="document.getElementById('date-picker').showPicker?document.getElementById('date-picker').showPicker():document.getElementById('date-picker').click()" style="flex-shrink:0;padding:5px 10px;border:1px solid #d1d5db;border-radius:8px;background:#fff;color:#374151;font-size:12px;font-family:inherit;cursor:pointer;height:30px;white-space:nowrap" title="과거 날짜 조회">📅 과거 이력</button>
   <button class="date-refresh" id="date-refresh-btn" onclick="loadWorkOrders()" title="새로고침">🔄</button>
 </div>
 
@@ -1029,7 +1030,7 @@ var _prodViewPairs = {}; // sh → pairs[]
 
 var _slotBadge={
   a:'<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#fef3c7;color:#92400e;font-weight:700">☀️ A타임</span>',
-  b:'<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#ffedd5;color:#9a3412;font-weight:700">☀️ B타임</span>',
+  b:'<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#d1fae5;color:#065f46;font-weight:700">☀️ B타임</span>',
   c:'<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#dbeafe;color:#1e3a8a;font-weight:700">🌙 C타임</span>',
   d:'<span style="font-size:10px;padding:2px 7px;border-radius:8px;background:#ede9fe;color:#5b21b6;font-weight:700">🌙 D타임</span>'
 };
@@ -1396,14 +1397,14 @@ function renderResultByLine(){
       });
     });
     pLineOrder.sort();
-    var pSlotColors={a:'#f59e0b',b:'#fb923c',c:'#3b82f6',d:'#8b5cf6'};
+    var pSlotColors={a:'#f59e0b',b:'#10b981',c:'#3b82f6',d:'#8b5cf6'};
     var pSlotIcons={a:'☀️',b:'☀️',c:'🌙',d:'🌙'};
     var pSlotLabels={a:'A타임',b:'B타임',c:'C타임',d:'D타임'};
     var html=pLineOrder.map(function(ln){
       var slotsForLine=pLineMap[ln];
       var totalItems=['a','b','c','d'].reduce(function(s,sh){return s+(slotsForLine[sh]||[]).length;},0);
       if(!totalItems) return '';
-      if(_rblOpen[ln]===undefined) _rblOpen[ln]=pLineOrder.indexOf(ln)===0;
+      if(_rblOpen[ln]===undefined) _rblOpen[ln]=false;
       var isOpen=_rblOpen[ln];
       var safeId='rbl-p-'+ln.replace(/[^a-z0-9가-힣]/gi,'_');
       var slotsHtml=['a','b','c','d'].map(function(sh){
@@ -1440,7 +1441,7 @@ function renderResultByLine(){
 
   var slotInfo={
     a:{color:'#f59e0b',label:'A타임',icon:'☀️'},
-    b:{color:'#fb923c',label:'B타임',icon:'☀️'},
+    b:{color:'#10b981',label:'B타임',icon:'☀️'},
     c:{color:'#3b82f6',label:'C타임',icon:'🌙'},
     d:{color:'#8b5cf6',label:'D타임',icon:'🌙'}
   };
@@ -1469,7 +1470,7 @@ function renderResultByLine(){
     var slotMats=lineMap[ln];
     var totalCount=['a','b','c','d'].reduce(function(s,sh){return s+(slotMats[sh]||[]).length;},0);
     if(!totalCount) return '';
-    if(_rblOpen[ln]===undefined) _rblOpen[ln]=lineOrder.indexOf(ln)===0;
+    if(_rblOpen[ln]===undefined) _rblOpen[ln]=false;
     var isOpen=_rblOpen[ln];
     var safeId='rbl-'+ln.replace(/[^a-z0-9가-힣]/gi,'_');
 
@@ -1496,12 +1497,12 @@ function renderResultByLine(){
         +'<div style="overflow-x:auto;border-radius:6px;border:1px solid #f0f4fa">'
         +'<table style="width:100%;border-collapse:collapse;min-width:280px">'
         +'<thead><tr style="background:#f8f9fb">'
-        +'<th style="padding:5px 7px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb">#</th>'
-        +'<th style="padding:5px 7px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb">품목코드</th>'
-        +'<th style="padding:5px 7px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb">품목명</th>'
-        +'<th style="padding:5px 7px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">소요량</th>'
-        +'<th style="padding:5px 7px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">적입량</th>'
-        +'<th style="padding:5px 7px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">박스수</th>'
+        +'<th style="padding:4px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb;white-space:nowrap;width:20px">#</th>'
+        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb;white-space:nowrap">품목코드</th>'
+        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb;white-space:nowrap">품목명</th>'
+        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb;white-space:nowrap">소요량</th>'
+        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb;white-space:nowrap">적입량</th>'
+        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb;white-space:nowrap">박스수</th>'
         +'</tr></thead>'
         +'<tbody>'+rows+'</tbody>'
         +'</table></div></div>';
@@ -2076,14 +2077,6 @@ function renderWO(){
       +'</div>';
   }).join('');
 
-  if(!isPast){
-    html+='<div class="wo-actions">'
-      +'<button class="btn btn-am" style="flex:1;font-size:13px" onclick="assignAll(\'a\')">전체 A</button>'
-      +'<button class="btn btn-am" style="flex:1;font-size:13px" onclick="assignAll(\'b\')">전체 B</button>'
-      +'<button class="btn btn-pm" style="flex:1;font-size:13px" onclick="assignAll(\'c\')">전체 C</button>'
-      +'<button class="btn btn-pm" style="flex:1;font-size:13px" onclick="assignAll(\'d\')">전체 D</button>'
-      +'</div>';
-  }
   body.innerHTML=html;
   initSwipe();
 }
@@ -2217,21 +2210,38 @@ function saveResultData(){
   if(!woDate) return;
   try{ localStorage.setItem(RESULT_KEY+woDate, JSON.stringify(resultData)); }catch(e){}
 }
+function _applyResultData(saved){
+  ['am','pm','a','b','c','d'].forEach(function(s){resultData[s]=saved[s]||[];});
+  if(!saved.a&&!saved.b&&saved.am&&saved.am.length){resultData.a=saved.am;resultData.am=saved.am;}
+  if(!saved.c&&!saved.d&&saved.pm&&saved.pm.length){resultData.c=saved.pm;resultData.pm=saved.pm;}
+  ['am','a','b','pm','c','d'].forEach(function(s){renderResult(s,resultData[s]);});
+  renderResultByLine();
+  var allLoadCodes=[].concat(resultData.am||[],resultData.pm||[]).map(function(r){return r.code;}).filter(function(c,i,a){return c&&a.indexOf(c)===i;});
+  if(allLoadCodes.length) fetchPackQty(allLoadCodes);
+  var first=resultData.a&&resultData.a.length?'a':resultData.am&&resultData.am.length?'am':resultData.c&&resultData.c.length?'c':'pm';
+  switchResult(first);
+}
 function restoreResultData(date){
   try{
     var saved=JSON.parse(localStorage.getItem(RESULT_KEY+date)||'null');
     if(saved){
-      ['am','pm','a','b','c','d'].forEach(function(s){resultData[s]=saved[s]||[];});
-      if(!saved.a&&!saved.b&&saved.am&&saved.am.length){resultData.a=saved.am;resultData.am=saved.am;}
-      if(!saved.c&&!saved.d&&saved.pm&&saved.pm.length){resultData.c=saved.pm;resultData.pm=saved.pm;}
-      ['am','a','b','pm','c','d'].forEach(function(s){renderResult(s,resultData[s]);});
-      renderResultByLine();
-      var allLoadCodes=[].concat(resultData.am||[],resultData.pm||[]).map(function(r){return r.code;}).filter(function(c,i,a){return c&&a.indexOf(c)===i;});
-      if(allLoadCodes.length) fetchPackQty(allLoadCodes);
-      var first=resultData.a&&resultData.a.length?'a':resultData.am&&resultData.am.length?'am':resultData.c&&resultData.c.length?'c':'pm';
-      switchResult(first);
+      _applyResultData(saved);
+      return;
     }
   }catch(e){}
+  // localStorage 없으면 n8n에서 과거 확정 데이터 조회
+  fetch(N8N_BASE+'/webhook/confirmed?date='+date,{headers:{'ngrok-skip-browser-warning':'true'}})
+    .then(function(r){return r.text();})
+    .then(function(text){
+      if(!text||!text.trim()) return;
+      var data=JSON.parse(text);
+      var hasData=['am','pm','a','b','c','d'].some(function(s){return data[s]&&data[s].length;});
+      if(hasData){
+        _applyResultData(data);
+        showToast('📦 과거 확정 데이터 불러옴 ('+date.slice(4,6)+'/'+date.slice(6,8)+')');
+      }
+    })
+    .catch(function(){});
 }
 
 /* 확정 데이터 초기화 */
@@ -2721,7 +2731,7 @@ function confirmSelected(){
     <!-- 타임 버튼 -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px;margin-bottom:10px">
       <button class="btn btn-am" onclick="addPlan('a')">A타임 추가</button>
-      <button class="btn btn-am" onclick="addPlan('b')" style="opacity:.85">B타임 추가</button>
+      <button class="btn" onclick="addPlan('b')" style="background:#10b981;color:#fff">B타임 추가</button>
       <button class="btn btn-pm" onclick="addPlan('c')">C타임 추가</button>
       <button class="btn btn-pm" onclick="addPlan('d')" style="opacity:.85">D타임 추가</button>
     </div>
@@ -2757,7 +2767,7 @@ function confirmSelected(){
     <!-- 타임 버튼 -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:7px;margin-bottom:14px">
       <button class="btn btn-am" onclick="addDirect('a')">A타임 추가</button>
-      <button class="btn btn-am" onclick="addDirect('b')" style="opacity:.85">B타임 추가</button>
+      <button class="btn" onclick="addDirect('b')" style="background:#10b981;color:#fff">B타임 추가</button>
       <button class="btn btn-pm" onclick="addDirect('c')">C타임 추가</button>
       <button class="btn btn-pm" onclick="addDirect('d')" style="opacity:.85">D타임 추가</button>
     </div>

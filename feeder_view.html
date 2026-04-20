@@ -130,22 +130,6 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:v
     <div id="iosGuide" style="display:none;font-size:11px;color:#f97316;text-align:center;line-height:1.5">
       iOS Safari에서 홈 화면에 추가 후 사용하세요.<br><b>공유 → 홈 화면에 추가</b>
     </div>
-    <!-- 담당자 지정 -->
-    <div style="border-top:1px solid #e5e7eb;padding-top:10px;margin-top:4px">
-      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:8px">👤 내 이름 (피더 선택)</div>
-      <div style="display:flex;gap:6px;align-items:center;margin-bottom:10px">
-        <select id="my-person-sel" onchange="applyMyPerson()"
-          style="flex:1;padding:7px 10px;border:1px solid #d1d5db;border-radius:10px;font-size:13px;font-family:inherit;background:#fff">
-          <option value="">-- 선택 안 함 (전체 표시) --</option>
-        </select>
-      </div>
-      <div style="font-size:12px;font-weight:700;color:#374151;margin-bottom:6px">🔧 라인별 담당자 지정 (관리자)</div>
-      <div id="line-assign-rows" style="display:flex;flex-direction:column;gap:6px">
-        <span style="font-size:11px;color:#9ca3af">날짜 선택 후 라인이 표시됩니다</span>
-      </div>
-      <button onclick="saveLineAssignments()"
-        style="margin-top:8px;width:100%;padding:8px;border:none;border-radius:10px;background:#1e3a8a;color:#fff;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer">💾 담당자 저장</button>
-    </div>
   </div>
 </div>
 
@@ -631,7 +615,7 @@ function renderMain(){
       +'<th style="padding:6px 3px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">위치</th>'
       +'<th style="padding:6px 2px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">타임</th>'
       +'<th style="padding:6px 2px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">수량</th>'
-      +'<th style="padding:6px 2px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">적재</th>'
+      +'<th style="padding:6px 2px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">박스적재수</th>'
       +'<th style="padding:6px 2px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">박스</th>'
       +'<th style="padding:6px 2px;text-align:center;font-size:16px;font-weight:700">출고</th>'
       +'</tr>';
