@@ -563,7 +563,7 @@ function renderMain(){
         }
         var lg=lineGroups[ln];
         if(!lg.codes[code]){
-          lg.codes[code]={code:code,name:m.name||'',location:m.location||'',slots:{}};
+          lg.codes[code]={code:code,name:m.name||'',location:m.location||'',vendor:m.vendor||'',slots:{}};
           lg.codeOrder.push(code);
         }
         // 이 라인의 수량만 사용
@@ -599,42 +599,26 @@ function renderMain(){
     +'<span id="done-count">'+done+'/'+total+'</span> 출고 완료';
 
 
-  // ── 테이블: No | 품번 | 품명 | 자재위치 | 타임 | 수량 | 박스 | 출고 ──
+  // ── 테이블: No(20) | 위치(40) | 품번/품명/업체(auto) | 타임(28) | 수량/박스(62) | 출고(44) ──
   function buildTable(){
     if(!lineOrder.length) return '';
-    var slotLabels={a:'A타임',b:'B타임',c:'C타임',d:'D타임'};
     var slotColors={
       a:{bg:'#fef3c7',color:'#92400e'},b:{bg:'#ffedd5',color:'#9a3412'},
       c:{bg:'#dbeafe',color:'#1e3a8a'},d:{bg:'#ede9fe',color:'#5b21b6'}
     };
-    // 컬럼 헤더 행 (라인 헤더 아래 반복)
-    var colHeader='<tr style="background:#f1f5f9;color:#475569">'
-      +'<th style="padding:6px 2px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">No</th>'
-      +'<th style="padding:6px 4px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">품번</th>'
-      +'<th style="padding:6px 4px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">품명</th>'
-      +'<th style="padding:6px 3px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">위치</th>'
-      +'<th style="padding:6px 2px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">타임</th>'
-      +'<th style="padding:6px 2px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">수량</th>'
-      +'<th style="padding:6px 2px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">박스적재수</th>'
-      +'<th style="padding:6px 2px;text-align:center;font-size:16px;border-right:1px solid #cdd5e4;font-weight:700">박스</th>'
-      +'<th style="padding:6px 2px;text-align:center;font-size:16px;font-weight:700">출고</th>'
+    var slotShort={a:'A',b:'B',c:'C',d:'D'};
+
+    // thead — 라인 헤더 아래 반복
+    var colHeader='<tr style="background:#f1f5f9">'
+      +'<th style="padding:5px 2px;font-size:10px;color:#64748b;font-weight:700;text-align:center;border-right:1px solid #e2e8f0">No</th>'
+      +'<th style="padding:5px 3px;font-size:10px;color:#64748b;font-weight:700;text-align:center;border-right:1px solid #e2e8f0">위치</th>'
+      +'<th style="padding:5px 8px;font-size:10px;color:#64748b;font-weight:700;text-align:left;border-right:1px solid #e2e8f0">품번 / 품명</th>'
+      +'<th style="padding:5px 2px;font-size:10px;color:#64748b;font-weight:700;text-align:center;border-right:1px solid #e2e8f0">타임</th>'
+      +'<th style="padding:5px 3px;font-size:10px;color:#64748b;font-weight:700;text-align:center;border-right:1px solid #e2e8f0">수량/박스</th>'
+      +'<th style="padding:5px 2px;font-size:10px;color:#64748b;font-weight:700;text-align:center">출고</th>'
       +'</tr>';
 
-    var out='<div style="border-radius:14px;overflow:hidden;background:#fff;'
-      +'box-shadow:0 4px 20px rgba(26,52,114,.13);border:1.5px solid #cdd5e4">'
-      +'<table style="width:100%;border-collapse:collapse;font-size:17px;table-layout:fixed">'
-      +'<colgroup>'
-        +'<col style="width:22px">'   // No
-        +'<col style="width:62px">'   // 품번
-        +'<col style="width:62px">'   // 품명
-        +'<col style="width:40px">'   // 자재위치
-        +'<col style="width:38px">'   // 타임
-        +'<col style="width:44px">'   // 수량
-        +'<col style="width:30px">'   // 적재량
-        +'<col style="width:28px">'   // 박스
-        +'<col style="width:42px">'   // 출고
-      +'</colgroup>'
-      +'<tbody>';
+    var out='<div style="display:flex;flex-direction:column;gap:12px">';
 
     var no=0;
     lineOrder.forEach(function(ln){
@@ -651,15 +635,30 @@ function renderMain(){
       });
       var lineAllDone=lineTotal>0&&lineDoneCount===lineTotal;
 
-      // 라인 섹션 헤더행
-      out+='<tr style="background:'+(lineAllDone?'#166534':'#475569')+'">'
-        +'<td colspan="9" style="padding:9px 12px;font-size:20px;font-weight:800;color:#fff;letter-spacing:-.01em">'
-          +(lineAllDone?'✅ ':'📦 ')+esc(lg.line_name)
-          +' <span style="font-size:18px;font-weight:500;opacity:.8">'+lineDoneCount+'/'+lineTotal+'</span>'
-        +'</td></tr>';
+      out+='<div style="border-radius:12px;overflow:hidden;box-shadow:0 3px 14px rgba(26,52,114,.14);border:1.5px solid '+(lineAllDone?'#16a34a':'#cbd5e1')+'">';
 
-      // 컬럼 헤더 (라인명 바로 아래)
-      out+=colHeader;
+      // 라인 헤더
+      out+='<div style="background:'+(lineAllDone?'#15803d':'#1a3472')+';padding:10px 14px;'
+        +'display:flex;align-items:center;justify-content:space-between">'
+        +'<div style="display:flex;align-items:center;gap:8px">'
+          +'<span style="font-size:17px">'+(lineAllDone?'✅':'📦')+'</span>'
+          +'<span style="font-size:16px;font-weight:800;color:#fff;letter-spacing:-.01em">'+esc(lg.line_name)+'</span>'
+        +'</div>'
+        +'<span style="font-size:14px;font-weight:700;background:rgba(255,255,255,.2);color:#fff;padding:3px 10px;border-radius:20px">'+lineDoneCount+'/'+lineTotal+'</span>'
+      +'</div>';
+
+      // 6컬럼 table — No(20) 위치(40) 품번/품명(auto) 타임(28) 수량/박스(62) 출고(44)
+      out+='<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
+        +'<colgroup>'
+          +'<col style="width:20px">'
+          +'<col style="width:40px">'
+          +'<col>'
+          +'<col style="width:28px">'
+          +'<col style="width:62px">'
+          +'<col style="width:44px">'
+        +'</colgroup>'
+        +'<thead>'+colHeader+'</thead>'
+        +'<tbody>';
 
       lg.codeOrder.forEach(function(code){
         var cg=lg.codes[code];
@@ -669,69 +668,83 @@ function renderMain(){
           var ck=(code+'_'+lg.line+'_'+s).replace(/[^a-zA-Z0-9_\-]/g,'_');
           return !!checkedItems[ck];
         });
-        var dimCode=codeDone?'opacity:.35;text-decoration:line-through;':'';
+        var dimCode=codeDone?'opacity:.3;':'';
         no++;
 
         codeSlots.forEach(function(sh,si){
           var m=cg.slots[sh];
           var ck=(code+'_'+lg.line+'_'+sh).replace(/[^a-zA-Z0-9_\-]/g,'_');
           var isChecked=!!checkedItems[ck];
-          var bc=m.box_count||0;
           var pq=m.pack_qty||0;
+          var ceilo=pq>0?Math.ceil(m.qty/pq):(m.box_count||0);
+          var rem=pq>0&&ceilo>0?(ceilo*pq-m.qty):0;
           var sc=slotColors[sh]||{bg:'#f3f4f6',color:'#374151'};
-          var dim=isChecked?'opacity:.35;':'';
-          var rowBg=isChecked?'#f0fdf4':(si%2===0?'#fff':'#f5f8fc');
+          var dim=isChecked?'opacity:.3;':'';
+          var rowBg=isChecked?'#f0fdf4':(si%2===0?'#fff':'#f7f9fc');
+          var sep='border-bottom:1px solid #e8eef5;';
 
-          out+='<tr style="background:'+rowBg+';border-bottom:1px solid #cdd5e4;transition:.15s">';
+          out+='<tr style="background:'+rowBg+';'+sep+'">';
 
-          // No / 품번 / 품명 / 위치 — 첫 행만 rowspan
           if(si===0){
-            out+='<td rowspan="'+codeSpan+'" style="padding:6px 3px;text-align:center;'
-              +'border-right:1px solid #cdd5e4;border-bottom:2px solid #b8c5dc;vertical-align:middle">'
-              +'<span style="font-size:17px;font-weight:700;color:#94a3b8">'+no+'</span>'
-            +'</td>'
-            +'<td rowspan="'+codeSpan+'" style="padding:6px 4px;text-align:center;'
-              +'border-right:1px solid #cdd5e4;border-bottom:2px solid #b8c5dc;vertical-align:middle;overflow:hidden">'
-              +'<div style="font-size:17px;font-weight:900;color:#111;font-family:monospace;'
-                +'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+dimCode+'">'+esc(cg.code)+'</div>'
-            +'</td>'
-            +'<td rowspan="'+codeSpan+'" style="padding:6px 4px;text-align:center;'
-              +'border-right:1px solid #cdd5e4;border-bottom:2px solid #b8c5dc;vertical-align:middle;overflow:hidden">'
-              +'<div style="font-size:17px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+dimCode+'">'+esc(cg.name)+'</div>'
-            +'</td>'
-            +'<td rowspan="'+codeSpan+'" style="padding:6px 3px;text-align:center;'
-              +'border-right:1px solid #cdd5e4;border-bottom:2px solid #b8c5dc;vertical-align:middle;overflow:hidden">'
-              +'<div style="font-size:17px;font-weight:800;color:#1a3472;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'+dimCode+'">'+esc(cg.location||'-')+'</div>'
+            // No
+            out+='<td rowspan="'+codeSpan+'" style="text-align:center;vertical-align:middle;'
+              +'border-right:1px solid #e2e8f0;border-bottom:2px solid #cbd5e1;padding:4px 2px;'+dimCode+'">'
+              +'<span style="font-size:12px;font-weight:700;color:#94a3b8">'+no+'</span>'
+            +'</td>';
+            // 위치
+            out+='<td rowspan="'+codeSpan+'" style="text-align:center;vertical-align:middle;'
+              +'border-right:1px solid #e2e8f0;border-bottom:2px solid #cbd5e1;padding:3px 2px;background:#f8fafc;'+dimCode+'">'
+              +'<span style="font-size:12px;font-weight:800;color:#1a3472;word-break:break-all;line-height:1.3">'+esc(cg.location||'-')+'</span>'
+            +'</td>';
+            // 품번/품명/업체
+            out+='<td rowspan="'+codeSpan+'" style="padding:8px 8px 8px 10px;vertical-align:middle;'
+              +'border-right:1px solid #e2e8f0;border-bottom:2px solid #cbd5e1;overflow:hidden;min-width:0;'+dimCode+'">'
+              +'<div style="font-size:14px;font-weight:900;color:#0f172a;font-family:\'Courier New\',monospace;'
+                +'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.3">'+esc(cg.code)+'</div>'
+              +'<div style="font-size:11px;font-weight:500;color:#475569;'
+                +'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:3px;line-height:1.3">'+esc(cg.name)+'</div>'
+              +(cg.vendor?'<div style="font-size:10px;color:#94a3b8;font-weight:500;margin-top:3px;'
+                +'overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(cg.vendor)+'</div>':'')
             +'</td>';
           }
 
-          out+='<td style="padding:6px 3px;text-align:center;border-right:1px solid #cdd5e4;vertical-align:middle">'
-            +'<span style="font-size:16px;font-weight:800;background:'+sc.bg+';color:'+sc.color
-              +';padding:2px 4px;border-radius:4px;display:inline-block;white-space:nowrap">'+slotLabels[sh]+'</span>'
-          +'</td>'
-          +'<td style="padding:6px 3px;text-align:center;border-right:1px solid #cdd5e4;vertical-align:middle;'+dim+'">'
-            +'<span style="font-size:19px;font-weight:800;color:#111">'+fmtQty(m.qty)+'</span>'
-            +'<span style="font-size:16px;color:#9ca3af;margin-left:2px">ea</span>'
-          +'</td>'
-          +'<td style="padding:6px 2px;text-align:center;border-right:1px solid #cdd5e4;vertical-align:middle;'+dim+'">'
-            +(pq>0?'<span style="font-size:16px;color:#64748b">'+fmtQty(pq)+'</span><span style="font-size:14px;color:#9ca3af;margin-left:2px">ea</span>':'<span style="font-size:16px;color:#9ca3af">-</span>')
-          +'</td>'
-          +'<td style="padding:6px 2px;text-align:center;border-right:1px solid #cdd5e4;vertical-align:middle;'+dim+'">'
-            +'<span style="font-size:19px;font-weight:900;color:#92400e">'+(bc>0?bc:'-')+'</span>'
-            +(bc>0?'<span style="font-size:14px;color:#92400e;margin-left:1px">box</span>':'')
-          +'</td>'
-          +'<td style="padding:3px;text-align:center;vertical-align:middle">'
-            +'<button onclick="toggleCheck(\''+ck+'\')" style="width:40px;height:40px;border-radius:10px;'
-              +'border:2px solid '+(isChecked?'#22c55e':'#cdd5e4')+';'
-              +'background:'+(isChecked?'#22c55e':'#fff')+';font-size:25px;cursor:pointer;'
-              +'display:flex;align-items:center;justify-content:center;margin:auto;-webkit-tap-highlight-color:transparent">'
+          // 타임
+          out+='<td style="text-align:center;vertical-align:middle;border-right:1px solid #e2e8f0;padding:4px 2px;'+dim+'">'
+            +'<span style="display:inline-block;font-size:13px;font-weight:900;background:'+sc.bg+';color:'+sc.color
+              +';padding:3px 4px;border-radius:5px;line-height:1;width:20px;text-align:center">'+slotShort[sh]+'</span>'
+          +'</td>';
+
+          // 수량/박스
+          out+='<td style="text-align:center;vertical-align:middle;border-right:1px solid #e2e8f0;padding:5px 3px;'+dim+'">'
+            +'<div style="font-size:15px;font-weight:900;color:#0f172a;line-height:1">'+fmtQty(m.qty)+'</div>'
+            +'<div style="font-size:9px;color:#94a3b8;line-height:1.2;margin-top:1px">ea</div>'
+            +(ceilo>0
+              ?'<div style="font-size:12px;font-weight:700;color:#92400e;margin-top:3px;line-height:1">'+ceilo+'<span style="font-size:9px">bx</span></div>'
+              :'')
+            +(rem>0
+              ?'<div style="font-size:10px;font-weight:700;color:#dc2626;margin-top:2px;line-height:1">잔:'+rem+'</div>'
+              :(ceilo>0?'<div style="font-size:9px;font-weight:700;color:#16a34a;margin-top:2px">완박스</div>':''))
+          +'</td>';
+
+          // 출고 버튼
+          out+='<td style="text-align:center;vertical-align:middle;padding:4px 2px">'
+            +'<button onclick="toggleCheck(\''+ck+'\')" '
+              +'style="width:40px;height:40px;border-radius:10px;'
+              +'border:2px solid '+(isChecked?'#22c55e':'#d1d5db')+';'
+              +'background:'+(isChecked?'#dcfce7':'#fff')+';font-size:22px;cursor:pointer;'
+              +'display:flex;align-items:center;justify-content:center;margin:auto;'
+              +'-webkit-tap-highlight-color:transparent;touch-action:manipulation">'
               +(isChecked?'✅':'☐')
             +'</button>'
           +'</td></tr>';
         });
       });
+
+      out+='</tbody></table>';
+      out+='</div>'; // 라인 카드
     });
-    return out+'</tbody></table></div>';
+
+    return out+'</div>';
   }
 
   var html='<div style="padding:0 14px">';

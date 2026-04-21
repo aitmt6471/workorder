@@ -979,6 +979,7 @@ function explode(planList){
 
 var packQtyData = {}; // { 품목코드: 적입량 }
 var locationData = {}; // { 품목코드: 적재위치 }
+var vendorData = {}; // { 품목코드: 업체명 }
 
 function fetchPackQty(codes){
   if(!codes||!codes.length) return;
@@ -993,18 +994,22 @@ function fetchPackQty(codes){
     var data=JSON.parse(text);
     if(Array.isArray(data)){
       packQtyData={};
+      vendorData={};
       data.forEach(function(item){
         var code=item.code||item.item_code||item.material_code;
         var qty=item.qty||item.pack_qty||item.box_qty||item.packQty||0;
-        if(code) packQtyData[code]=qty;
+        var vendor=item.vendor||item.maker||item.vendor_name||'';
+        if(code){ packQtyData[code]=qty; if(vendor) vendorData[code]=vendor; }
       });
       locationData={};
     } else if(data.items&&typeof data.items==='object'){
       packQtyData=data.items;
       locationData=data.locations||{};
+      vendorData=data.vendors||{};
     } else {
       packQtyData=data;
       locationData={};
+      vendorData={};
     }
     ['am','a','b','pm','c','d'].forEach(function(sh){renderResult(sh,resultData[sh]);});
     renderResultByLine();
@@ -1172,6 +1177,7 @@ function _renderProdModal(){
     var isZero=edit.qty<=0;
     var pq=packQtyData[m.code]||0;
     var bc=(!isZero&&pq>0)?fmt(Math.ceil(edit.qty/pq)):'-';
+    var rem=(!isZero&&pq>0)?(Math.ceil(edit.qty/pq)*pq-edit.qty):0;
     var dimStyle=isZero?'opacity:0.38;background:#f9fafb;':'';
 
     html+='<div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid #f0f0f0;'+dimStyle+'">'
@@ -1194,6 +1200,13 @@ function _renderProdModal(){
         +'<div style="text-align:center;min-width:46px">'
           +'<div style="font-size:9px;color:#9ca3af;font-weight:700;letter-spacing:.04em;margin-bottom:3px">박스적입량</div>'
           +'<div style="font-size:13px;font-weight:700;color:#374151;padding:6px 0;line-height:1.2">'+(pq>0?fmt(pq)+'<span style="font-size:10px;font-weight:400;color:#9ca3af;margin-left:1px">ea</span>':'-')+'</div>'
+        +'</div>'
+        // 잔여량
+        +'<div style="text-align:center;min-width:44px">'
+          +'<div style="font-size:9px;color:#9ca3af;font-weight:700;letter-spacing:.04em;margin-bottom:3px">잔여량</div>'
+          +'<div style="font-size:13px;font-weight:700;padding:6px 0;line-height:1.2;color:'+(rem>0?'#dc2626':(pq>0&&!isZero?'#22c55e':'#9ca3af'))+'">'
+            +(rem>0?fmt(rem)+'<span style="font-size:10px;font-weight:400;margin-left:1px">ea</span>':(pq>0&&!isZero?'완박스':'-'))
+          +'</div>'
         +'</div>'
         // 필요박스수
         +'<div style="text-align:center;min-width:40px">'
@@ -1483,26 +1496,30 @@ function renderResultByLine(){
         var pq=packQtyData[r.code]||0;
         var bc=(pq>0&&lnQty>0)?fmt(Math.ceil(lnQty/pq)):'-';
         return '<tr>'
-          +'<td style="padding:5px 7px;font-size:10px;color:#bbb;border-bottom:1px solid #f1f5f9">'+(i+1)+'</td>'
-          +'<td style="padding:5px 7px;border-bottom:1px solid #f1f5f9"><code style="font-size:11px;color:#1e3a8a;font-weight:700">'+esc(r.code)+'</code></td>'
-          +'<td style="padding:5px 7px;font-size:12px;font-weight:600;color:#111;border-bottom:1px solid #f1f5f9">'+esc(r.name)+'</td>'
-          +'<td style="padding:5px 7px;text-align:right;font-size:13px;font-weight:800;color:#1e3a8a;border-bottom:1px solid #f1f5f9">'+fmt(lnQty)+'</td>'
-          +'<td style="padding:5px 7px;text-align:right;font-size:12px;color:#6b7280;border-bottom:1px solid #f1f5f9">'+(pq>0?fmt(pq):'-')+'</td>'
-          +'<td style="padding:5px 7px;text-align:right;font-size:13px;font-weight:800;color:#92400e;border-bottom:1px solid #f1f5f9">'+bc+'</td>'
+          +'<td style="padding:3px 4px;text-align:center;border-bottom:1px solid #f1f5f9">'
+            +'<input type="checkbox" checked data-sh="'+sh+'" data-code="'+r.code+'" style="width:14px;height:14px;accent-color:#1e3a8a;cursor:pointer">'
+          +'</td>'
+          +'<td style="padding:3px 5px;border-bottom:1px solid #f1f5f9;overflow:hidden;min-width:0">'
+            +'<code style="font-size:11px;color:#1e3a8a;font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.code)+'</code>'
+            +'<div style="font-size:10px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name)+'</div>'
+          +'</td>'
+          +'<td style="padding:3px 4px;text-align:right;font-size:12px;font-weight:800;color:#1e3a8a;border-bottom:1px solid #f1f5f9">'+fmt(lnQty)+'</td>'
+          +'<td style="padding:3px 4px;text-align:right;font-size:11px;color:#6b7280;border-bottom:1px solid #f1f5f9">'+(pq>0?fmt(pq):'-')+'</td>'
+          +'<td style="padding:3px 4px;text-align:right;font-size:12px;font-weight:800;color:#92400e;border-bottom:1px solid #f1f5f9">'+bc+'</td>'
           +'</tr>';
       }).join('');
       return '<div style="margin-bottom:8px">'
-        +'<div style="background:'+si.color+';color:#fff;padding:6px 10px;border-radius:7px;font-size:11px;font-weight:800;display:flex;align-items:center;gap:5px;margin-bottom:4px">'
+        +'<div style="background:'+si.color+';color:#fff;padding:5px 10px;border-radius:7px;font-size:11px;font-weight:800;display:flex;align-items:center;gap:5px;margin-bottom:4px">'
         +si.icon+' '+si.label+'<span style="font-weight:400;opacity:.8;margin-left:4px">'+items.length+'건</span></div>'
-        +'<div style="overflow-x:auto;border-radius:6px;border:1px solid #f0f4fa">'
-        +'<table style="width:100%;border-collapse:collapse;min-width:280px">'
+        +'<div style="border-radius:6px;border:1px solid #f0f4fa;overflow:hidden">'
+        +'<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
+        +'<colgroup><col style="width:22px"><col><col style="width:38px"><col style="width:34px"><col style="width:34px"></colgroup>'
         +'<thead><tr style="background:#f8f9fb">'
-        +'<th style="padding:4px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb;white-space:nowrap;width:20px">#</th>'
-        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb;white-space:nowrap">품목코드</th>'
-        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb;white-space:nowrap">품목명</th>'
-        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb;white-space:nowrap">소요량</th>'
-        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb;white-space:nowrap">적입량</th>'
-        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb;white-space:nowrap">박스수</th>'
+        +'<th style="padding:4px 3px;font-size:9px;color:#9ca3af;font-weight:700;text-align:center;border-bottom:1px solid #e5e7eb">☑</th>'
+        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb">품목코드/품명</th>'
+        +'<th style="padding:4px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">소요량</th>'
+        +'<th style="padding:4px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">적입</th>'
+        +'<th style="padding:4px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">박스</th>'
         +'</tr></thead>'
         +'<tbody>'+rows+'</tbody>'
         +'</table></div></div>';
@@ -2525,7 +2542,7 @@ function confirmToN8N(){
   if(!woDate){ showToast('날짜를 선택하세요',true); return; }
   var _hasAny=false;['a','b','c','d'].forEach(function(s){if(plans[s].length)_hasAny=true;});
   if(!_hasAny){ showToast('배정된 작업지시가 없습니다',true); return; }
-  function _addMeta(m){var pq=packQtyData[m.code]||0;return Object.assign({},m,{pack_qty:pq,box_count:pq>0?Math.ceil(m.qty/pq):0,location:locationData[m.code]||''});}
+  function _addMeta(m){var pq=packQtyData[m.code]||0;return Object.assign({},m,{pack_qty:pq,box_count:pq>0?Math.ceil(m.qty/pq):0,location:locationData[m.code]||'',vendor:vendorData[m.code]||''});}
   function _addLineName(mats,planList){
     var lnMap={};
     planList.forEach(function(p){
