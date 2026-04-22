@@ -834,7 +834,7 @@ function addDirect(sh){
   if(qty<=0){alert('수량을 1 이상 입력하세요.');return;}
   var existing=directMats[sh].find(function(m){return m.code===selPart.code;});
   if(existing){existing.qty+=qty;}
-  else{directMats[sh].push({code:selPart.code,name:selPart.name,remark:selPart.remark,unit:selPart.unit,qty:qty});}
+  else{directMats[sh].push({code:selPart.code,name:selPart.name,remark:selPart.remark,unit:selPart.unit,qty:qty,line_name:'추가제품'});}
   renderDirect(sh);
   switchDirectTab(sh);
   document.getElementById('part-srch').value='';
@@ -952,7 +952,7 @@ function addPlan(sh){
   if(!selProd){alert('품목을 검색하여 선택하세요.');return;}
   var qty=parseFloat(document.getElementById('qty').value)||1;
   if(qty<=0){alert('수량을 1 이상 입력하세요.');return;}
-  plans[sh].push({code:selProd.code,name:selProd.name,remark:selProd.remark,unit:selProd.unit,qty:qty});
+  plans[sh].push({code:selProd.code,name:selProd.name,remark:selProd.remark,unit:selProd.unit,qty:qty,line_name:'추가제품'});
   renderPlan(sh);
   switchPlanTab(sh);
   document.getElementById('srch').value='';
@@ -1555,11 +1555,11 @@ function renderResultByLine(){
         var remColor=remain===0?'#22c55e':(remain>0?'#dc2626':'#9ca3af');
         return '<tr data-code="'+r.code.replace(/"/g,'&quot;').toLowerCase()+'" data-name="'+r.name.replace(/"/g,'&quot;').replace(/</g,'&lt;').toLowerCase()+'">'
           +'<td style="padding:3px 4px;text-align:center;border-bottom:1px solid #f1f5f9">'
-            +'<input type="checkbox" checked data-sh="'+sh+'" data-code="'+r.code+'" style="width:14px;height:14px;accent-color:#1e3a8a;cursor:pointer">'
+            +'<input type="checkbox" checked data-sh="'+sh+'" data-code="'+r.code+'" style="width:17px;height:17px;accent-color:#1e3a8a;cursor:pointer">'
           +'</td>'
           +'<td style="padding:3px 5px;border-bottom:1px solid #f1f5f9;overflow:hidden;min-width:0">'
-            +'<code style="font-size:11px;color:#1e3a8a;font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.code)+'</code>'
-            +'<div style="font-size:10px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name)+'</div>'
+            +'<code style="font-size:14px;color:#1e3a8a;font-weight:700;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.code)+'</code>'
+            +'<div style="font-size:13px;color:#374151;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(r.name)+'</div>'
           +'</td>'
           +'<td style="padding:3px 4px;text-align:right;font-size:12px;font-weight:800;color:#1e3a8a;border-bottom:1px solid #f1f5f9">'+fmt(lnQty)+'</td>'
           +'<td style="padding:3px 4px;text-align:right;font-size:11px;color:#6b7280;border-bottom:1px solid #f1f5f9">'+(pq>0?fmt(pq):'-')+'</td>'
@@ -1574,8 +1574,8 @@ function renderResultByLine(){
         +'<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
         +'<colgroup><col style="width:22px"><col><col style="width:44px"><col style="width:50px"><col style="width:52px"><col style="width:34px"></colgroup>'
         +'<thead><tr style="background:#f8f9fb">'
-        +'<th style="padding:4px 3px;font-size:9px;color:#9ca3af;font-weight:700;text-align:center;border-bottom:1px solid #e5e7eb"><input type="checkbox" checked style="width:13px;height:13px;accent-color:#1e3a8a;cursor:pointer" onclick="toggleRblSlotAll(this)" title="전체 선택/해제"></th>'
-        +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb">품목코드/품명</th>'
+        +'<th style="padding:4px 3px;font-size:9px;color:#9ca3af;font-weight:700;text-align:center;border-bottom:1px solid #e5e7eb"><input type="checkbox" checked style="width:16px;height:16px;accent-color:#16a34a;cursor:pointer" onclick="toggleRblSlotAll(this)" title="전체 선택/해제"></th>'
+        +'<th style="padding:4px 5px;font-size:13px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb">품목코드/품명</th>'
         +'<th style="padding:4px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">소요량</th>'
         +'<th style="padding:4px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">적입</th>'
         +'<th style="padding:4px 4px;font-size:9px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">예상잔량</th>'
@@ -2186,6 +2186,39 @@ function renderWO(){
       +'</div>';
   }).join('');
 
+  // ── 추가제품 카드 (완제품 추가 / 부품 직접추가 항목) ──────────
+  var _shLabel={a:'A타임',b:'B타임',c:'C타임',d:'D타임'};
+  var extraEntries=[];
+  ['a','b','c','d'].forEach(function(sh){
+    (plans[sh]||[]).forEach(function(p){ if(!p._wo) extraEntries.push({p:p,sh:sh,isDirect:false}); });
+    (directMats[sh]||[]).forEach(function(m){ extraEntries.push({p:m,sh:sh,isDirect:true}); });
+  });
+  if(extraEntries.length){
+    var extraIsOpen=!!accOpen['__추가제품__'];
+    var extraItems=extraEntries.map(function(e){
+      var p=e.p;
+      var tag=e.isDirect?'🔧 부품':'🔍 완제품';
+      var isAM=e.sh==='a'||e.sh==='b';
+      var shBg=isAM?'#fef3c7':'#dbeafe';
+      return '<div style="padding:10px 16px;border-bottom:1px solid #edf0f5;display:flex;align-items:center;gap:8px">'
+        +'<span style="font-size:10px;padding:1px 7px;border-radius:6px;background:#f3f4f6;color:#374151;white-space:nowrap;flex-shrink:0">'+tag+'</span>'
+        +'<div style="flex:1;min-width:0">'
+        +'<div style="font-size:14px;font-weight:700;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.code||'')+'</div>'
+        +'<div style="font-size:12px;color:#475569;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name||'')+'</div>'
+        +'</div>'
+        +'<span style="font-size:10px;padding:2px 8px;border-radius:8px;background:'+shBg+';color:#374151;white-space:nowrap;flex-shrink:0">'+_shLabel[e.sh]+'</span>'
+        +'</div>';
+    }).join('');
+    html+='<div class="acc-line">'
+      +'<div class="acc-header'+(extraIsOpen?' open':'')+'" onclick="(function(){accOpen[\'__추가제품__\']=!accOpen[\'__추가제품__\'];renderWO();})()">'
+      +'<span class="acc-title">➕ 추가제품</span>'
+      +'<span class="acc-meta"><span class="acc-count">'+extraEntries.length+'건</span><span class="acc-chevron'+(extraIsOpen?' collapsed':'')+'">▼</span></span>'
+      +'</div>'
+      +'<div class="acc-body'+(extraIsOpen?' open':'')+'">'
+      +extraItems
+      +'</div></div>';
+  }
+
   body.innerHTML=html;
   initSwipe();
 }
@@ -2353,71 +2386,46 @@ function restoreResultData(date){
     .catch(function(){});
 }
 
-/* 확정 데이터 초기화 */
+/* 확정 데이터 초기화 — 로컬만 삭제, 피더뷰 반영은 다음 확정 버튼 클릭 시 */
 function clearConfirmedData(){
   if(!woDate){ showToast('날짜를 선택하세요',true); return; }
-  if(!confirm(woDate.slice(4,6)+'/'+woDate.slice(6,8)+' 확정 데이터를 초기화할까요?')) return;
-  fetch(N8N_BASE+'/webhook/confirm',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},
-    body:JSON.stringify({date:woDate, am:[], pm:[], a:[], b:[], c:[], d:[]})
-  })
-  .then(function(r){ if(!r.ok) throw new Error(r.status); return r.json(); })
-  .then(function(){
-    resultData={am:[],pm:[],a:[],b:[],c:[],d:[]};
-    ['am','a','b','pm','c','d'].forEach(function(s){renderResult(s,[]);});
-    try{ localStorage.removeItem(RESULT_KEY+woDate); }catch(e){}
-    plans={a:[],b:[],c:[],d:[]};
-    woAssign={};
-    woSplitQty={};
-    directMats={a:[],b:[],c:[],d:[]};
-    ['a','b','c','d'].forEach(function(s){renderPlan(s);renderDirect(s);});
-    calcAll();
-    savePlans();
-    renderWO();
-    pickupData={};
-    _pickupJustCleared=true;
-    setTimeout(function(){ _pickupJustCleared=false; },10000);
-    if(currentStep===4) renderPickupStatus();
-    showToast('🗑 초기화 완료 — 피더뷰에서 삭제됩니다');
-  })
-  .catch(function(){ showToast('❌ 초기화 실패',true); });
+  if(!confirm(woDate.slice(4,6)+'/'+woDate.slice(6,8)+' 소요량 데이터를 초기화할까요?\n\n⚠️ 피더뷰 반영은 [확정 → 피더 전달] 버튼을 눌러야 합니다.')) return;
+  resultData={am:[],pm:[],a:[],b:[],c:[],d:[]};
+  ['am','a','b','pm','c','d'].forEach(function(s){renderResult(s,[]);});
+  try{ localStorage.removeItem(RESULT_KEY+woDate); }catch(e){}
+  plans={a:[],b:[],c:[],d:[]};
+  woAssign={};
+  woSplitQty={};
+  directMats={a:[],b:[],c:[],d:[]};
+  ['a','b','c','d'].forEach(function(s){renderPlan(s);renderDirect(s);});
+  calcAll();
+  savePlans();
+  renderWO();
+  pickupData={};
+  _pickupJustCleared=true;
+  setTimeout(function(){ _pickupJustCleared=false; },10000);
+  if(currentStep===4) renderPickupStatus();
+  showToast('🗑 초기화 완료 — 확정 버튼을 눌러야 피더뷰에 반영됩니다');
 }
 
 function deleteConfirmed(sh){
   if(!woDate) return;
   var label={am:'오전(A+B)',pm:'오후(C+D)',a:'A타임',b:'B타임',c:'C타임',d:'D타임'}[sh];
-  if(!confirm(label+' 출고요청을 삭제하시겠습니까? 피더뷰에서 사라집니다.')) return;
-  var body={date:woDate};
-  if(sh==='am'){body.am=[];body.a=[];body.b=[];}
-  else if(sh==='pm'){body.pm=[];body.c=[];body.d=[];}
-  else{body[sh]=[];
-    if(sh==='a'||sh==='b'){body.am=mergeResults(sh==='a'?[]:resultData.a,sh==='b'?[]:resultData.b);}
-    if(sh==='c'||sh==='d'){body.pm=mergeResults(sh==='c'?[]:resultData.c,sh==='d'?[]:resultData.d);}
+  if(!confirm(label+' 소요량을 삭제할까요?\n\n⚠️ 피더뷰 반영은 [확정 → 피더 전달] 버튼을 눌러야 합니다.')) return;
+  if(sh==='am'){
+    resultData.am=[];resultData.a=[];resultData.b=[];
+    renderResult('am',[]);renderResult('a',[]);renderResult('b',[]);
+  } else if(sh==='pm'){
+    resultData.pm=[];resultData.c=[];resultData.d=[];
+    renderResult('pm',[]);renderResult('c',[]);renderResult('d',[]);
+  } else {
+    resultData[sh]=[];renderResult(sh,[]);
+    if(sh==='a'||sh==='b'){resultData.am=mergeResults(resultData.a,resultData.b);renderResult('am',resultData.am);}
+    if(sh==='c'||sh==='d'){resultData.pm=mergeResults(resultData.c,resultData.d);renderResult('pm',resultData.pm);}
   }
-  fetch(N8N_BASE+'/webhook/confirm',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},
-    body:JSON.stringify(body)
-  })
-  .then(function(r){return r.json();})
-  .then(function(){
-    if(sh==='am'){
-      resultData.am=[];resultData.a=[];resultData.b=[];
-      renderResult('am',[]);renderResult('a',[]);renderResult('b',[]);
-    } else if(sh==='pm'){
-      resultData.pm=[];resultData.c=[];resultData.d=[];
-      renderResult('pm',[]);renderResult('c',[]);renderResult('d',[]);
-    } else {
-      resultData[sh]=[];renderResult(sh,[]);
-      if(sh==='a'||sh==='b'){resultData.am=mergeResults(resultData.a,resultData.b);renderResult('am',resultData.am);}
-      if(sh==='c'||sh==='d'){resultData.pm=mergeResults(resultData.c,resultData.d);renderResult('pm',resultData.pm);}
-    }
-    saveResultData();
-    renderResultByLine();
-    showToast('🗑 '+label+' 출고요청 삭제됨');
-  })
-  .catch(function(){showToast('❌ 삭제 실패',true);});
+  saveResultData();
+  renderResultByLine();
+  showToast('🗑 '+label+' 삭제됨 — 확정 버튼을 눌러야 피더뷰에 반영됩니다');
 }
 
 /* 확정 → n8n POST */
@@ -2680,7 +2688,6 @@ function confirmToN8N(){
     saveResultData();
     var dateLabel = (parseInt(woDate.slice(4,6)))+'/'+parseInt(woDate.slice(6,8));
     sendNtfy('✅ 자재 출고 확정', dateLabel+' 확정 완료\nA:'+aMats.length+' B:'+bMats.length+' C:'+cMats.length+' D:'+dMats.length+'\n피더뷰를 확인하세요');
-    fetch(N8N_BASE+'/webhook/mrp/push/send',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:'📦 자재 출고 확정',body:'신규 출고요청이 있습니다.'})}).catch(function(){});
   })
   .catch(function(e){ showToast('❌ 확정 저장 실패: '+e.message,true); });
 }
