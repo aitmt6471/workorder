@@ -729,29 +729,54 @@ function clearConfirmHistory(){
 }
 
 var MRP_SAVE_KEY = 'mrp_plans_';
+
+function _applyPlansData(saved){
+  var sp=saved.plans||{};
+  if(sp.am&&!sp.a){sp.a=sp.am;delete sp.am;}
+  if(sp.pm&&!sp.c){sp.c=sp.pm;delete sp.pm;}
+  plans={a:sp.a||[],b:sp.b||[],c:sp.c||[],d:sp.d||[]};
+  woAssign=saved.woAssign||{};
+  Object.keys(woAssign).forEach(function(k){if(woAssign[k]==='am')woAssign[k]='a';if(woAssign[k]==='pm')woAssign[k]='c';});
+  woSplitQty=saved.woSplitQty||{};
+  var sd=saved.directMats||{};
+  if(sd.am&&!sd.a){sd.a=sd.am;delete sd.am;}
+  if(sd.pm&&!sd.c){sd.c=sd.pm;delete sd.pm;}
+  directMats={a:sd.a||[],b:sd.b||[],c:sd.c||[],d:sd.d||[]};
+  if(saved.priority && woDate){
+    woPriority=saved.priority;
+    try{ localStorage.setItem('mrp_priority_'+woDate, JSON.stringify(woPriority)); }catch(e){}
+  }
+  ['a','b','c','d'].forEach(function(s){renderPlan(s);renderDirect(s);});
+  calcAll();
+}
+
 function savePlans(){
   if(!woDate) return;
-  try{ localStorage.setItem(MRP_SAVE_KEY+woDate, JSON.stringify({plans:plans,woAssign:woAssign,woSplitQty:woSplitQty,directMats:directMats})); }catch(e){}
+  var payload={plans:plans,woAssign:woAssign,woSplitQty:woSplitQty,directMats:directMats,priority:woPriority||{}};
+  try{ localStorage.setItem(MRP_SAVE_KEY+woDate, JSON.stringify(payload)); }catch(e){}
+  // n8n에 백업 (fire-and-forget)
+  fetch(N8N_BASE+'/webhook/mrp-plans',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},
+    body:JSON.stringify(Object.assign({date:woDate},payload))
+  }).catch(function(){});
 }
+
 function restorePlans(date){
   try{
     var saved=JSON.parse(localStorage.getItem(MRP_SAVE_KEY+date)||'null');
-    if(saved){
-      var sp=saved.plans||{};
-      if(sp.am&&!sp.a){sp.a=sp.am;delete sp.am;}
-      if(sp.pm&&!sp.c){sp.c=sp.pm;delete sp.pm;}
-      plans={a:sp.a||[],b:sp.b||[],c:sp.c||[],d:sp.d||[]};
-      woAssign=saved.woAssign||{};
-      Object.keys(woAssign).forEach(function(k){if(woAssign[k]==='am')woAssign[k]='a';if(woAssign[k]==='pm')woAssign[k]='c';});
-      woSplitQty=saved.woSplitQty||{};
-      var sd=saved.directMats||{};
-      if(sd.am&&!sd.a){sd.a=sd.am;delete sd.am;}
-      if(sd.pm&&!sd.c){sd.c=sd.pm;delete sd.pm;}
-      directMats={a:sd.a||[],b:sd.b||[],c:sd.c||[],d:sd.d||[]};
-      ['a','b','c','d'].forEach(function(s){renderPlan(s);renderDirect(s);});
-      calcAll();
-    }
+    if(saved){ _applyPlansData(saved); return; }
   }catch(e){}
+  // localStorage 없으면 n8n에서 복원
+  fetch(N8N_BASE+'/webhook/mrp-plans-load?date='+date,{headers:{'ngrok-skip-browser-warning':'true'}})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data||data.ok===false) return;
+      try{ localStorage.setItem(MRP_SAVE_KEY+date, JSON.stringify(data)); }catch(e){}
+      _applyPlansData(data);
+      showToast('☁️ 작업지시 데이터 복원됨 ('+date.slice(4,6)+'/'+date.slice(6,8)+')');
+    })
+    .catch(function(){});
 }
 
 /* ── 부품 직접추가 ── */
