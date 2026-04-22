@@ -175,10 +175,10 @@ body{font-family:'Inter','Malgun Gothic',sans-serif;background:var(--bg);color:#
 .sw-content{flex:1;padding:14px 18px;display:flex;flex-direction:column;gap:5px;background:transparent;box-sizing:border-box;border-left:4px solid transparent;min-width:0;transition:background .15s}
 .sw-content.am-active{border-left-color:#22c55e;background:rgba(34,197,94,.08)}
 .sw-content.pm-active{border-left-color:#22c55e;background:rgba(34,197,94,.08)}
-.wo-code{font-size:20px;color:#475569;font-family:inherit;font-weight:600;word-break:break-all}
-.wo-code-label{font-size:20px;color:#475569;font-family:inherit;font-weight:600}
-.wo-name{font-size:20px;font-weight:700;color:var(--text-main);line-height:1.4;word-break:break-all;font-family:inherit}
-.wo-name-label{font-size:20px;color:var(--text-main);font-family:inherit;font-weight:700}
+.wo-code{font-size:20px;color:var(--text-main);font-family:inherit;font-weight:700;word-break:break-all}
+.wo-code-label{font-size:20px;color:var(--text-main);font-family:inherit;font-weight:700}
+.wo-name{font-size:20px;font-weight:700;color:#475569;line-height:1.4;word-break:break-all;font-family:inherit}
+.wo-name-label{font-size:20px;color:#475569;font-family:inherit;font-weight:700}
 .wo-qty-row{font-size:20px;font-weight:800;color:var(--primary);margin-top:2px;font-family:inherit}
 .wo-qty-label{font-size:20px;color:var(--primary);font-family:inherit;font-weight:800}
 .wo-btns{flex-shrink:0;width:92px;display:flex;flex-direction:column;gap:6px;padding:10px 8px;justify-content:center;background:#f9fafb;border-left:1px solid #e5e7eb}
@@ -301,8 +301,8 @@ body{background:var(--bg);color:var(--text-main)}
 .acc-count,.acc-badge{background:rgba(255,255,255,.15);border-radius:4px;font-size:11px;padding:2px 8px;color:#fff}
 .acc-body{background:#fff}
 
-.wo-code,.wo-code-label{font-size:15px;color:var(--c-text2);font-weight:500}
-.wo-name,.wo-name-label{font-size:15px;font-weight:700;color:var(--text-main)}
+.wo-code,.wo-code-label{font-size:15px;color:var(--text-main);font-weight:700}
+.wo-name,.wo-name-label{font-size:15px;font-weight:700;color:var(--c-text2)}
 .wo-qty-row,.wo-qty-label{font-size:16px;font-weight:800;color:var(--c-accent)}
 .wo-btns{background:#f8f9fb;border-left:1px solid var(--c-border);width:84px}
 .wo-btn{border-radius:8px;font-size:13px}
@@ -848,6 +848,7 @@ function mergeWithDirect(exploded,directs){
 var selProd = null;
 var acIdx = -1, acMatches = [];
 var resultData = {am:[], pm:[], a:[], b:[], c:[], d:[]};
+var confirmedMatCodes = null; // {a:{code:true,...}, ...} 확정 시 체크된 자재코드
 
 /* ── 자동완성 ── */
 document.addEventListener('DOMContentLoaded',function(){
@@ -1014,7 +1015,34 @@ function fetchPackQty(codes){
     ['am','a','b','pm','c','d'].forEach(function(sh){renderResult(sh,resultData[sh]);});
     renderResultByLine();
   })
+  .then(function(){
+    // pack-qty 완료 후 MES DB에서 주거래처명 보완
+    var allCodes = Object.keys(packQtyData);
+    if(allCodes.length) fetchVendors(allCodes);
+  })
   .catch(function(e){ console.warn('[적입량] 조회 실패 (WF4 비활성 또는 네트워크 오류):',e); });
+}
+
+function fetchVendors(codes){
+  if(!codes||!codes.length) return;
+  fetch(N8N_BASE+'/webhook/vendor-lookup',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','ngrok-skip-browser-warning':'true'},
+    body:JSON.stringify({codes:codes})
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    var vendors=data.vendors||{};
+    var updated=false;
+    Object.keys(vendors).forEach(function(code){
+      if(vendors[code]){ vendorData[code]=vendors[code]; updated=true; }
+    });
+    if(updated){
+      ['am','a','b','pm','c','d'].forEach(function(sh){ renderResult(sh,resultData[sh]); });
+      renderResultByLine();
+    }
+  })
+  .catch(function(e){ console.warn('[vendor-lookup] 주거래처명 조회 실패:',e); });
 }
 
 /* ── 완제품별 보기 토글 ── */
@@ -1428,7 +1456,7 @@ function renderResultByLine(){
           var mats=explode([plan]);
           var activeCount=mats.filter(function(m){var e=productViewEdits[_prodEK(sh,woKey,m.code)];return e&&e.checked&&e.qty>0;}).length;
           var allOk=activeCount===mats.length&&mats.length>0;
-          return '<div onclick="openProdModal(\''+sh+'\','+pi+')" style="padding:11px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;-webkit-tap-highlight-color:transparent;background:#fff" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
+          return '<div class="rbl-prod-item" data-code="'+plan.code.replace(/"/g,'&quot;').toLowerCase()+'" data-name="'+plan.name.replace(/"/g,'&quot;').replace(/</g,'&lt;').toLowerCase()+'" onclick="openProdModal(\''+sh+'\','+pi+')" style="padding:11px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;-webkit-tap-highlight-color:transparent;background:#fff" onmouseover="this.style.background=\'#f8fafc\'" onmouseout="this.style.background=\'#fff\'">'
             +'<code style="font-size:14px;color:#1e3a8a;font-weight:700;background:#dbeafe;padding:1px 6px;border-radius:5px">'+esc(plan.code)+'</code>'
             +'<div style="font-size:13px;font-weight:700;color:#111;margin-top:3px">'+esc(plan.name)+'</div>'
             +'<div style="font-size:12px;color:#6b7280;margin-top:2px">'+fmt(plan.qty)+' EA · 자재 <span style="color:'+(allOk?'#22c55e':'#f59e0b')+'">'+activeCount+'/'+mats.length+'종</span></div>'
@@ -1446,7 +1474,9 @@ function renderResultByLine(){
         +'<span style="background:rgba(255,255,255,.2);border-radius:4px;padding:2px 8px;font-size:11px">'+totalItems+'종</span>'
         +'<span style="font-size:18px;transition:transform .25s;display:inline-block'+(isOpen?';transform:rotate(180deg)':'')+'">▾</span>'
         +'</div></button>'
-        +'<div class="rbl-body'+(isOpen?' open':'')+'" style="padding:12px">'+slotsHtml+'</div></div>';
+        +'<div class="rbl-body'+(isOpen?' open':'')+'" style="padding:12px">'
+        +'<div style="margin-bottom:8px"><input type="text" id="srch-'+safeId+'" placeholder="품번/품명 검색 (A·B·C·D타임 전체)..." oninput="filterRblMats(\''+safeId+'\')" style="width:100%;padding:7px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:12px;font-family:inherit;outline:none" onfocus="this.style.borderColor=\'#1e3a8a\'" onblur="this.style.borderColor=\'#e5e7eb\'"></div>'
+        +slotsHtml+'</div></div>';
     }).join('');
     container.innerHTML=html||'<div style="text-align:center;color:#9ca3af;padding:32px 0">계획이 없습니다</div>';
     return;
@@ -1495,7 +1525,10 @@ function renderResultByLine(){
         var r=item.r, lnQty=item.qty;
         var pq=packQtyData[r.code]||0;
         var bc=(pq>0&&lnQty>0)?fmt(Math.ceil(lnQty/pq)):'-';
-        return '<tr>'
+        var remain=(pq>0&&lnQty>0)?(Math.ceil(lnQty/pq)*pq-lnQty):-1;
+        var remStr=remain>=0?fmt(remain):'-';
+        var remColor=remain===0?'#22c55e':(remain>0?'#dc2626':'#9ca3af');
+        return '<tr data-code="'+r.code.replace(/"/g,'&quot;').toLowerCase()+'" data-name="'+r.name.replace(/"/g,'&quot;').replace(/</g,'&lt;').toLowerCase()+'">'
           +'<td style="padding:3px 4px;text-align:center;border-bottom:1px solid #f1f5f9">'
             +'<input type="checkbox" checked data-sh="'+sh+'" data-code="'+r.code+'" style="width:14px;height:14px;accent-color:#1e3a8a;cursor:pointer">'
           +'</td>'
@@ -1505,6 +1538,7 @@ function renderResultByLine(){
           +'</td>'
           +'<td style="padding:3px 4px;text-align:right;font-size:12px;font-weight:800;color:#1e3a8a;border-bottom:1px solid #f1f5f9">'+fmt(lnQty)+'</td>'
           +'<td style="padding:3px 4px;text-align:right;font-size:11px;color:#6b7280;border-bottom:1px solid #f1f5f9">'+(pq>0?fmt(pq):'-')+'</td>'
+          +'<td style="padding:3px 4px;text-align:right;font-size:11px;font-weight:700;color:'+remColor+';border-bottom:1px solid #f1f5f9">'+remStr+'</td>'
           +'<td style="padding:3px 4px;text-align:right;font-size:12px;font-weight:800;color:#92400e;border-bottom:1px solid #f1f5f9">'+bc+'</td>'
           +'</tr>';
       }).join('');
@@ -1513,12 +1547,13 @@ function renderResultByLine(){
         +si.icon+' '+si.label+'<span style="font-weight:400;opacity:.8;margin-left:4px">'+items.length+'건</span></div>'
         +'<div style="border-radius:6px;border:1px solid #f0f4fa;overflow:hidden">'
         +'<table style="width:100%;border-collapse:collapse;table-layout:fixed">'
-        +'<colgroup><col style="width:22px"><col><col style="width:38px"><col style="width:34px"><col style="width:34px"></colgroup>'
+        +'<colgroup><col style="width:22px"><col><col style="width:44px"><col style="width:50px"><col style="width:52px"><col style="width:34px"></colgroup>'
         +'<thead><tr style="background:#f8f9fb">'
-        +'<th style="padding:4px 3px;font-size:9px;color:#9ca3af;font-weight:700;text-align:center;border-bottom:1px solid #e5e7eb">☑</th>'
+        +'<th style="padding:4px 3px;font-size:9px;color:#9ca3af;font-weight:700;text-align:center;border-bottom:1px solid #e5e7eb"><input type="checkbox" checked style="width:13px;height:13px;accent-color:#1e3a8a;cursor:pointer" onclick="toggleRblSlotAll(this)" title="전체 선택/해제"></th>'
         +'<th style="padding:4px 5px;font-size:10px;color:#9ca3af;font-weight:700;text-align:left;border-bottom:1px solid #e5e7eb">품목코드/품명</th>'
         +'<th style="padding:4px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">소요량</th>'
         +'<th style="padding:4px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">적입</th>'
+        +'<th style="padding:4px 4px;font-size:9px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">예상잔량</th>'
         +'<th style="padding:4px 4px;font-size:10px;color:#9ca3af;font-weight:700;text-align:right;border-bottom:1px solid #e5e7eb">박스</th>'
         +'</tr></thead>'
         +'<tbody>'+rows+'</tbody>'
@@ -1538,12 +1573,42 @@ function renderResultByLine(){
       +'<span style="font-size:18px;transition:transform .25s;display:inline-block'+(isOpen?';transform:rotate(180deg)':'')+'">▾</span>'
       +'</div></button>'
       +'<div class="rbl-body'+(isOpen?' open':'')+'" style="padding:12px">'
+      +'<div style="margin-bottom:8px"><input type="text" id="srch-'+safeId+'" placeholder="자재번호/품명 검색 (A·B·C·D타임 전체)..." oninput="filterRblMats(\''+safeId+'\')" style="width:100%;padding:7px 12px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:12px;font-family:inherit;outline:none" onfocus="this.style.borderColor=\'#1e3a8a\'" onblur="this.style.borderColor=\'#e5e7eb\'"></div>'
       +slotsHtml
       +(delBtns?'<div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid #f1f5f9">'+delBtns+'</div>':'')
       +'</div></div>';
   }).join('');
 
   container.innerHTML=html||'<div style="text-align:center;color:#9ca3af;padding:32px 0;font-size:13px">소요량 계산 버튼을 눌러주세요</div>';
+}
+
+function toggleRblSlotAll(hd){
+  var tb=hd.closest('table').querySelector('tbody');
+  if(!tb) return;
+  tb.querySelectorAll('tr[data-code]').forEach(function(tr){
+    if(tr.style.display==='none') return;
+    var cb=tr.querySelector('input[type="checkbox"]');
+    if(cb) cb.checked=hd.checked;
+  });
+}
+
+function filterRblMats(safeId){
+  var el=document.getElementById(safeId);
+  var srch=document.getElementById('srch-'+safeId);
+  if(!el||!srch) return;
+  var kw=(srch.value||'').trim().toLowerCase();
+  // 자재별: tr 행 필터
+  el.querySelectorAll('tbody tr[data-code]').forEach(function(tr){
+    var code=tr.getAttribute('data-code')||'';
+    var name=tr.getAttribute('data-name')||'';
+    tr.style.display=(!kw||code.includes(kw)||name.includes(kw))?'':'none';
+  });
+  // 완제품별: 제품 div 필터
+  el.querySelectorAll('.rbl-prod-item').forEach(function(div){
+    var code=div.getAttribute('data-code')||'';
+    var name=div.getAttribute('data-name')||'';
+    div.style.display=(!kw||code.includes(kw)||name.includes(kw))?'':'none';
+  });
 }
 
 function toggleRblLine(ln, id){
@@ -1869,6 +1934,8 @@ function selectWODate(date){
   woAssign={};
   woSplitQty={};
   productViewEdits={};
+  confirmedMatCodes=null;
+  try{ var _cmc=JSON.parse(localStorage.getItem('mrp_cmc_'+date)||'null'); if(_cmc) confirmedMatCodes=_cmc; }catch(e){}
   loadPriority(date);
   buildDateBar();
   // 날짜 피커 동기화 (YYYYMMDD → YYYY-MM-DD)
@@ -2469,7 +2536,10 @@ function renderPickupStatus(){
     var allMatCodes=[];
     var entries=lineMap[ln];
     entries.forEach(function(e){
-      getMatsForItem(e.plan.code).forEach(function(m){
+      var _allM=getMatsForItem(e.plan.code);
+      var _shC=confirmedMatCodes&&confirmedMatCodes[e.sh];
+      if(_shC&&Object.keys(_shC).length) _allM=_allM.filter(function(m){ return _shC[m.code]; });
+      _allM.forEach(function(m){
         if(allMatCodes.indexOf(m.code)<0) allMatCodes.push(m.code);
       });
     });
@@ -2496,7 +2566,9 @@ function renderPickupStatus(){
       var shBadgeColor=sh==='a'||sh==='b'?'#fef3c7':'#dbeafe';
       var shBadge='<span style="font-size:10px;padding:1px 6px;border-radius:4px;background:'+shBadgeColor+';color:#374151;margin-left:6px">'+(_shL[sh]||sh)+'</span>';
 
+      var _shC2=confirmedMatCodes&&confirmedMatCodes[sh];
       var mats=getMatsForItem(plan.code);
+      if(_shC2&&Object.keys(_shC2).length) mats=mats.filter(function(m){ return _shC2[m.code]; });
       var prodChecked=mats.filter(function(m){ return isMatChecked(m.code, tabShift); }).length;
       var prodDone=mats.length>0&&prodChecked===mats.length;
 
@@ -2680,6 +2752,12 @@ function toggleAllCheck(sh){
 function confirmSelected(){
   if(resultViewMode==='product'){
     buildResultDataFromProductView();
+    confirmedMatCodes={};
+    ['a','b','c','d'].forEach(function(sh){
+      confirmedMatCodes[sh]={};
+      (resultData[sh]||[]).forEach(function(r){ confirmedMatCodes[sh][r.code]=true; });
+    });
+    try{ if(woDate) localStorage.setItem('mrp_cmc_'+woDate, JSON.stringify(confirmedMatCodes)); }catch(e){}
     confirmToN8N();
     goStep(3);
     return;
@@ -2696,6 +2774,12 @@ function confirmSelected(){
       return Object.assign({}, r, {qty: qty});
     }).filter(function(r){ return r.qty > 0; });
   });
+  confirmedMatCodes={};
+  ['a','b','c','d'].forEach(function(sh){
+    confirmedMatCodes[sh]={};
+    (selected[sh]||[]).forEach(function(r){ confirmedMatCodes[sh][r.code]=true; });
+  });
+  try{ if(woDate) localStorage.setItem('mrp_cmc_'+woDate, JSON.stringify(confirmedMatCodes)); }catch(e){}
   var _orig = resultData;
   resultData = selected;
   confirmToN8N();
