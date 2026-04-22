@@ -331,6 +331,7 @@ function onDateSelChange(){
   var ds = document.getElementById('day-sel');
   if(!ys||!ms||!ds||!ds.value) return;
   currentDate = ys.value + ms.value + ds.value;
+  lastConfirmSig = '';
   loadChecked();
   loadData();
 }

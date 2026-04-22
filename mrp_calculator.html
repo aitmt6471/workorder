@@ -2646,7 +2646,6 @@ function togglePickupLine(ln){
 function confirmToN8N(){
   if(!woDate){ showToast('날짜를 선택하세요',true); return; }
   var _hasAny=false;['a','b','c','d'].forEach(function(s){if(plans[s].length)_hasAny=true;});
-  if(!_hasAny){ showToast('배정된 작업지시가 없습니다',true); return; }
   function _addMeta(m){var pq=packQtyData[m.code]||0;return Object.assign({},m,{pack_qty:pq,box_count:pq>0?Math.ceil(m.qty/pq):0,location:locationData[m.code]||'',vendor:vendorData[m.code]||''});}
   function _addLineName(mats,planList){
     var lnMap={};
