@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>공정문서 관리시스템</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="app-layout">
+
+  <!-- ── 좌측 사이드바 ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="ait-logo.png" alt="AIT" class="sidebar-logo-img">
+      <div class="sidebar-logo-text">공정문서<br>관리시스템</div>
+    </div>
+
+    <div class="sidebar-car">
+      <label class="sidebar-car-label">아이템 선택</label>
+      <select class="sidebar-sel" id="car-sel" onchange="onCarChange(this)"></select>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-tab="cp" onclick="showTab('cp',this)">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">CP (관리계획서)</span>
+      </div>
+      <div class="nav-item" data-tab="ws" onclick="showTab('ws',this)">
+        <span class="nav-icon">📄</span>
+        <span class="nav-label">작업표준서</span>
+      </div>
+      <div class="nav-item" data-tab="daily" onclick="showTab('daily',this)">
+        <span class="nav-icon">🔧</span>
+        <span class="nav-label">설비일상점검표</span>
+      </div>
+      <div class="nav-item" data-tab="imf" onclick="showTab('imf',this)">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-label">초중종물</span>
+      </div>
+      <div class="nav-item" data-tab="ms" onclick="showTab('ms',this)">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-label">마스터샘플</span>
+      </div>
+      <div class="nav-item" data-tab="spec" onclick="showTab('spec',this)">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">사양표</span>
+      </div>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="btn btn-sm sidebar-btn" onclick="openCarModal()">⚙ 아이템관리</button>
+      <button class="btn btn-sm sidebar-btn">🖨 인쇄</button>
+    </div>
+    <div id="sidebar-reset-btn" style="display:none;padding:8px 12px;border-top:1px solid var(--border)">
+      <button class="btn btn-sm sidebar-btn" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}resetAllData();})()" style="width:100%;color:#f87171;border-color:rgba(248,113,113,.4)">🗑 전체 초기화</button>
+    </div>
+  </aside>
+
+  <!-- ── 메인 콘텐츠 ── -->
+  <main class="main-content">
+    <div id="pane-cp" class="pane active"></div>
+    <div id="pane-ws" class="pane"></div>
+    <div id="pane-daily" class="pane"></div>
+    <div id="pane-imf" class="pane"></div>
+    <div id="pane-ms" class="pane"></div>
+    <div id="pane-spec" class="pane"></div>
+  </main>
+
+</div>
+
+<!-- ── 라이트박스 모달 ── -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <div class="lightbox-box" id="lightbox-box"></div>
+  <div class="lightbox-caption" id="lightbox-caption"></div>
+  <div style="color:rgba(255,255,255,.45);font-size:13px">클릭하거나 ESC를 눌러 닫기</div>
+</div>
+
+<!-- ── 차종 관리 모달 ── -->
+<div class="car-modal-overlay" id="car-modal" onclick="if(event.target===this)closeCarModal()">
+  <div class="car-modal">
+    <div class="car-modal-hd">
+      <h4>아이템 관리</h4>
+      <button class="btn btn-ghost btn-sm" onclick="closeCarModal()">✕</button>
+    </div>
+    <div class="car-list" id="car-list"></div>
+    <div class="car-add-row">
+      <input id="car-add-input" type="text" placeholder="새 아이템명 입력 (예: SP2 ROOM)"
+             onkeydown="if(event.key==='Enter')addCar()">
+      <button class="btn btn-primary btn-sm" onclick="addCar()">＋ 추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── 품번/품명 모달 ── -->
+<div class="car-modal-overlay" id="part-modal" onclick="if(event.target===this)closePartModal()">
+  <div class="car-modal" style="width:380px;max-width:96vw">
+    <div class="car-modal-hd">
+      <h4>품번 / 품명 등록</h4>
+      <button class="btn btn-ghost btn-sm" onclick="closePartModal()">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#6b7280;font-weight:600">품번</label>
+        <input id="part-modal-partno" type="text" placeholder="품번 입력" style="border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;font-family:inherit">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#6b7280;font-weight:600">품명</label>
+        <input id="part-modal-partname" type="text" placeholder="품명 입력" style="border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;font-family:inherit" onkeydown="if(event.key==='Enter')savePartModal()">
+      </div>
+    </div>
+    <div class="car-add-row" style="justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="closePartModal()">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="savePartModal()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── CFT 모달 ── -->
+<div class="car-modal-overlay" id="cft-modal" onclick="if(event.target===this)closeCftModal()">
+  <div class="car-modal" style="width:520px;max-width:96vw">
+    <div class="car-modal-hd">
+      <h4>상호 기능원 (CFT)</h4>
+      <button class="btn btn-ghost btn-sm" onclick="closeCftModal()">✕</button>
+    </div>
+    <div style="padding:12px 16px;display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto" id="cft-list"></div>
+    <div class="car-add-row" style="flex-direction:column;gap:6px">
+      <div style="display:flex;gap:6px">
+        <input id="cft-role-input" type="text" placeholder="역할 (예: 설계개발)" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+        <input id="cft-name-input" type="text" placeholder="이름 (예: 홍길동 책임)" style="flex:2;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit" onkeydown="if(event.key==='Enter')addCftMember()">
+        <button class="btn btn-primary btn-sm" onclick="addCftMember()">＋ 추가</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 개정이력 모달 ── -->
+<div class="rev-modal-overlay" id="rev-modal" onclick="if(event.target===this)closeRevModal()">
+  <div class="rev-modal">
+    <div class="rev-modal-hd">
+      <div>
+        <div class="rev-modal-title">개정 이력</div>
+        <div class="rev-modal-sub" id="rev-modal-car"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeRevModal()">✕</button>
+    </div>
+    <div class="rev-modal-body">
+      <table class="rev-tbl">
+        <thead>
+          <tr>
+            <th style="width:80px">개정번호</th>
+            <th style="width:100px">개정일</th>
+            <th style="width:80px">작성자</th>
+            <th>개정 내용</th>
+            <th style="width:120px">해당 문서</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="rev-modal-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── CP 항목 추가 모달 ── -->
+<div class="car-modal-overlay" id="cp-add-modal" onclick="if(event.target===this)closeCpAddModal()">
+  <div class="car-modal" style="width:580px;max-width:96vw">
+    <div class="car-modal-hd">
+      <h4>CP 항목 추가</h4>
+      <button class="btn btn-ghost btn-sm" onclick="closeCpAddModal()">✕</button>
+    </div>
+    <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:72vh;overflow-y:auto">
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">공정 그룹 선택</label>
+        <select id="cpa-group" onchange="onCpaGroupChange(this)" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit"></select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">공정번호</label>
+        <input id="cpa-proc-no" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">공정명</label>
+        <input id="cpa-proc-name" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">설비명</label>
+        <input id="cpa-equip" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">MAIN/SUB</label>
+        <select id="cpa-mainsub" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>MAIN</option><option>SUB</option><option>외주</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">특별특성</label>
+        <input id="cpa-special" type="text" placeholder="—" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">F/PF</label>
+        <input id="cpa-fpf" type="text" placeholder="—" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">구분</label>
+        <select id="cpa-cat" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>제품</option><option>공정</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">관리항목 <span style="color:var(--red)">*</span></label>
+        <input id="cpa-item" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">규격/관리기준</label>
+        <input id="cpa-spec" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">확인방법</label>
+        <select id="cpa-method" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>육안</option><option>지시값기록</option><option>측정기</option><option>다이얼게이지</option><option>전하량측정기</option><option>에어건</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">주기</label>
+        <select id="cpa-cycle" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>전수</option><option>시업 시</option><option>1회/주</option><option>1개월</option><option>LOT별</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">관리방안</label>
+        <select id="cpa-plan" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>작업표준서</option><option>설비일상점검표</option><option>QC기준서</option><option>FMEA</option><option>SOP</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">관리주체</label>
+        <select id="cpa-owner" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>생산</option><option>품질</option><option>설비</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">이상조치</label>
+        <input id="cpa-action" type="text" placeholder="부적합 격리/관리자 통보" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">비고</label>
+        <input id="cpa-note" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+    </div>
+    <div class="car-add-row" style="justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="closeCpAddModal()">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="submitCpAddModal()">추가</button>
+    </div>
+  </div>
+</div>
+
+
+<script src="js/api.js?v=20260504a"></script>
+<script src="js/cp.js?v=20260504a"></script>
+<script src="js/main.js?v=20260504a"></script>
+<script src="js/ws.js?v=20260427f"></script>
+
+<!-- 탭 콘텐츠 fetch 로드 -->
+<script>
+const TABS = ['cp','ws','daily','imf','ms','spec'];
+const loaded = {};
+async function loadTab(id) {
+  if (loaded[id]) return;
+  try {
+    const res = await fetch(`tabs/${id}.html?v=${Date.now()}`);
+    const html = await res.text();
+    const pane = document.getElementById('pane-' + id);
+    pane.innerHTML = '';
+    if (id === 'cp') {
+      pane.innerHTML = html; // <script> 없음 → innerHTML이 createContextualFragment보다 수배 빠름
+      initCpEventListeners();
+    } else {
+      const frag = document.createRange().createContextualFragment(html);
+      pane.appendChild(frag);
+    }
+    loaded[id] = true;
+    if (typeof loadCarContent === 'function') loadCarContent(id);
+    updateMonthLabel(id);
+    updateRevDisplay(id);
+  } catch(e) {
+    console.warn('탭 로드 실패:', id, e);
+  }
+}
+document.addEventListener('DOMContentLoaded', async () => {
+  await initCars();
+  loadTab('cp');
+});
+const _origShowTab = window.showTab;
+window.showTab = function(id, el) {
+  _origShowTab(id, el);
+  loadTab(id);
+};
+</script>
+
+<!-- ── Toast 컨테이너 ── -->
+<div id="toast-container"></div>
+
+<!-- ── 저장 중 indicator (헤더 우측 삽입 대상) ── -->
+<div id="saving-indicator">저장 중...</div>
+
+</body>
+</html>

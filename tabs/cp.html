@@ -1,0 +1,107 @@
+<!-- CP 탭 -->
+<div class="tab-toolbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">관리계획서</span>
+    <div style="width:1px;height:16px;background:var(--border)"></div>
+    <span id="cp-rev-badge" style="font-size:13px;font-weight:700;color:#111827">Rev. 0</span>
+    <span id="cp-rev-date" style="font-size:13px;color:#374151">개정일: -</span>
+    <button class="btn btn-ghost btn-sm" onclick="openRevModal()">이력</button>
+  </div>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost btn-sm" onclick="cpExpandAll(true)">&#x25BC; 펼치기</button>
+  <button class="btn btn-ghost btn-sm" onclick="cpExpandAll(false)">&#x25B2; 접기</button>
+  <button class="btn btn-ghost btn-sm" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}cpResetToDefault();})()" style="color:#ef4444;border-color:rgba(239,68,68,.4)">&#x21BA; CP 초기화</button>
+  <button class="btn btn-ghost btn-sm edit-only" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}deleteEmptyCpRows();})()" style="color:#ef4444;border-color:rgba(239,68,68,.4)">&#x1F5D1; 빈 행 삭제</button>
+  <button class="btn btn-ghost btn-sm edit-only" onclick="addCpRow()">&#xFF0B; 항목 추가</button>
+  <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('cp')">저장</button>
+  <button class="btn btn-ghost btn-sm" id="cp-edit-btn" onclick="toggleTabEditMode('cp', this)">&#x270F; 편집 모드</button>
+</div>
+
+<!-- ── CP 메타 바 ── -->
+<div id="cp-meta-bar" style="background:#f8faff;border-bottom:2px solid #dce6f7;padding:7px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px">
+  <!-- 읽기모드: 단계 텍스트 -->
+  <span id="cp-stage-view" style="font-weight:700;color:#1e3264;font-size:12px;background:#edf3ff;border-radius:6px;padding:3px 10px"></span>
+  <!-- 편집모드: 라디오 -->
+  <div class="edit-only" style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 10px">
+    <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;font-weight:600">
+      <input type="radio" name="cp-stage" id="cp-stage-start" value="시작" style="accent-color:#1e3264" onchange="saveCpMetaOnChange()"> 시작
+    </label>
+    <span style="color:#d1d5db;margin:0 2px">|</span>
+    <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;font-weight:600">
+      <input type="radio" name="cp-stage" id="cp-stage-mass" value="양산" style="accent-color:#1e3264" onchange="saveCpMetaOnChange()"> 양산
+    </label>
+  </div>
+  <span style="color:#d1d5db">|</span>
+  <span style="font-size:11px;color:#6b7280">라인명</span>
+  <span id="cp-meta-linename" contenteditable="false" oninput="saveCpMetaOnChange()"
+    style="font-weight:700;color:#1e3264;font-size:12px;min-width:20px;display:inline-block"></span>
+  <span style="color:#d1d5db">|</span>
+  <span style="font-size:11px;color:#6b7280">차종</span>
+  <span id="cp-meta-model" style="font-weight:700;color:#1e3264;font-size:12px"></span>
+  <span style="color:#d1d5db">|</span>
+  <span style="font-size:11px;color:#6b7280">품번</span>
+  <span id="cp-meta-partno" style="font-weight:700;color:#1e3264;font-size:12px;padding:1px 3px"></span>
+  <span style="color:#d1d5db">|</span>
+  <span style="font-size:11px;color:#6b7280">품명</span>
+  <span id="cp-meta-partname" style="font-weight:700;color:#1e3264;font-size:12px;padding:1px 3px"></span>
+  <button class="edit-only" onclick="openPartModal()" style="background:#fff;border:1px solid #d1d5db;border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;color:#6b7280;line-height:1.6">수정</button>
+  <div style="width:100%;display:flex;align-items:flex-start;gap:6px;padding-top:4px;border-top:1px solid #dce6f7;margin-top:2px">
+    <span style="font-size:11px;color:#6b7280;white-space:nowrap;padding-top:1px">CFT</span>
+    <span id="cp-cft-inline" style="font-size:11px;color:#374151;flex:1;line-height:1.6"></span>
+    <button class="edit-only" onclick="openCftModal()" style="background:#fff;border:1px solid #d1d5db;border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;color:#6b7280;line-height:1.6;white-space:nowrap">수정</button>
+  </div>
+</div>
+
+<div style="padding:0 4px 16px">
+  <table id="cp-table" class="data-tbl" style="table-layout:fixed;width:100%">
+    <colgroup>
+      <col style="width:4.5%">   <!-- 공정번호 -->
+      <col style="width:7.5%">   <!-- 공정흐름도 -->
+      <col style="width:8%">     <!-- 공정명 -->
+      <col style="width:8%">     <!-- 설비명 -->
+      <col style="width:4%">     <!-- 특별특성 -->
+      <col style="width:3.5%">   <!-- F/PF -->
+      <col style="width:4.5%">   <!-- 관리항목구분 -->
+      <col style="width:10%">    <!-- 관리항목 -->
+      <col>                       <!-- 규격/관리기준 (flex) -->
+      <col style="width:6%">     <!-- 확인방법 -->
+      <col style="width:4%">     <!-- 주기 -->
+      <col style="width:8%">     <!-- 관리방안 -->
+      <col style="width:4.5%">   <!-- 관리주체 -->
+      <col style="width:9%">     <!-- 이상조치 -->
+      <col style="width:6%">     <!-- 비고 -->
+      <col class="edit-only" style="width:3%">  <!-- 삭제버튼 -->
+    </colgroup>
+    <thead>
+      <tr style="background:#1e3264;color:#fff;text-align:center;vertical-align:middle">
+        <th rowspan="2">공정번호</th>
+        <th style="font-size:10px;padding:2px 4px;border-bottom:1px solid rgba(255,255,255,.25)">공정흐름도</th>
+        <th rowspan="2">공정명</th>
+        <th rowspan="2">설비명</th>
+        <th rowspan="2">특별특성</th>
+        <th rowspan="2">F/PF</th>
+        <th rowspan="2">구분</th>
+        <th rowspan="2">관리항목</th>
+        <th rowspan="2">규격/관리기준</th>
+        <th rowspan="2">확인방법</th>
+        <th rowspan="2">주기</th>
+        <th rowspan="2">관리방안</th>
+        <th rowspan="2">관리주체</th>
+        <th rowspan="2">이상조치</th>
+        <th rowspan="2">비고</th>
+        <th class="edit-only" rowspan="2"></th>
+      </tr>
+      <tr style="background:#1e3264;color:#fff;text-align:center;vertical-align:middle">
+        <th style="padding:2px 0;font-size:9px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;justify-items:center">
+            <span>SUB</span><span>MAIN</span><span>외주</span>
+          </div>
+        </th>
+      </tr>
+    </thead>
+    <tbody id="cp-tbody">
+    </tbody>
+  </table>
+</div>
+
+</script>

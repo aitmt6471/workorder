@@ -1,0 +1,839 @@
+<!-- 마스터샘플 체크시트 -->
+<div class="tab-toolbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">마스터샘플 체크시트</span>
+    <div style="width:1px;height:16px;background:var(--border)"></div>
+    <span id="ms-rev-badge" style="font-size:13px;font-weight:700;color:#111827">Rev. 0</span>
+    <span id="ms-rev-date" style="font-size:13px;color:#374151">개정일: -</span>
+    <button class="btn btn-ghost btn-sm" onclick="openRevModal('ms')">이력</button>
+  </div>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('ms')">저장</button>
+  <button class="btn btn-ghost btn-sm" id="ms-edit-btn" onclick="toggleTabEditMode('ms',this)">&#x270F; 편집 모드</button>
+</div>
+
+<!-- 유효기간 임박 알림 배너 -->
+<div id="ms-expire-banner" style="display:none;padding:8px 16px;background:#fffbeb;border-bottom:2px solid #fcd34d">
+  <span style="font-size:12px;font-weight:700;color:#b45309">&#x26A0; 유효기간 임박: </span>
+  <span id="ms-expire-msg" style="font-size:12px;color:#92400e"></span>
+</div>
+
+<!-- 샘플 탭 -->
+<div style="background:#f4f7fc;border-bottom:2px solid #1e3264;padding:8px 16px 0;display:flex;flex-wrap:wrap;align-items:flex-end;gap:4px" id="ms-sample-tab-bar">
+  <div id="ms-sample-tabs" style="display:flex;flex-wrap:wrap;gap:4px;align-items:flex-end"></div>
+  <!-- 탭 추가 버튼 (편집 모드) -->
+  <button id="ms-add-tab-btn" style="display:none;padding:6px 12px;font-size:11px;font-weight:600;border:1px dashed #3b82f6;border-bottom:none;border-radius:6px 6px 0 0;cursor:pointer;background:#eff6ff;color:#1e40af;white-space:nowrap" onclick="window.msAddSample()">&#xFF0B; 탭 추가</button>
+</div>
+
+<!-- 빈 상태 (샘플 없음) -->
+<div id="ms-empty-state" style="display:none;padding:60px 20px;text-align:center;background:#f9fafb">
+  <div style="font-size:32px;margin-bottom:12px">📋</div>
+  <div style="font-size:15px;font-weight:600;color:#374151;margin-bottom:6px">등록된 마스터샘플이 없습니다</div>
+  <div style="font-size:12px;color:#6b7280;margin-bottom:20px">편집 모드에서 <strong>탭 추가</strong> 버튼으로 샘플을 추가하세요</div>
+  <div id="ms-empty-edit-hint" style="display:none">
+    <button onclick="window.msAddSample()" style="padding:8px 20px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#xFF0B; 샘플 추가</button>
+  </div>
+</div>
+
+<!-- 샘플 콘텐츠 (샘플 있을 때만 표시) -->
+<div id="ms-content">
+
+  <!-- 샘플 정보 헤더 -->
+  <div style="padding:0;border-bottom:3px solid #fff">
+    <table style="border-collapse:collapse;font-size:12px;width:100%;table-layout:fixed">
+      <colgroup>
+        <col style="width:58px"><col>
+        <col style="width:70px"><col style="width:110px">
+        <col style="width:50px"><col style="width:60px">
+        <col style="width:62px"><col style="width:100px">
+        <col style="width:70px"><col style="width:100px">
+      </colgroup>
+      <tbody>
+      <tr>
+        <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">설비명</th>
+        <td id="ms-sample-name" style="border:1px solid var(--border);padding:7px 8px;background:#fff;font-weight:600"></td>
+        <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">관리번호</th>
+        <td id="ms-sample-num" style="border:1px solid var(--border);padding:7px 8px;background:#fff;font-family:monospace;font-size:11px"></td>
+        <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">구분</th>
+        <td id="ms-sample-type" style="border:1px solid var(--border);padding:7px 8px;background:#fff;text-align:center"></td>
+        <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">유효기간</th>
+        <td id="ms-sample-expire" style="border:1px solid var(--border);padding:7px 8px;background:#fff;text-align:center"></td>
+        <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">관리책임자</th>
+        <td id="ms-manager" style="border:1px solid var(--border);padding:7px 8px;background:#fff"></td>
+      </tr>
+      <tr>
+        <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">내용</th>
+        <td id="ms-sample-content" colspan="9" style="border:1px solid var(--border);padding:7px 10px;background:#fff;font-weight:500;color:#1e3264"></td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 하단: 사진패널 + 점검표 -->
+  <div style="display:flex;min-height:0;border-top:1px solid var(--border)">
+
+    <!-- 왼쪽: 사진 패널 (앞/뒤/식별표) -->
+    <div id="ms-photo-panel" style="flex:1;min-width:0;display:flex;flex-direction:column;border-right:2px solid #c9d4e8;background:#fff">
+      <div style="background:#1e3264;color:#fff;padding:9px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0">
+        <span style="font-size:12px;font-weight:700;letter-spacing:.6px">샘플 사진</span>
+        <span id="ms-photo-status" style="font-size:11px;color:rgba(255,255,255,.6)"></span>
+      </div>
+      <div id="ms-photo-main" style="flex:1;background:#f3f4f6;position:relative;overflow:hidden;min-height:180px;display:flex;align-items:center;justify-content:center">
+        <div style="text-align:center;color:#9ca3af">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+          <div style="font-size:11px;margin-top:6px">사진을 선택하세요</div>
+        </div>
+      </div>
+      <div style="background:#f8f9fa;padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0">
+        <div id="ms-photo-strip" style="display:flex;gap:10px;align-items:flex-start;overflow-x:auto;padding-bottom:4px"></div>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 점검표 -->
+    <div style="flex:1;overflow-y:auto;min-width:0;display:flex;flex-direction:column">
+
+      <!-- 월 선택 -->
+      <div style="padding:10px 16px;border-bottom:3px solid #fff;background:#1e3264;display:flex;align-items:center;gap:10px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" onclick="prevMonth('ms');window.msRenderDayPicker()"
+          style="color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.08)">&#x2039;</button>
+        <span id="ms-month-label" style="font-weight:700;font-size:14px;min-width:90px;text-align:center;color:#fff">2026년 4월</span>
+        <button class="btn btn-ghost btn-sm" onclick="nextMonth('ms');window.msRenderDayPicker()"
+          style="color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.08)">&#x203A;</button>
+        <span style="font-size:11px;color:rgba(255,255,255,.5);margin-left:4px">날짜를 선택하세요</span>
+        <div style="flex:1"></div>
+        <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px">
+          <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.8)">점검자</span>
+          <input id="ms-worker-input" type="text" placeholder="이름 입력"
+            style="border:none;background:transparent;font-size:11px;font-family:inherit;width:90px;outline:none;color:#fff;caret-color:#fff"
+            onchange="window._msSaveWorker(this.value)">
+        </div>
+      </div>
+
+      <!-- 날짜 선택 -->
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);background:#f4f7fc;flex-shrink:0">
+        <div style="display:flex;flex-wrap:wrap;gap:4px" id="ms-day-picker"></div>
+      </div>
+
+      <!-- 점검 항목 -->
+      <div style="padding:14px 16px;overflow-x:auto;background:#fff">
+        <table id="ms-check-table" style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr style="background:#1e3264">
+              <th class="ms-edit-col" style="display:none;padding:7px 8px;text-align:center;font-weight:600;color:#fff;width:40px">삭제</th>
+              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:36px">No.</th>
+              <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">점검항목</th>
+              <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">판정기준</th>
+              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:78px">확인방법</th>
+              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:65px">주기</th>
+              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:80px">결과</th>
+              <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;width:120px">비고</th>
+            </tr>
+          </thead>
+          <tbody id="ms-check-tbody"></tbody>
+        </table>
+      </div>
+
+      <!-- 항목 추가 버튼 (편집 모드) -->
+      <div class="ms-edit-col" style="display:none;padding:6px 16px 14px;background:#fff">
+        <button onclick="window.msAddItem()"
+          style="padding:5px 14px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">
+          &#xFF0B; 항목 추가
+        </button>
+      </div>
+
+    </div><!-- /오른쪽 점검표 -->
+  </div><!-- /하단 flex -->
+
+</div><!-- /ms-content -->
+
+<script>
+(function(){
+/* ── 기본 데이터: 아이템별로 별도 관리, 기본은 빈 배열 ── */
+let MS_DATA = [];
+
+/* ── 작업 A: MS_ITEMS – 항목 메타 DB 캐시 ── */
+let MS_ITEMS = {}; // { "sampleIdx_itemNo": { id, sample_id, item_name, standard, method, cycle } }
+let _msSampleIds = []; // parallel to MS_DATA: _msSampleIds[tabIdx] = DB sample_id
+
+async function _msLoadItems() {
+  if (!window.currentCarId) return;
+  try {
+    const rows = await AIT_API.getMsItems(window.currentCarId);
+    MS_ITEMS = {};
+    _msSampleIds = [];
+    rows.forEach(r => { if (!_msSampleIds.includes(r.sample_id)) _msSampleIds.push(r.sample_id); });
+    rows.forEach(r => { MS_ITEMS[`${_msSampleIds.indexOf(r.sample_id)}_${r.item_no}`] = r; });
+  } catch(e) { console.warn('ms items 로드 실패', e); }
+}
+
+/* ── 작업 E: 점검 결과 Pending + debounce batch ── */
+let _msPendingResults = new Map();
+let _msSaveTimer = null;
+
+function _msStageResult(sampleIdx, itemNo, date, result, remark) {
+  const key = `${sampleIdx}_${itemNo}_${date}`;
+  _msPendingResults.set(key, { sampleIdx, itemNo, date, result, remark });
+  clearTimeout(_msSaveTimer);
+  _msSaveTimer = setTimeout(_msFlushResults, 1000);
+}
+
+async function _msFlushResults() {
+  if (!_msPendingResults.size || !window.currentCarId) return;
+  const grouped = new Map();
+  _msPendingResults.forEach((v) => {
+    const gKey = `${v.sampleIdx}_${v.date}`;
+    if (!grouped.has(gKey)) grouped.set(gKey, { sampleIdx: v.sampleIdx, date: v.date, results: [] });
+    grouped.get(gKey).results.push({ item_no: v.itemNo, result: v.result || '', remark: v.remark || '' });
+  });
+  _msPendingResults.clear();
+  for (const [, g] of grouped) {
+    const MS_SAMPLES_ARR = Array.isArray(MS_DATA) ? MS_DATA : [];
+    const sample_id = _msSampleIds[g.sampleIdx] || g.sampleIdx;
+    const worker = document.getElementById('ms-worker-input')?.value || '';
+    const payload = { sample_id, check_date: g.date, worker, results: g.results };
+    try { await AIT_API.saveMsResults(payload); } catch(e) { console.warn('MS 결과 저장 실패', e); }
+  }
+}
+
+window.addEventListener('beforeunload', () => { clearTimeout(_msSaveTimer); _msFlushResults(); });
+
+async function _msInitFromDb() {
+  if (!window.currentCarId || AIT_API.MOCK) return;
+  try {
+    // getMsSamples(헤더) + getMsItems(항목)을 병렬 호출 — JOIN 오버플로우 방지
+    const [samplesRaw, itemsRaw] = await Promise.all([
+      AIT_API.getMsSamples(window.currentCarId).catch(() => []),
+      AIT_API.getMsItems(window.currentCarId).catch(() => [])
+    ]);
+
+    const samples  = (Array.isArray(samplesRaw) && samplesRaw.length ? samplesRaw : [])
+      .sort((a, b) => (a.mgmt_no || '').localeCompare(b.mgmt_no || ''));
+    const allItems = Array.isArray(itemsRaw) ? itemsRaw : [];
+
+    // 항목을 sample_id 기준으로 그룹화
+    const itemsBySample = {};
+    allItems.forEach(it => {
+      if (!itemsBySample[it.sample_id]) itemsBySample[it.sample_id] = [];
+      itemsBySample[it.sample_id].push(it);
+    });
+
+    MS_DATA = []; _msSampleIds = []; MS_ITEMS = {};
+
+    samples.forEach((r, sIdx) => {
+      const sId = r.id;
+      _msSampleIds.push(sId);
+
+      let items = [];
+      // getMsItems 항목 우선 (신뢰성 높음)
+      const dbItems = (itemsBySample[sId] || []).sort((a, b) => Number(a.item_no) - Number(b.item_no));
+      if (dbItems.length) {
+        items = dbItems.map(it => {
+          MS_ITEMS[`${sIdx}_${it.item_no}`] = { ...it, sample_id: sId };
+          return { no: String(it.item_no), name: it.item_name || '', std: it.standard || '', method: it.method || '', cycle: it.cycle || '' };
+        });
+      } else if (r.items_raw) {
+        // 구형 GROUP_CONCAT 포맷
+        try {
+          items = String(r.items_raw).split('||').filter(Boolean).map(s => {
+            try {
+              const obj = JSON.parse(s);
+              MS_ITEMS[`${sIdx}_${obj.item_no}`] = { ...obj, sample_id: sId };
+              return { no: String(obj.item_no), name: obj.item_name || '', std: obj.standard || '', method: obj.method || '', cycle: obj.cycle || '' };
+            } catch { return null; }
+          }).filter(Boolean);
+        } catch {}
+      } else if (Array.isArray(r.items)) {
+        // n8n items 배열 포맷 (null 제외)
+        items = r.items.filter(it => it && it.item_no != null).map(it => {
+          MS_ITEMS[`${sIdx}_${it.item_no}`] = { ...it, sample_id: sId };
+          return { no: String(it.item_no), name: it.item_name || '', std: it.standard || '', method: it.method || '', cycle: it.cycle || '' };
+        });
+      }
+
+      MS_DATA.push({
+        id: sId,
+        sheet: r.sheet_name || '',
+        name: r.equip_name || '',
+        num: r.mgmt_no || '',
+        type: r.sample_type || 'OK',
+        expire: r.expire_date || '',
+        manager: r.manager || '',
+        items: items.length ? items : [{ no: '1', name: '마스터샘플 확인', std: '', method: '', cycle: '시업 전' }]
+      });
+    });
+  } catch(e) {
+    console.warn('MS DB 로드 실패', e);
+  }
+}
+
+let curSample = 0, curDay = new Date().getDate(), msEditMode = false;
+function getCar(){ return typeof getCurrentCar==='function' ? getCurrentCar() : ''; }
+
+/* ── 데이터 저장 (DB 전환 후 localStorage 제거) ── */
+function msSaveData(){
+  if(typeof window._markPaneDirty === 'function') window._markPaneDirty('ms');
+}
+
+/* ── 빈 상태 / 콘텐츠 전환 ── */
+function msUpdateVisibility(){
+  const empty   = document.getElementById('ms-empty-state');
+  const content = document.getElementById('ms-content');
+  const hint    = document.getElementById('ms-empty-edit-hint');
+  if(!empty || !content) return;
+  if(MS_DATA.length === 0){
+    empty.style.display   = '';
+    content.style.display = 'none';
+    if(hint) hint.style.display = msEditMode ? '' : 'none';
+  } else {
+    empty.style.display   = 'none';
+    content.style.display = '';
+  }
+}
+
+/* ── 탭 단축 레이블 파생 (설비명+타입+NG순번) ── */
+function _msDeriveTabLabel(s, idx){
+  const nm = s.name || '';
+  const isVision = nm.includes('비전') || nm.includes('비젼');
+  const eqType = isVision ? '비전' : '기능';
+  if ((s.type||'OK') === 'OK') return `GN7 ${eqType} OK`;
+  let ngCount = 0;
+  for(let i=0; i<=idx; i++){
+    const x=MS_DATA[i], xnm=x.name||'';
+    const xVision=xnm.includes('비전')||xnm.includes('비젼');
+    if(xVision===isVision && (x.type||'OK')==='NG') ngCount++;
+  }
+  return `GN7 ${eqType} NG ${ngCount}`;
+}
+
+/* ── 샘플 탭 렌더 ── */
+function msRenderSampleTabs(){
+  const c = document.getElementById('ms-sample-tabs'); if(!c) return;
+  const addBtn = document.getElementById('ms-add-tab-btn');
+  if(addBtn) addBtn.style.display = msEditMode ? '' : 'none';
+
+  c.innerHTML = MS_DATA.map((s,i) => {
+    const isOk = s.type === 'OK', active = i === curSample;
+    const typeColor = isOk ? '#166534' : '#991b1b';
+    const typeBg   = isOk ? '#dcfce7'  : '#fee2e2';
+    const delBtn = msEditMode
+      ? `<span onclick="event.stopPropagation();window.msDeleteSample(${i})"
+           style="margin-left:6px;display:inline-flex;align-items:center;justify-content:center;
+           width:14px;height:14px;border-radius:50%;background:rgba(239,68,68,.15);color:#ef4444;
+           font-size:9px;font-weight:900;cursor:pointer;line-height:1" title="탭 삭제">✕</span>`
+      : '';
+    return `<button onclick="window._msSelSample(${i})"
+      style="padding:6px 10px;font-size:11px;font-weight:600;border:1px solid ${active?'#1e3264':'#c4cedf'};border-bottom:none;
+      border-radius:6px 6px 0 0;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;
+      background:${active?'#1e3264':'#fff'};color:${active?'#fff':'var(--text)'}">
+      <span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;
+        background:${active?'rgba(255,255,255,.2)':typeBg};color:${active?'#fff':typeColor};margin-right:4px">${s.type}</span>${_msDeriveTabLabel(s,i)}${delBtn}
+    </button>`;
+  }).join('');
+}
+
+/* ── 샘플 탭 추가 / 삭제 ── */
+window.msAddSample = function(){
+  if (!window.currentCarId || AIT_API.MOCK) {
+    MS_DATA.push({ sheet:'(샘플명)', name:'(설비명)', num:'', type:'OK', expire:'', manager:'', items:[{no:'1', name:'(항목명)', std:'(판정기준)', method:'', cycle:'시업 전'}] });
+    _msSampleIds.push(null);
+    curSample = MS_DATA.length - 1;
+    msRenderAll();
+    return;
+  }
+  const sortOrder = MS_DATA.length * 10;
+  AIT_API.createMsSample(window.currentCarId, { sheet_name:'(샘플명)', equip_name:'(설비명)', mgmt_no:'', sample_type:'OK', expire_date:'', manager:'', sort_order: sortOrder })
+    .then(res => {
+      const newId = res?.id || res?.insertId || res?.[0]?.insertId;
+      MS_DATA.push({ id: newId, sheet:'(샘플명)', name:'(설비명)', num:'', type:'OK', expire:'', manager:'', items:[{no:'1', name:'(항목명)', std:'(판정기준)', method:'', cycle:'시업 전'}] });
+      _msSampleIds.push(newId);
+      curSample = MS_DATA.length - 1;
+      msRenderAll();
+    })
+    .catch(e => { console.warn('샘플 추가 실패', e); window.showToast && window.showToast('샘플 추가 실패', 'error'); });
+};
+window.msDeleteSample = function(idx){
+  if(!confirm(`"${MS_DATA[idx].sheet}" 탭을 삭제하겠습니까?`)) return;
+  const sId = _msSampleIds[idx];
+  if (sId && !AIT_API.MOCK) {
+    AIT_API.deleteMsSample(sId).catch(e => console.warn('샘플 삭제 실패', e));
+  }
+  MS_DATA.splice(idx, 1);
+  _msSampleIds.splice(idx, 1);
+  if(curSample >= MS_DATA.length) curSample = Math.max(0, MS_DATA.length - 1);
+  msRenderAll();
+};
+
+window._msSelSample = function(idx){
+  curSample = idx;
+  msRenderSampleTabs();
+  renderMsSampleInfo();
+  msRenderDayPicker();
+  renderMsCheckTable();
+  renderMsPhotoStrip();
+  _msLoadWorker();
+  _msLoadItems().then(() => {
+    renderMsCheckTable();
+    if (!_msHasLocalResults(idx, curDay)) _msLoadResultsFromDB(idx, curDay);
+  });
+};
+
+/* ── 전체 재렌더 ── */
+function msRenderAll(){
+  msUpdateVisibility();
+  msRenderSampleTabs();
+  if(MS_DATA.length > 0){
+    renderMsSampleInfo();
+    msRenderDayPicker();
+    renderMsCheckTable();
+    renderMsPhotoStrip();
+    _msLoadWorker();
+  }
+  _msCheckAllExpire();
+}
+
+/* ── 점검자 로드 ── */
+function _msLoadWorker(){
+  const m = getTabMonth('ms'), car = getCar();
+  const wk = localStorage.getItem(`ms_worker_${car}_${m.year}_${m.month}_${curDay}_${curSample}`) || '';
+  const wi = document.getElementById('ms-worker-input'); if(wi) wi.value = wk;
+}
+
+/* ── 샘플 정보 헤더 ── */
+function renderMsSampleInfo(){
+  if(MS_DATA.length === 0) return;
+  const s = MS_DATA[curSample]; if(!s) return;
+  // 작업 D: localStorage 대신 MS_DATA(DB 로드값) 직접 사용
+  const nm  = s.name    || '';
+  const num = s.num     || '';
+  const exp = s.expire  || '';
+  const mgr = s.manager || '';
+  const set = (id, v, field) => {
+    const el = document.getElementById(id); if(!el) return;
+    el.textContent = v;
+    el.contentEditable = msEditMode ? 'true' : 'false';
+    el.dataset.msfield = field;
+    el.onblur = () => {
+      const val = el.textContent.trim().replace(/^~/,'');
+      MS_DATA[curSample][el.dataset.msfield] = val;
+      msSaveData();
+      // DB sync (샘플 정보 변경)
+      if (window.currentCarId && typeof AIT_API !== 'undefined' && typeof AIT_API.updateMsSample === 'function') {
+        clearTimeout(window._msSampSyncTimer);
+        window._msSampSyncTimer = setTimeout(() => {
+          const sd = MS_DATA[curSample] || {};
+          const sId = _msSampleIds[curSample];
+          if (!sId) return;
+          const payload = { equip_name: sd.name, mgmt_no: sd.num, expire_date: sd.expire, manager: sd.manager };
+          window.safeApi
+            ? window.safeApi(() => AIT_API.updateMsSample(sId, payload), { msg: '샘플정보 저장' })
+            : AIT_API.updateMsSample(sId, payload).catch(e => console.warn('샘플정보 저장 실패', e));
+        }, 800);
+      }
+    };
+  };
+  set('ms-sample-name',   nm,  'name');
+  set('ms-sample-num',    num, 'num');
+  set('ms-sample-expire', exp ? `~${exp}` : '', 'expire');
+  set('ms-manager',       mgr || '—', 'manager');
+  const contentEl = document.getElementById('ms-sample-content');
+  if(contentEl) contentEl.textContent = s.sheet || '';
+  const typeEl = document.getElementById('ms-sample-type');
+  if(typeEl){
+    const isOk = s.type === 'OK';
+    let html = `<span style="display:inline-block;font-size:12px;font-weight:700;padding:2px 10px;border-radius:4px;background:${isOk?'#dcfce7':'#fee2e2'};color:${isOk?'#166534':'#991b1b'}">${s.type}</span>`;
+    if(msEditMode) html += `<button onclick="window._msToggleType()" style="margin-left:4px;font-size:10px;border:1px solid var(--border);border-radius:3px;padding:1px 5px;cursor:pointer">변경</button>`;
+    typeEl.innerHTML = html;
+  }
+}
+window._msToggleType = function(){
+  const s = MS_DATA[curSample]; if(!s) return;
+  s.type = s.type === 'OK' ? 'NG' : 'OK';
+  const sId = _msSampleIds[curSample];
+  if (sId && !AIT_API.MOCK) {
+    AIT_API.updateMsSample(sId, { sample_type: s.type }).catch(e => console.warn('샘플타입 저장 실패', e));
+  }
+  renderMsSampleInfo();
+  msRenderSampleTabs();
+};
+
+/* ── 유효기간 임박 배너 ── */
+function _msCheckAllExpire(){
+  const banner = document.getElementById('ms-expire-banner');
+  const msg    = document.getElementById('ms-expire-msg');
+  if(!banner || !msg) return;
+  const warns = [];
+  MS_DATA.forEach(s => {
+    if(!s.expire) return;
+    try {
+      const parts = s.expire.replace('~','').split('.');
+      const yr = parseInt(parts[0]) < 100 ? 2000+parseInt(parts[0]) : parseInt(parts[0]);
+      const exp = new Date(yr, parseInt(parts[1]), 0);
+      const diff = Math.ceil((exp - new Date())/(1000*60*60*24));
+      if(diff <= 90) warns.push(`${s.num||s.sheet}(${s.type}) D-${diff}일`);
+    } catch(e) {}
+  });
+  if(warns.length){
+    banner.style.display = 'block';
+    msg.textContent = warns.join(' / ');
+    const hasUrgent = warns.some(w => parseInt(w.match(/D-(\d+)/)?.[1]||'999') <= 30);
+    banner.style.background = hasUrgent ? '#fff5f5' : '#fffbeb';
+    banner.style.borderBottomColor = hasUrgent ? '#fca5a5' : '#fcd34d';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
+/* ── Holiday helper ── */
+const _MKRF = ['1-1','3-1','5-5','6-6','8-15','10-3','10-9','12-25'];
+const _MKRX = {
+  2025:['1-27','1-28','1-29','3-3','10-5','10-6','10-7','10-8'],
+  2026:['2-16','2-17','2-18','3-2','6-8','8-17','9-25','9-26','9-27','9-28','9-29','10-5']
+};
+function _msHol(m,d){
+  const dow = new Date(m.year,m.month-1,d).getDay(); if(dow===0) return true;
+  const md = `${m.month}-${d}`; if(_MKRF.includes(md)) return true;
+  const ex = _MKRX[m.year]; return !!(ex&&ex.includes(md));
+}
+
+/* ── 날짜 상태 ── */
+function getMsDaySt(day){
+  if(MS_DATA.length===0) return '';
+  const s = MS_DATA[curSample], m = getTabMonth('ms'), car = getCar();
+  if(!s) return '';
+  const res = s.items.map(it => localStorage.getItem(`ms_${car}_${m.year}_${m.month}_${day}_${curSample}_${it.no}`));
+  if(res.every(r=>r===null)) return '';
+  if(res.some(r=>r==='✕')) return 'ng';
+  if(res.every(r=>r!==null&&r!=='')) return 'ok';
+  return 'partial';
+}
+function _msDayStyle(active,st){
+  if(active)         return {bg:'var(--primary)',col:'#fff',bdr:'var(--primary)'};
+  if(st==='ok')      return {bg:'#f0fdf4',col:'#16a34a',bdr:'#86efac'};
+  if(st==='ng')      return {bg:'#fff5f5',col:'#ef4444',bdr:'#fca5a5'};
+  if(st==='partial') return {bg:'#fff8e7',col:'#92400e',bdr:'#fcd34d'};
+  return {bg:'#fff',col:'var(--text)',bdr:'var(--border)'};
+}
+
+/* ── Day picker ── */
+window.msRenderDayPicker = function(){
+  if(MS_DATA.length===0) return;
+  const m = getTabMonth('ms'), days = new Date(m.year,m.month,0).getDate();
+  const dp = document.getElementById('ms-day-picker'); if(!dp) return;
+  dp.innerHTML = Array.from({length:days},(_,i)=>{
+    const d=i+1, dow=new Date(m.year,m.month-1,d).getDay();
+    const isSat=dow===6, isHol=_msHol(m,d);
+    if(isHol||isSat){
+      const col=isSat?'#f87171':'#f9a8d4', sel=d===curDay?'outline:2px solid #f87171;outline-offset:1px;':'';
+      return `<button data-mday="${d}" onclick="window._msSelDay(${d})"
+        style="min-width:30px;height:30px;padding:0 4px;border:1px solid #fecdd3;border-radius:6px;background:#fff0f3;color:${col};font-size:11px;font-weight:600;cursor:pointer;${sel}">${d}</button>`;
+    }
+    const s=_msDayStyle(d===curDay,getMsDaySt(d));
+    return `<button data-mday="${d}" onclick="window._msSelDay(${d})"
+      style="min-width:30px;height:30px;padding:0 4px;border:1px solid ${s.bdr};border-radius:6px;background:${s.bg};color:${s.col};font-size:11px;font-weight:600;cursor:pointer">${d}</button>`;
+  }).join('');
+};
+function msRenderDayPicker(){ window.msRenderDayPicker(); }
+function _msUpdateDayBtn(day){
+  const btn=document.querySelector(`#ms-day-picker [data-mday="${day}"]`); if(!btn) return;
+  const m=getTabMonth('ms'), dow=new Date(m.year,m.month-1,day).getDay();
+  if(dow===0||dow===6||_msHol(m,day)) return;
+  const s=_msDayStyle(day===curDay,getMsDaySt(day));
+  btn.style.background=s.bg; btn.style.color=s.col; btn.style.borderColor=s.bdr;
+}
+const _msDBLoadedDays = new Set();
+async function _msLoadResultsFromDB(sampleIdx, day) {
+  const sampleId = _msSampleIds[sampleIdx];
+  if (!sampleId || !window.currentCarId || AIT_API.MOCK) return;
+  const m = getTabMonth('ms'), car = getCar();
+  const cacheKey = `${sampleIdx}_${day}_${m.year}_${m.month}`;
+  if (_msDBLoadedDays.has(cacheKey)) return;
+  _msDBLoadedDays.add(cacheKey);
+  const dateStr = `${m.year}-${String(m.month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  try {
+    const rows = await AIT_API.getMsResults(sampleId, dateStr);
+    if (!rows || !rows.length) return;
+    rows.forEach(r => {
+      if (r.result != null && r.result !== '') localStorage.setItem(`ms_${car}_${m.year}_${m.month}_${day}_${sampleIdx}_${r.item_no}`, r.result);
+      if (r.remark) localStorage.setItem(`ms_rmk_${car}_${m.year}_${m.month}_${day}_${sampleIdx}_${r.item_no}`, r.remark);
+    });
+    if (sampleIdx === curSample && day === curDay) { renderMsCheckTable(); window.msRenderDayPicker && window.msRenderDayPicker(); }
+  } catch(e) { console.warn('MS 결과 DB 로드 실패', e); }
+}
+function _msHasLocalResults(sampleIdx, day) {
+  const m = getTabMonth('ms'), car = getCar(), s = MS_DATA[sampleIdx];
+  return !!s && s.items.some(it => localStorage.getItem(`ms_${car}_${m.year}_${m.month}_${day}_${sampleIdx}_${it.no}`) !== null);
+}
+window._msSelDay = function(day){
+  const prev=curDay; curDay=day;
+  _msUpdateDayBtn(prev); _msUpdateDayBtn(day);
+  renderMsCheckTable();
+  _msLoadWorker();
+  if (!_msHasLocalResults(curSample, day)) _msLoadResultsFromDB(curSample, day);
+};
+
+/* ── 점검 테이블 ── */
+function renderMsCheckTable(){
+  if(MS_DATA.length===0) return;
+  const s=MS_DATA[curSample]; if(!s) return;
+  const m=getTabMonth('ms'), car=getCar();
+  const ce=msEditMode?'true':'false', es=msEditMode?'background:#edf3ff;cursor:text;':'';
+  const tbody=document.getElementById('ms-check-tbody'); if(!tbody) return;
+
+  tbody.innerHTML = s.items.map((item,i) => {
+    const k  =`ms_${car}_${m.year}_${m.month}_${curDay}_${curSample}_${item.no}`;
+    const kr =`ms_rmk_${car}_${m.year}_${m.month}_${curDay}_${curSample}_${item.no}`;
+    // 작업 E: 결과는 localStorage에서 읽되(초기 표시용), 저장은 _msStageResult로
+    const val=localStorage.getItem(k)||'';
+    const rmk=(localStorage.getItem(kr)||'').replace(/"/g,'&quot;');
+    const isNg=val==='✕';
+    const bg   =isNg?'#fff5f5':val==='○'?'#f7fef9':'#fff';
+    const resBg =isNg?'#fee2e2':val==='○'?'#dcfce7':'#fff';
+    const resBdr=isNg?'#fca5a5':val==='○'?'#86efac':'var(--border)';
+    const rmkStyle=isNg?'border-color:#fca5a5;background:#fff0f0;':'border-color:var(--border);background:#fff;';
+    // 작업 C: localStorage 대신 MS_ITEMS(DB 캐시) 사용
+    const _msKey = `${curSample}_${item.no}`;
+    const _msItem = MS_ITEMS[_msKey] || {};
+    const n  = _msItem.item_name || item.name   || '';
+    const std= _msItem.standard  || item.std    || '';
+    const mt = _msItem.method    || item.method || '';
+    const cy = _msItem.cycle     || item.cycle  || '';
+    // 작업 E: 인라인 핸들러에 sampleIdx, itemNo, day 전달
+    const sIdx = curSample, ino = item.no, day = curDay;
+
+    const delTd=msEditMode
+      ?`<td style="padding:5px 6px;text-align:center;vertical-align:middle"><button onclick="window.msDeleteItem(${i})" style="background:#fee2e2;color:#991b1b;border:none;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px;font-weight:700">✕</button></td>`:'';
+
+    return `<tr data-mrow="${i}" style="background:${bg};border-bottom:1px solid var(--border)">
+      ${delTd}
+      <td style="padding:7px 8px;text-align:center;border-right:1px solid var(--border);color:var(--text3);font-size:11px">${i+1}</td>
+      <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_name"  style="padding:7px 10px;border-right:1px solid var(--border);font-weight:500;${es}" onblur="window._msSaveItemDef(this)">${n}</td>
+      <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_std"   style="padding:7px 10px;border-right:1px solid var(--border);color:${std.includes('NG')&&std.includes('판정')?'#dc2626':'var(--text2)'};font-weight:${std.includes('NG')&&std.includes('판정')?'600':'400'};${es}" onblur="window._msSaveItemDef(this)">${std}</td>
+      <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_method" style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._msSaveItemDef(this)">${mt}</td>
+      <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_cycle"  style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._msSaveItemDef(this)">${cy}</td>
+      <td style="padding:4px 5px;border-right:1px solid var(--border);text-align:center;vertical-align:middle">
+        <select onchange="window._msSaveRes('${k}',this.value,${i},${sIdx},'${ino}',${day})"
+          style="width:52px;border:1px solid ${resBdr};border-radius:5px;padding:3px;font-size:12px;background:${resBg};font-family:inherit;cursor:pointer">
+          <option value=""${val===''?' selected':''}></option>
+          <option value="○"${val==='○'?' selected':''}>○</option>
+          <option value="✕"${val==='✕'?' selected':''}>✕</option>
+          <option value="N"${val==='N'?' selected':''}>N</option>
+        </select>
+      </td>
+      <td style="padding:5px 6px">
+        <input type="text" value="${rmk}" placeholder="${isNg?'이상조치 입력':'비고'}"
+          data-samp="${sIdx}" data-ino="${ino}" data-day="${day}"
+          onchange="window._msSaveRmk('${kr}',this.value,${sIdx},'${ino}',${day})"
+          style="width:100%;border:1px solid;${rmkStyle}border-radius:5px;padding:3px 6px;font-size:11px;font-family:inherit;color:var(--text)">
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── 결과 입력 ── */
+function _msUpdateRowBg(rowIdx,v){
+  const tr=document.querySelector(`#ms-check-tbody tr[data-mrow="${rowIdx}"]`); if(!tr) return;
+  tr.style.background=v==='✕'?'#fff5f5':v==='○'?'#f7fef9':'#fff';
+  const rmkInput=tr.querySelector('td:last-child input');
+  if(rmkInput){
+    const isNg=v==='✕';
+    rmkInput.style.borderColor=isNg?'#fca5a5':'var(--border)';
+    rmkInput.style.background =isNg?'#fff0f0':'#fff';
+    rmkInput.placeholder=isNg?'이상조치 입력':'비고';
+  }
+}
+window._msSaveRes=function(k,v,rowIdx,sIdx,ino,day){
+  if(v) localStorage.setItem(k,v); else localStorage.removeItem(k);
+  _msUpdateRowBg(rowIdx,v); _msUpdateDayBtn(curDay);
+  const tr=document.querySelector(`#ms-check-tbody tr[data-mrow="${rowIdx}"]`);
+  const sel=tr?tr.querySelector('select'):null;
+  if(sel){
+    sel.style.background =v==='✕'?'#fee2e2':v==='○'?'#dcfce7':'#fff';
+    sel.style.borderColor=v==='✕'?'#fca5a5':v==='○'?'#86efac':'var(--border)';
+  }
+  const rmkEl=tr?tr.querySelector('td:last-child input'):null;
+  const rmk=rmkEl?rmkEl.value:'';
+  _msStageResult(sIdx,ino,day,v,rmk);
+};
+window._msSaveRmk=function(k,v,sIdx,ino,day){
+  // 작업 E: localStorage 유지(UI상태) + DB debounce 저장
+  if(v) localStorage.setItem(k,v); else localStorage.removeItem(k);
+  // 결과값을 같은 행 input에서 읽어 함께 stage
+  const resKey = k.replace(/^ms_rmk_/,'ms_');
+  const resVal = localStorage.getItem(resKey) || '';
+  _msStageResult(sIdx ?? curSample, ino ?? '', day ?? curDay, resVal, v);
+};
+window._msSaveWorker =function(v){
+  const m=getTabMonth('ms'),car=getCar();
+  const k=`ms_worker_${car}_${m.year}_${m.month}_${curDay}_${curSample}`;
+  if(v) localStorage.setItem(k,v); else localStorage.removeItem(k);
+};
+/* ── 샘플 사진 (앞/뒤/식별표) ── */
+const MS_PHOTO_SLOTS = ['앞','뒤','식별표'];
+const _msPhotoCache = {};
+function _msPhotoKey(sId){ return `ms_photos_${sId}`; }
+function _msLoadPhotoCache(sId){
+  if(_msPhotoCache[sId]!==undefined) return;
+  try{ _msPhotoCache[sId]=JSON.parse(localStorage.getItem(_msPhotoKey(sId))||'null')||{}; }catch{ _msPhotoCache[sId]={}; }
+}
+function _msSavePhotoCache(sId){ localStorage.setItem(_msPhotoKey(sId),JSON.stringify(_msPhotoCache[sId]||{})); }
+function _msShowMainPhoto(url){
+  const main=document.getElementById('ms-photo-main'); if(!main) return;
+  if(url){
+    const safe=url.replace(/'/g,'%27');
+    main.innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:contain;cursor:zoom-in;display:block;max-height:100%" onclick="window.open('${safe}','_blank')">`;
+  } else {
+    main.innerHTML=`<div style="text-align:center;color:#9ca3af"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><div style="font-size:11px;margin-top:6px">사진 없음</div></div>`;
+  }
+}
+window._msShowMainPhoto=_msShowMainPhoto;
+function renderMsPhotoStrip(){
+  const sId=_msSampleIds[curSample]; if(!sId) return;
+  _msLoadPhotoCache(sId);
+  const photos=_msPhotoCache[sId]||{};
+  const strip=document.getElementById('ms-photo-strip'); if(!strip) return;
+  let html='', firstUrl='';
+  MS_PHOTO_SLOTS.forEach(slot=>{
+    const fileId=photos[slot];
+    const url=fileId?AIT_API.driveUrl(fileId):'';
+    if(url&&!firstUrl) firstUrl=url;
+    const safe=url.replace(/'/g,'%27');
+    const imgHtml=url
+      ?`<img src="${url}" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="window._msShowMainPhoto('${safe}')">`
+      :`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#9ca3af"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span style="font-size:9px">없음</span></div>`;
+    const delBtn=url?`<button onclick="window._msDelPhoto('${slot}')" style="position:absolute;top:3px;right:3px;background:rgba(180,0,0,.75);color:#fff;border:none;border-radius:3px;font-size:9px;padding:2px 5px;cursor:pointer;z-index:3">✕</button>`:'';
+    html+=`<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px">
+      <div style="width:72px;height:72px;border:2px solid ${url?'#3b82f6':'#d1d5db'};border-radius:8px;overflow:hidden;position:relative;background:#f9fafb">
+        ${imgHtml}${delBtn}
+        <label style="position:absolute;bottom:3px;left:50%;transform:translateX(-50%);background:rgba(30,50,100,.75);color:#fff;font-size:9px;padding:2px 6px;border-radius:4px;cursor:pointer;z-index:2;white-space:nowrap">📷<input type="file" accept="image/*" style="display:none" onchange="window._msUploadPhoto('${slot}',this)"></label>
+      </div>
+      <span style="font-size:10px;font-weight:600;color:#374151">${slot}</span>
+    </div>`;
+  });
+  strip.innerHTML=html;
+  _msShowMainPhoto(firstUrl);
+}
+window._msUploadPhoto=async function(slot,input){
+  const file=input.files[0]; input.value=''; if(!file) return;
+  if(file.size>10*1024*1024){alert('10MB 이하 이미지만 가능합니다.');return;}
+  const sId=_msSampleIds[curSample]; if(!sId) return;
+  const st=document.getElementById('ms-photo-status'); if(st) st.textContent='업로드 중…';
+  const r=new FileReader();
+  r.onload=async ev=>{
+    try{
+      const base64=ev.target.result.split(',')[1];
+      const car=getCar(), ext=(file.name.split('.').pop()||'jpg');
+      const res=await AIT_API.uploadDailyPhoto({car,filename:`ms_${car}_s${sId}_${slot}_${Date.now()}.${ext}`,base64});
+      _msLoadPhotoCache(sId);
+      if(!_msPhotoCache[sId]) _msPhotoCache[sId]={};
+      _msPhotoCache[sId][slot]=res.fileId;
+      _msSavePhotoCache(sId);
+      if(st) st.textContent=''; renderMsPhotoStrip();
+    }catch(err){ if(st) st.textContent=''; alert('업로드 실패: '+(err.message||err)); }
+  };
+  r.readAsDataURL(file);
+};
+window._msDelPhoto=async function(slot){
+  const sId=_msSampleIds[curSample]; if(!sId) return;
+  _msLoadPhotoCache(sId);
+  const fileId=(_msPhotoCache[sId]||{})[slot];
+  if(fileId){try{await AIT_API.deleteDailyPhoto(fileId);}catch(e){}}
+  if(_msPhotoCache[sId]) delete _msPhotoCache[sId][slot];
+  _msSavePhotoCache(sId);
+  renderMsPhotoStrip();
+};
+
+window._msSyncToDb = async function() {
+  if (!window.currentCarId || AIT_API.MOCK) return;
+  const carId = window.currentCarId;
+  await Promise.all(MS_DATA.map((s, idx) => {
+    const id = _msSampleIds[idx];
+    if (!id) return Promise.resolve();
+    return AIT_API.updateMsSample(id, {
+      sheet_name: s.sheet, equip_name: s.name, mgmt_no: s.num,
+      sample_type: s.type, expire_date: s.expire, manager: s.manager,
+      sort_order: (idx + 1) * 10
+    }).catch(e => console.warn(`샘플 ${id} 헤더 저장 실패`, e));
+  }));
+  const allItems = [];
+  MS_DATA.forEach((s, sIdx) => {
+    const sId = _msSampleIds[sIdx];
+    if (!sId) return;
+    s.items.forEach((it, iIdx) => {
+      allItems.push({ sample_id: sId, item_no: parseInt(it.no) || (iIdx + 1),
+        item_name: it.name, standard: it.std, method: it.method,
+        cycle: it.cycle, sort_order: iIdx + 1 });
+    });
+  });
+  if (allItems.length)
+    await AIT_API.syncMsItems(carId, allItems).catch(e => console.warn('MS 항목 동기화 실패', e));
+};
+window._msSaveItemDef=function(td){
+  // 작업 D: localStorage 대신 MS_ITEMS 업데이트 + DB sync debounce
+  const mk = td.dataset.mk || '';
+  // mk 형식: ms_item_${car}_s${curSample}_no${item.no}_${field}
+  const mkMatch = mk.match(/_s(\d+)_no([^_]+)_(\w+)$/);
+  if (mkMatch) {
+    const sampleIdx = parseInt(mkMatch[1]), itemNo = mkMatch[2], field = mkMatch[3];
+    const sampleDbId = _msSampleIds[sampleIdx] || sampleIdx;
+    const _msKey2 = `${sampleIdx}_${itemNo}`;
+    if (!MS_ITEMS[_msKey2]) MS_ITEMS[_msKey2] = { sample_id: sampleDbId, item_no: itemNo };
+    const fieldMap = { name: 'item_name', std: 'standard', method: 'method', cycle: 'cycle' };
+    const dbField = fieldMap[field] || field;
+    MS_ITEMS[_msKey2][dbField] = td.textContent.trim();
+
+    if (window.currentCarId) {
+      clearTimeout(window._msItemSyncTimer);
+      window._msItemSyncTimer = setTimeout(() => {
+        const itemsArr = Object.values(MS_ITEMS).map(it => ({
+          sample_id: it.sample_id, item_no: it.item_no,
+          item_name: it.item_name || '', standard: it.standard || '',
+          method: it.method || '', cycle: it.cycle || ''
+        }));
+        window.safeApi
+          ? window.safeApi(() => AIT_API.syncMsItems(window.currentCarId, itemsArr), { msg: '항목 저장' })
+          : AIT_API.syncMsItems(window.currentCarId, itemsArr).catch(e => console.warn('항목 저장 실패', e));
+      }, 800);
+    }
+  }
+  msSaveData();
+};
+
+/* ── 항목 추가 / 삭제 ── */
+window.msAddItem=function(){
+  const s=MS_DATA[curSample]; if(!s) return;
+  const maxNo=s.items.reduce((m,it)=>Math.max(m,parseInt(it.no)||0),0);
+  s.items.push({no:String(maxNo+1),name:'(항목명)',std:'(판정기준)',method:s.items[0]?.method||'',cycle:'시업 전'});
+  msSaveData();
+  renderMsCheckTable();
+};
+window.msDeleteItem=function(idx){
+  const s=MS_DATA[curSample]; if(!s) return;
+  if(s.items.length<=1){alert('항목이 1개 이상 있어야 합니다.'); return;}
+  if(!confirm(`항목 "${s.items[idx].name}"을(를) 삭제하겠습니까?`)) return;
+  s.items.splice(idx,1);
+  msSaveData();
+  renderMsCheckTable();
+};
+
+/* ── 편집 모드 ── */
+window.msSetEditable=function(on){
+  msEditMode=on;
+  document.querySelectorAll('.ms-edit-col').forEach(el=>el.style.display=on?'':'none');
+  const addBtn=document.getElementById('ms-add-tab-btn'); if(addBtn) addBtn.style.display=on?'':'none';
+  const hint=document.getElementById('ms-empty-edit-hint'); if(hint) hint.style.display=(on&&MS_DATA.length===0)?'':'none';
+  msRenderSampleTabs();
+  if(MS_DATA.length>0){ renderMsSampleInfo(); renderMsCheckTable(); }
+};
+
+/* ── Init ── */
+(async function(){
+  if (!AIT_API.MOCK && window.currentCarId) {
+    await _msInitFromDb();
+  }
+  msRenderAll();
+  if (MS_DATA.length > 0 && !_msHasLocalResults(curSample, curDay)) {
+    _msLoadResultsFromDB(curSample, curDay);
+  }
+})();
+})();
+</script>

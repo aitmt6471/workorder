@@ -1,0 +1,779 @@
+<!-- 설비일상점검표 -->
+<div class="tab-toolbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">설비일상점검표</span>
+    <div style="width:1px;height:16px;background:var(--border)"></div>
+    <span id="daily-rev-badge" style="font-size:13px;font-weight:700;color:#111827">Rev. 0</span>
+    <span id="daily-rev-date" style="font-size:13px;color:#374151">개정일: -</span>
+    <button class="btn btn-ghost btn-sm" onclick="openRevModal()">이력</button>
+  </div>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost btn-sm edit-only" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}dailyResetToDefault();})()" style="color:#dc2626">기본값 복원</button>
+  <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('daily')">저장</button>
+  <button class="btn btn-ghost btn-sm" id="daily-edit-btn" onclick="toggleTabEditMode('daily',this)">&#x270F; 편집 모드</button>
+</div>
+
+<!-- 전체 콘텐츠 래퍼 -->
+<div style="display:flex;flex-direction:column;height:calc(100vh - 100px);overflow:hidden">
+
+  <!-- 설비 탭 (좌우 스크롤) -->
+  <div id="d-equip-tabs" class="process-nav" style="flex-shrink:0"></div>
+
+<!-- 설비 정보 -->
+<div style="padding:0;border-top:3px solid #fff;border-bottom:3px solid #fff;flex-shrink:0">
+  <table style="border-collapse:collapse;font-size:12px;width:100%;table-layout:fixed">
+    <colgroup>
+      <col style="width:58px"><col style="width:160px">
+      <col style="width:64px"><col style="width:50px">
+      <col style="width:58px"><col style="width:130px">
+      <col style="width:58px"><col style="width:80px">
+      <col style="width:70px"><col style="width:100px">
+    </colgroup>
+    <tbody><tr>
+      <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">설비명</th>
+      <td id="d-equip-name" style="border:1px solid var(--border);padding:7px 8px;background:#fff;font-weight:600"></td>
+      <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">공정번호</th>
+      <td id="d-proc-no" style="border:1px solid var(--border);padding:7px 8px;background:#fff;text-align:center"></td>
+      <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">공정명</th>
+      <td id="d-proc-name" style="border:1px solid var(--border);padding:7px 8px;background:#fff"></td>
+      <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">설치장소</th>
+      <td id="d-location" style="border:1px solid var(--border);padding:7px 8px;background:#fff"></td>
+      <th style="background:#1e3264;border:1px solid #1e3264;padding:7px 8px;font-weight:600;color:#fff;white-space:nowrap;text-align:center">관리책임자</th>
+      <td id="d-manager" style="border:1px solid var(--border);padding:7px 8px;background:#fff"></td>
+    </tr></tbody>
+  </table>
+</div>
+
+<!-- 2열 메인 레이아웃 -->
+<div style="display:flex;flex:1;min-height:0;border-bottom:2px solid #c9d4e8">
+
+  <!-- 왼쪽 55%: 사진 패널 -->
+  <div id="d-photo-panel" style="flex:0 0 50%;min-width:0;overflow:hidden;display:flex;flex-direction:column;border-right:2px solid #c9d4e8;background:#fff;min-height:0">
+    <!-- 사진 패널 헤더 -->
+    <div style="background:#1e3264;color:#fff;padding:9px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0">
+      <span style="font-size:12px;font-weight:700;letter-spacing:.6px">설비 사진</span>
+      <span id="d-photo-status" style="font-size:11px;color:rgba(255,255,255,.6)"></span>
+    </div>
+    <!-- 메인 사진 표시 영역 -->
+    <div id="d-photo-main" style="flex:1;background:#f3f4f6;position:relative;overflow:hidden;min-height:280px;display:flex;align-items:center;justify-content:center">
+      <div style="text-align:center;color:#9ca3af">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+        <div style="font-size:11px;margin-top:6px">사진을 선택하세요</div>
+      </div>
+    </div>
+    <!-- 하단 썸네일 스트립 -->
+    <div style="background:#f8f9fa;padding:10px 12px;border-top:1px solid var(--border);flex-shrink:0;overflow:hidden">
+      <div id="d-photo-strip" style="display:flex;gap:10px;align-items:flex-start;overflow-x:auto;padding-bottom:4px;min-width:0"></div>
+    </div>
+  </div>
+
+  <!-- 오른쪽 45%: 월선택 + 날짜선택 + 점검항목 -->
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden;background:#fff">
+    <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden">
+
+      <!-- 월 선택 -->
+      <div style="padding:10px 16px;border-bottom:3px solid #fff;background:#1e3264;display:flex;align-items:center;gap:10px;flex-shrink:0">
+        <button class="btn btn-ghost btn-sm" onclick="prevMonth('daily');dailyRenderDayPicker()"
+          style="color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.08)">&#x2039;</button>
+        <span id="daily-month-label" style="font-weight:700;font-size:14px;min-width:90px;text-align:center;color:#fff">2026년 4월</span>
+        <button class="btn btn-ghost btn-sm" onclick="nextMonth('daily');dailyRenderDayPicker()"
+          style="color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.08)">&#x203A;</button>
+        <span style="color:rgba(255,255,255,.35);margin:0 4px">|</span>
+        <span id="d-sel-date" style="font-size:13px;font-weight:700;color:#fff;background:rgba(255,255,255,.15);padding:3px 12px;border-radius:6px;letter-spacing:.5px">날짜 선택</span>
+      </div>
+
+      <!-- 날짜 선택 -->
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border);background:#f4f7fc;flex-shrink:0">
+        <div style="display:flex;flex-wrap:wrap;gap:4px" id="d-day-picker"></div>
+      </div>
+
+      <!-- 점검 항목 -->
+      <div style="padding:14px 16px;overflow-x:auto;background:#fff">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px">점검 항목</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
+            <div style="display:flex;align-items:center;gap:6px;background:#eef2fb;border:1px solid #c4d4ef;border-radius:8px;padding:4px 10px">
+              <span style="font-size:11px;font-weight:600;color:#1e3264">점검자</span>
+              <input id="d-worker-input" type="text" placeholder="이름 입력"
+                style="border:none;background:transparent;font-size:11px;font-family:inherit;width:90px;outline:none;color:var(--text)"
+                onchange="window._dSaveWorker(this.value)">
+            </div>
+            <button onclick="window._dSaveNow()" id="d-save-btn"
+              style="font-size:11px;font-weight:700;padding:5px 14px;border-radius:8px;border:1px solid #1e3264;background:#1e3264;color:#fff;cursor:pointer;letter-spacing:.5px">
+              저장
+            </button>
+          </div>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
+          <colgroup>
+            <col style="width:36px">
+            <col style="width:18%">
+            <col style="width:22%">
+            <col style="width:74px">
+            <col style="width:58px">
+            <col style="width:64px">
+            <col style="width:72px">
+          </colgroup>
+          <thead>
+            <tr style="background:#1e3264">
+              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">No.</th>
+              <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">점검항목</th>
+              <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">관리기준</th>
+              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">확인방법</th>
+              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">주기</th>
+              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">결과</th>
+              <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff">비고</th>
+            </tr>
+          </thead>
+          <tbody id="d-check-tbody"></tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /2열 메인 레이아웃 -->
+</div><!-- /전체 콘텐츠 래퍼 -->
+<script>
+(function(){
+let DAILY_EQUIP = [];
+let DAILY_ITEMS = {}; // { "equipId_itemNo": { id, equip_id, item_name, standard, method, cycle } }
+let _dWorkerCache = {}; // { "year_month_day_equipIdx": workerName }
+
+async function _dLoadItems() {
+  if (!window.currentCarId) return;
+  try {
+    const rows = await AIT_API.getDailyItems(window.currentCarId);
+    DAILY_ITEMS = {};
+    rows.forEach(r => { DAILY_ITEMS[`${r.equip_id}_${r.item_no}`] = r; });
+    // daily_items가 비어있고 장비 항목이 있으면 자동 동기화
+    if (rows.length === 0 && DAILY_EQUIP.length > 0) {
+      const allItems = [];
+      DAILY_EQUIP.forEach(e => {
+        if (!e.id || !e.items) return;
+        e.items.forEach(item => allItems.push({
+          equip_id: e.id, item_no: String(item.no),
+          item_name: item.name||'', standard: item.std||'',
+          method: item.method||'', cycle: item.cycle||''
+        }));
+      });
+      if (allItems.length) {
+        await AIT_API.syncDailyItems(window.currentCarId, allItems);
+        const reloaded = await AIT_API.getDailyItems(window.currentCarId);
+        DAILY_ITEMS = {};
+        reloaded.forEach(r => { DAILY_ITEMS[`${r.equip_id}_${r.item_no}`] = r; });
+      }
+    }
+  } catch(e) { console.warn('daily items 로드 실패', e); }
+}
+
+// 점검 결과 인메모리 캐시: { "year_month_day_equipIdx": { [itemNo]: { result, remark, savedAt, modifiedAt } } }
+let _dResults = {};
+
+let curEquip = 0, curDay = 1, dailyEditMode = false;
+
+function getCar(){ return typeof getCurrentCar==='function' ? getCurrentCar() : 'GN7 OHCL'; }
+
+/* ── Equipment tabs (수평) ── */
+(function(){
+  const c = document.getElementById('d-equip-tabs');
+  c.innerHTML = DAILY_EQUIP.map((e,i)=>
+    `<button data-deq="${i}" class="proc-btn${i===0?' active':''}" onclick="window._dSelEquip(${i},this)">${e.sheet}</button>`
+  ).join('');
+})();
+
+window._dSelEquip = function(idx, btn){
+  curEquip=idx;
+  const _today=new Date(), _m=getTabMonth('daily');
+  curDay=(_m.year===_today.getFullYear()&&_m.month===_today.getMonth()+1)?_today.getDate():1;
+  document.querySelectorAll('[data-deq]').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderEquipInfo(); dailyRenderDayPicker(); _dUpdateDateBadge(); renderCheckTable(); loadAndRenderPhotos();
+  if (!_dHasLocalResults(idx, curDay)) _dLoadResultsFromDB(idx, curDay);
+};
+
+/* ── Equipment info ── */
+function renderEquipInfo(){
+  const e=DAILY_EQUIP[curEquip];
+  const set=(id,v)=>{const el=document.getElementById(id); if(el){el.textContent=v; el.contentEditable=dailyEditMode?'true':'false';}};
+  set('d-equip-name',e.sheet); set('d-proc-no',e.proc_no);
+  const _dLinename = JSON.parse(localStorage.getItem(`ait_cp_meta_${getCar()}`) || '{}').linename || '';
+  set('d-proc-name',e.proc_name); set('d-location',e.location || _dLinename || 'GN7 外');
+  set('d-manager',e.manager||'이성호');
+  const _eph=document.getElementById('d-equip-label-ph'); if(_eph) _eph.textContent=e.sheet;
+}
+
+window._dFlushInfo = function(){
+  const e = DAILY_EQUIP[curEquip]; if(!e) return;
+  const g = id => document.getElementById(id)?.textContent.trim() || '';
+  e.sheet     = g('d-equip-name') || e.sheet;
+  e.proc_no   = g('d-proc-no')    || e.proc_no;
+  e.proc_name = g('d-proc-name')  || e.proc_name;
+  e.location  = g('d-location')   || e.location;
+  e.manager   = g('d-manager')    || e.manager;
+};
+window._dailyGetEquip = () => DAILY_EQUIP;
+
+// DB에서 로드한 설비 목록으로 탭 재초기화
+window._dInitEquip = async function(list) {
+  // id 없는 CP 데이터 → DB 동기화 후 ID만 병합 (이름·항목은 CP 데이터 유지)
+  if (list.length > 0 && !list[0].id && window.currentCarId && !AIT_API.MOCK) {
+    try { await AIT_API.syncDailyEquip(window.currentCarId, list); } catch(e) { console.warn('설비 DB 동기화 실패', e); }
+    try {
+      const dbRows = await AIT_API.getDailyEquipments(window.currentCarId);
+      if (dbRows && dbRows.length) {
+        const idMap = {};
+        dbRows.forEach(r => { idMap[r.equip_name] = { id: r.id, photo_count: r.photo_count||0 }; });
+        list = list.map(e => ({ ...e, ...(idMap[e.sheet] || {}) }));
+      }
+    } catch(e) { console.warn('설비 DB ID 조회 실패', e); }
+  }
+  DAILY_EQUIP = list;
+  curEquip = 0;
+  // 현재 선택 월이 오늘 월이면 curDay를 오늘 날짜로 설정
+  const today = new Date();
+  const m = typeof getTabMonth === 'function' ? getTabMonth('daily') : { year: today.getFullYear(), month: today.getMonth()+1 };
+  if (m.year === today.getFullYear() && m.month === today.getMonth()+1) {
+    curDay = today.getDate();
+  }
+  // CP → DAILY_ITEMS 즉시 반영 (CP = 단일 진실 소스, 구 DB 캐시 덮어씀)
+  DAILY_ITEMS = {};
+  list.forEach(e => {
+    if (!e.id || !e.items) return;
+    e.items.forEach(item => {
+      DAILY_ITEMS[`${e.id}_${item.no}`] = {
+        equip_id: e.id, item_no: item.no,
+        item_name: item.name || '', standard: item.std || '',
+        method: item.method || '', cycle: item.cycle || ''
+      };
+    });
+  });
+  // ait_daily_items DB 백그라운드 동기화 (persistence, CP가 변경될 때 DB도 최신화)
+  if (window.currentCarId && !AIT_API.MOCK) {
+    const _syncItems = [];
+    list.forEach(e => {
+      if (!e.id || !e.items) return;
+      e.items.forEach(item => _syncItems.push({
+        equip_id: e.id, item_no: String(item.no),
+        item_name: item.name||'', standard: item.std||'',
+        method: item.method||'', cycle: item.cycle||''
+      }));
+    });
+    if (_syncItems.length) AIT_API.syncDailyItems(window.currentCarId, _syncItems)
+      .catch(e => console.warn('daily items 동기화 실패', e));
+  }
+  const c = document.getElementById('d-equip-tabs');
+  if (!c) return;
+  c.innerHTML = DAILY_EQUIP.map((e,i)=>
+    `<button data-deq="${i}" class="proc-btn${i===0?' active':''}" onclick="window._dSelEquip(${i},this)">${e.sheet}</button>`
+  ).join('');
+  if (DAILY_EQUIP.length > 0) {
+    renderEquipInfo();
+    if (typeof dailyRenderDayPicker === 'function') dailyRenderDayPicker();
+    if (typeof renderCheckTable === 'function') renderCheckTable();
+    loadAndRenderPhotos();
+    _dLoadResultsFromDB(0, curDay); // 초기 로드 시 DB에서 결과 자동 조회
+  }
+};
+
+/* ── Photo strip (Drive + DB 연동) ── */
+const _dailyPhotos = {};
+// equipId 없는 설비는 설비명을 캐시 키로 사용해 사진 공유 방지
+function _photoKey(e) { return e?.id ? `id_${e.id}` : `sheet_${e?.sheet || curEquip}`; }
+
+async function loadEquipPhotos(e) {
+  const key = _photoKey(e);
+  const equipId = e?.id;
+  _dailyPhotos[key] = [];
+  if (!equipId || !window.currentCarId || AIT_API.MOCK) return;
+  try {
+    const rows = await AIT_API.getDailyEquipPhotos(window.currentCarId, equipId);
+    _dailyPhotos[key] = rows || [];
+  } catch(err) { console.warn('사진 로드 실패', err); }
+}
+
+async function loadAndRenderPhotos() {
+  const e = DAILY_EQUIP[curEquip]; if (!e) return;
+  const st = document.getElementById('d-photo-status');
+  if (st) st.textContent = '로딩 중…';
+  await loadEquipPhotos(e);
+  if (st) st.textContent = '';
+  renderPhotoStrip();
+}
+
+function _dShowMainPhoto(url) {
+  const main = document.getElementById('d-photo-main'); if (!main) return;
+  if (url) {
+    const safeUrl = url.replace(/'/g,'%27');
+    main.innerHTML = `<img src="${url}" style="width:100%;height:100%;object-fit:contain;cursor:zoom-in;display:block;max-height:100%" onclick="window._dOpenPhoto('${safeUrl}')">`;
+  } else {
+    main.innerHTML = `<div style="text-align:center;color:#9ca3af"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><div style="font-size:11px;margin-top:6px">사진 없음</div></div>`;
+  }
+}
+
+function renderPhotoStrip() {
+  const e = DAILY_EQUIP[curEquip]; if (!e) return;
+  const strip = document.getElementById('d-photo-strip'); if (!strip) return;
+  const photoKey = _photoKey(e), photoCount = e.photo_count || e.items.length || 0;
+  const photos = _dailyPhotos[photoKey] || [];
+  const getP = o => photos.find(p => parseInt(p.photo_order) === o);
+  const totalSlots = 1 + photoCount;
+  let html = '';
+  let firstUrl = '';
+  for (let i = 0; i < totalSlots; i++) {
+    const p = getP(i);
+    const _itemName = (i > 0 && e.items && e.items[i-1]) ? (e.items[i-1].name || '') : '';
+    const _baseLabel = i === 0 ? '전체사진' : (_itemName || `상세사진 ${i}`);
+    const label = i === 0 ? _baseLabel : `${i}.${_baseLabel}`;
+    const hasPhoto = p && p.photo_url;
+    const safeUrl = hasPhoto ? p.photo_url.replace(/'/g,'%27') : '';
+    if (hasPhoto && !firstUrl) firstUrl = p.photo_url;
+    const imgHtml = hasPhoto
+      ? `<img src="${p.photo_url}" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="window._dShowMainPhoto('${safeUrl}')">`
+      : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#9ca3af"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span style="font-size:9px">없음</span></div>`;
+    const uploadBtn = dailyEditMode ? `<label style="position:absolute;bottom:5px;right:5px;background:rgba(30,50,100,.75);color:#fff;font-size:9px;padding:3px 7px;border-radius:4px;cursor:pointer;z-index:2">&#x1F4F7;<input type="file" accept="image/*" style="display:none" onchange="window._dUploadEquipPhoto(${i},this)"></label>` : '';
+    const delBtn = (dailyEditMode && hasPhoto) ? `<button onclick="window._dDelEquipPhoto(${i})" style="position:absolute;top:4px;right:4px;width:20px;height:20px;background:rgba(220,38,38,.8);color:#fff;border:none;border-radius:50%;font-size:10px;line-height:1;cursor:pointer;z-index:2">✕</button>` : '';
+    const remBtn = (dailyEditMode && i > 0 && i === totalSlots-1) ? `<button onclick="window._dRemovePhotoSlot()" style="position:absolute;top:4px;left:4px;background:rgba(107,114,128,.7);color:#fff;border:none;border-radius:3px;font-size:9px;cursor:pointer;padding:2px 5px;z-index:2">-슬롯</button>` : '';
+    html += `<div style="flex-shrink:0;width:90px"><div style="font-size:12px;font-weight:600;color:#111827;margin-bottom:4px;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div><div style="position:relative;background:#f3f4f6;border:1px dashed #d1d5db;border-radius:6px;height:70px;overflow:hidden">${imgHtml}${uploadBtn}${delBtn}${remBtn}</div></div>`;
+  }
+  if (dailyEditMode) html += `<div style="flex-shrink:0;display:flex;align-items:flex-end"><button onclick="window._dAddPhotoSlot()" title="슬롯 추가" style="width:36px;height:70px;background:#f9fafb;border:2px dashed #d1d5db;border-radius:6px;cursor:pointer;color:#9ca3af;font-size:22px;line-height:1">+</button></div>`;
+  strip.innerHTML = html;
+  // 메인 패널에 첫 번째 사진 자동 표시
+  _dShowMainPhoto(firstUrl);
+}
+
+window._dShowMainPhoto = _dShowMainPhoto;
+
+window._dUploadEquipPhoto = async function(order, input) {
+  const file = input.files[0]; input.value = ''; if (!file) return;
+  if (file.size > 10*1024*1024) { alert('10MB 이하 이미지만 가능합니다.'); return; }
+  const car = getCar(), e = DAILY_EQUIP[curEquip], equipId = e.id, photoKey = _photoKey(e);
+  if (!equipId) { alert('설비 DB 동기화가 완료되지 않았습니다. 잠시 후 다시 시도해주세요.'); return; }
+  const st = document.getElementById('d-photo-status'); if (st) st.textContent = '업로드 중…';
+  const r = new FileReader();
+  r.onload = async ev => {
+    try {
+      const base64 = ev.target.result.split(',')[1];
+      const ext = (file.name.split('.').pop()||'jpg');
+      const res = await AIT_API.uploadDailyPhoto({ car, proc: e.proc_no, filename: `daily_${car}_equip${equipId}_slot${order}_${Date.now()}.${ext}`, base64 });
+      const entry = { photo_order: order, photo_url: AIT_API.driveUrl(res.fileId), media_file_id: res.fileId };
+      if (!_dailyPhotos[photoKey]) _dailyPhotos[photoKey] = [];
+      const idx = _dailyPhotos[photoKey].findIndex(p => parseInt(p.photo_order) === order);
+      if (idx >= 0) _dailyPhotos[photoKey][idx] = entry; else _dailyPhotos[photoKey].push(entry);
+      await AIT_API.syncDailyEquipPhotos(window.currentCarId, equipId, _dailyPhotos[photoKey]);
+      if (st) st.textContent = ''; renderPhotoStrip();
+    } catch(err) { if (st) st.textContent = ''; alert('업로드 실패: ' + (err.message||err)); }
+  };
+  r.readAsDataURL(file);
+};
+
+window._dDelEquipPhoto = async function(order) {
+  const e = DAILY_EQUIP[curEquip], equipId = e.id, photoKey = _photoKey(e);
+  const photo = (_dailyPhotos[photoKey]||[]).find(p => parseInt(p.photo_order) === order);
+  if (photo?.media_file_id) { try { await AIT_API.deleteDailyPhoto(photo.media_file_id); } catch(e){} }
+  _dailyPhotos[photoKey] = (_dailyPhotos[photoKey]||[]).filter(p => parseInt(p.photo_order) !== order);
+  if (equipId) { try { await AIT_API.syncDailyEquipPhotos(window.currentCarId, equipId, _dailyPhotos[photoKey]); } catch(e){} }
+  renderPhotoStrip();
+};
+
+window._dAddPhotoSlot = function() {
+  const e = DAILY_EQUIP[curEquip]; if (!e) return;
+  e.photo_count = (e.photo_count||0) + 1;
+  renderPhotoStrip();
+};
+
+window._dRemovePhotoSlot = function() {
+  const e = DAILY_EQUIP[curEquip]; if (!e||!e.photo_count) return;
+  e.photo_count--;
+  renderPhotoStrip();
+};
+
+window._dOpenPhoto = function(url) {
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  ov.onclick = () => ov.remove();
+  const img = document.createElement('img');
+  img.src = url; img.style.cssText = 'max-width:90vw;max-height:90vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.5)';
+  ov.appendChild(img); document.body.appendChild(ov);
+};
+
+/* ── Day status helpers ── */
+function getDaySt(day){
+  const e=DAILY_EQUIP[curEquip], m=getTabMonth('daily');
+  const rKey=`${m.year}_${m.month}_${day}_${curEquip}`;
+  const dayData=_dResults[rKey]||{};
+  const res=e.items.map(it=>(dayData[it.no]||{}).result||'');
+  if(res.every(r=>!r)) return '';
+  if(res.some(r=>r==='✕')) return 'ng';
+  if(res.every(r=>r)) return 'ok';
+  return 'partial';
+}
+function dayBtnStyle(active, st){
+  if(active) return {bg:'var(--primary)',col:'#fff',bdr:'var(--primary)'};
+  if(st==='ok')      return {bg:'#f0fdf4',col:'#16a34a',bdr:'#86efac'};
+  if(st==='ng')      return {bg:'#fff5f5',col:'#ef4444',bdr:'#fca5a5'};
+  if(st==='partial') return {bg:'#fff8e7',col:'#92400e',bdr:'#fcd34d'};
+  return {bg:'#fff',col:'var(--text)',bdr:'var(--border)'};
+}
+
+/* ── 한국 공휴일 + 대체공휴일 ── */
+const KR_FIXED = ['1-1','3-1','5-5','6-6','8-15','10-3','10-9','12-25'];
+// 음력 공휴일(설날·추석 연휴) + 대체공휴일 — 연도별 하드코딩
+const KR_EXTRA = {
+  2025:['1-27','1-28','1-29',  // 설날 연휴
+        '3-3',                  // 삼일절 대체 (3/1 토)
+        '10-5','10-6','10-7',  // 추석 연휴
+        '10-8'],                // 추석 대체 (10/5 일)
+  2026:['2-16','2-17','2-18',  // 설날 연휴
+        '3-2',                  // 삼일절 대체 (3/1 일)
+        '6-8',                  // 현충일 대체 (6/6 토)
+        '8-17',                 // 광복절 대체 (8/15 토)
+        '9-25','9-26','9-27',  // 추석 연휴
+        '9-28','9-29',          // 추석 대체 (9/26 토, 9/27 일)
+        '10-5']                 // 개천절 대체 (10/3 토)
+};
+// 고정 공휴일 토·일 → 대체 자동 계산 (설날·추석 제외)
+function _calcSubs(year){
+  const subs=new Set();
+  [[1,1],[3,1],[5,5],[6,6],[8,15],[10,3],[10,9],[12,25]].forEach(([mo,da])=>{
+    const dow=new Date(year,mo-1,da).getDay();
+    let offset=0;
+    if(dow===0) offset=1;       // 일요일 → 다음 월요일
+    else if(dow===6) offset=2;  // 토요일 → 다음 월요일
+    if(offset){const s=new Date(year,mo-1,da+offset);subs.add(`${s.getMonth()+1}-${s.getDate()}`);}
+  });
+  return subs;
+}
+const _subCache={};
+function isHoliday(m,d){
+  const dow=new Date(m.year,m.month-1,d).getDay();
+  if(dow===0) return true;
+  const md=`${m.month}-${d}`;
+  if(KR_FIXED.includes(md)) return true;
+  const extra=KR_EXTRA[m.year];
+  if(extra && extra.includes(md)) return true;
+  if(!_subCache[m.year]) _subCache[m.year]=_calcSubs(m.year);
+  return _subCache[m.year].has(md);
+}
+
+/* ── Day picker — full render (only on tab/month switch) ── */
+window.dailyRenderDayPicker=function(){
+  const m=getTabMonth('daily'), days=new Date(m.year,m.month,0).getDate();
+  document.getElementById('d-day-picker').innerHTML=Array.from({length:days},(_,i)=>{
+    const d=i+1;
+    const dow=new Date(m.year,m.month-1,d).getDay();
+    const isSat=dow===6;
+    const isHol=isHoliday(m,d); // 일요일·공휴일 (토요일 제외)
+    if(isHol || isSat){
+      // 토요일: 연한 붉은색, 일요일·공휴일: 분홍색 — 모두 클릭 가능 (특근 입력 허용)
+      const col=isSat?'#f87171':'#f9a8d4';
+      const selSt=d===curDay?'outline:2px solid #f87171;outline-offset:1px;':'';
+      return `<button data-day="${d}" onclick="window._dSelDay(${d})"
+        style="min-width:30px;height:30px;padding:0 4px;border:1px solid #fecdd3;border-radius:6px;
+        background:#fff0f3;color:${col};font-size:11px;font-weight:600;cursor:pointer;${selSt}">${d}</button>`;
+    }
+    const s=dayBtnStyle(d===curDay,getDaySt(d));
+    return `<button data-day="${d}" onclick="window._dSelDay(${d})"
+      style="min-width:30px;height:30px;padding:0 4px;border:1px solid ${s.bdr};border-radius:6px;
+      background:${s.bg};color:${s.col};font-size:11px;font-weight:600;cursor:pointer">${d}</button>`;
+  }).join('');
+  if(typeof _dUpdateDateBadge==='function') _dUpdateDateBadge();
+};
+
+/* ── Day button targeted update (no full re-render) ── */
+function updateDayBtn(day){
+  const btn=document.querySelector(`#d-day-picker [data-day="${day}"]`); if(!btn) return;
+  const m=getTabMonth('daily');
+  const dow=new Date(m.year,m.month-1,day).getDay();
+  const isSat=dow===6, isHol=isHoliday(m,day);
+  if(isSat||isHol){
+    const col=isSat?'#f87171':'#f9a8d4';
+    btn.style.background='#fff0f3'; btn.style.color=col; btn.style.borderColor='#fecdd3';
+    btn.style.outline=day===curDay?`2px solid ${col}`:'';
+    btn.style.outlineOffset=day===curDay?'1px':'';
+    return;
+  }
+  btn.style.outline=''; btn.style.outlineOffset='';
+  const s=dayBtnStyle(day===curDay, getDaySt(day));
+  btn.style.background=s.bg; btn.style.color=s.col; btn.style.borderColor=s.bdr;
+}
+
+/* ── DB 결과 로드 (localStorage 미스 시 폴백) ── */
+const _dDBLoadedDays = new Set();
+async function _dLoadResultsFromDB(equipIdx, day) {
+  const equip = DAILY_EQUIP[equipIdx] || {};
+  const equip_id = equip.id || equipIdx;
+  if (!equip_id || !window.currentCarId || AIT_API.MOCK) return;
+  const m = getTabMonth('daily'), car = getCar();
+  const cacheKey = `${equipIdx}_${day}_${m.year}_${m.month}`;
+  if (_dDBLoadedDays.has(cacheKey)) return;
+  _dDBLoadedDays.add(cacheKey);
+  const dateStr = `${m.year}-${String(m.month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  try {
+    const rows = await AIT_API.getDailyResults(equip_id, dateStr);
+    if (!rows || !rows.length) return;
+    const rKey=`${m.year}_${m.month}_${day}_${equipIdx}`;
+    if(!_dResults[rKey]) _dResults[rKey]={};
+    rows.forEach(r => {
+      _dResults[rKey][r.item_no]={result:r.result||'',remark:r.remark||'',savedAt:r.created_at||null,modifiedAt:r.updated_at||null};
+    });
+    // 점검자 복원
+    const workerFromDb = rows[0]?.worker || '';
+    if (workerFromDb) _dWorkerCache[`${m.year}_${m.month}_${day}_${equipIdx}`] = workerFromDb;
+    if (equipIdx === curEquip && day === curDay) { renderCheckTable(); dailyRenderDayPicker(); }
+  } catch(e) { console.warn('결과 DB 로드 실패', e); }
+}
+function _dHasLocalResults(equipIdx, day) {
+  const m = getTabMonth('daily');
+  return _dDBLoadedDays.has(`${equipIdx}_${day}_${m.year}_${m.month}`);
+}
+
+function _dUpdateDateBadge(){
+  const el=document.getElementById('d-sel-date'); if(!el) return;
+  const m=getTabMonth('daily');
+  const yy=String(m.year).slice(2), mm=String(m.month).padStart(2,'0'), dd=String(curDay).padStart(2,'0');
+  el.textContent=`${yy}-${mm}-${dd}`;
+}
+
+window._dSelDay=function(day){
+  const prev=curDay; curDay=day;
+  updateDayBtn(prev); updateDayBtn(day);
+  _dUpdateDateBadge();
+  renderCheckTable();
+  if (!_dHasLocalResults(curEquip, day)) _dLoadResultsFromDB(curEquip, day);
+};
+
+/* ── Inspection table ── */
+function renderCheckTable(){
+  const e=DAILY_EQUIP[curEquip], m=getTabMonth('daily'), car=getCar();
+  const ce=dailyEditMode?'true':'false';
+  const es=dailyEditMode?'background:#edf3ff;cursor:text;':'';
+  // Load worker name for this day/equip
+  const wk=_dWorkerCache[`${m.year}_${m.month}_${curDay}_${curEquip}`]||'';
+  const wi=document.getElementById('d-worker-input'); if(wi) wi.value=wk;
+  const _rKey=`${m.year}_${m.month}_${curDay}_${curEquip}`;
+  const _dayData=_dResults[_rKey]||{};
+  document.getElementById('d-check-tbody').innerHTML=e.items.map((item,i)=>{
+    const k=`daily_${car}_${m.year}_${m.month}_${curDay}_${curEquip}_${item.no}`;
+    const kr=`daily_rmk_${car}_${m.year}_${m.month}_${curDay}_${curEquip}_${item.no}`;
+    const _rd=_dayData[item.no]||{};
+    const val=_rd.result||'', rmk=(_rd.remark||'').replace(/"/g,'&quot;');
+    const bg=val==='✕'?'#fff5f5':val==='○'?'#f7fef9':'#fff';
+    const isNg=val==='✕';
+    const rmkStyle=isNg?'border-color:#fca5a5;background:#fff0f0;':'border-color:var(--border);background:#fff;';
+    const rmkPh=isNg?'이상조치 입력':'비고';
+    const equipDbId = DAILY_EQUIP[curEquip]?.id || curEquip;
+    const _dItemKey = `${equipDbId}_${item.no}`;
+    const _dItem = DAILY_ITEMS[_dItemKey] || {};
+    const n=item.name   || _dItem.item_name || '';
+    const s=item.std    || _dItem.standard  || '';
+    const mt=item.method|| _dItem.method   || '';
+    const cy=item.cycle || _dItem.cycle    || '';
+    return `<tr data-row="${i}" data-itemno="${item.no}" style="background:${bg};border-bottom:1px solid var(--border)">
+      <td style="padding:7px 8px;text-align:center;border-right:1px solid var(--border);color:var(--text3);font-size:11px">${i+1}</td>
+      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_name" style="padding:7px 10px;border-right:1px solid var(--border);font-weight:500;${es}" onblur="window._dSaveItemDef(this)">${n}</td>
+      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_std" style="padding:7px 10px;border-right:1px solid var(--border);color:var(--text2);${es}" onblur="window._dSaveItemDef(this)">${s}</td>
+      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_method" style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._dSaveItemDef(this)">${mt}</td>
+      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_cycle" style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._dSaveItemDef(this)">${cy}</td>
+      <td style="padding:5px 6px;border-right:1px solid var(--border);text-align:center">
+        ${mt==='지시값기록'
+          ? `<input type="number" value="${val}" placeholder="" onchange="window._dSaveRes('${k}',this.value,${i})" style="width:58px;border:1px solid var(--border);border-radius:5px;padding:3px 4px;font-size:12px;font-family:inherit;text-align:center;background:#fff">`
+          : `<select onchange="window._dSaveRes('${k}',this.value,${i})" style="width:52px;border:1px solid var(--border);border-radius:5px;padding:3px;font-size:12px;background:#fff;font-family:inherit;cursor:pointer"><option value=""${val===''?' selected':''}></option><option value="○"${val==='○'?' selected':''}>○</option><option value="✕"${val==='✕'?' selected':''}>✕</option><option value="N"${val==='N'?' selected':''}>N</option></select>`}
+        <div class="d-ts-badge" style="font-size:9px;text-align:center;margin-top:2px;min-height:11px;line-height:1.3">${_dTsBadgeHtml(_rd.savedAt,_rd.modifiedAt)}</div>
+      </td>
+      <td style="padding:5px 6px">
+        <input type="text" value="${rmk}" placeholder="${rmkPh}" onchange="window._dSaveRmk('${kr}',this.value)"
+          style="width:100%;border:1px solid;${rmkStyle}border-radius:5px;padding:3px 6px;font-size:11px;font-family:inherit;color:var(--text)">
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+/* ── 타임스탬프 헬퍼 ── */
+function _dFmtTs(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function _dTsBadgeHtml(savedAt, modifiedAt) {
+  if (!savedAt && !modifiedAt) return '';
+  const parts = [];
+  if (savedAt) parts.push(`<span style="color:#9ca3af" title="최초 저장">저장&nbsp;${_dFmtTs(savedAt)}</span>`);
+  if (modifiedAt) parts.push(`<span style="color:#f59e0b" title="수정 저장">수정&nbsp;${_dFmtTs(modifiedAt)}</span>`);
+  return parts.join('<br>');
+}
+function _dUpdateRowTs(itemNo, savedAt, modifiedAt) {
+  const tr = document.querySelector(`#d-check-tbody tr[data-itemno="${itemNo}"]`);
+  if (!tr) return;
+  const badge = tr.querySelector('.d-ts-badge');
+  if (badge) badge.innerHTML = _dTsBadgeHtml(savedAt, modifiedAt);
+}
+
+/* ── Pending results (debounce batch POST) ── */
+let _dPendingResults = new Map(); // key → {equipIdx, itemNo, date, result, remark}
+let _dSaveTimer = null;
+
+function _dStageResult(equipIdx, itemNo, date, result, remark) {
+  const key = `${equipIdx}_${itemNo}_${date}`;
+  const prev = _dPendingResults.get(key) || { equipIdx, itemNo, date, result: '', remark: '' };
+  _dPendingResults.set(key, {
+    equipIdx, itemNo, date,
+    result:  result  !== undefined ? result  : prev.result,
+    remark:  remark  !== undefined ? remark  : prev.remark
+  });
+  clearTimeout(_dSaveTimer);
+  _dSaveTimer = setTimeout(_dFlushResults, 1000);
+}
+
+async function _dFlushResults() {
+  if (!_dPendingResults.size || !window.currentCarId) return;
+  const now = new Date().toISOString();
+  const grouped = new Map();
+  _dPendingResults.forEach((v) => {
+    const gKey = `${v.equipIdx}_${v.date}`;
+    if (!grouped.has(gKey)) grouped.set(gKey, { equipIdx: v.equipIdx, date: v.date, results: [], meta: [] });
+    const [yr, mo, dy] = v.date.split('-');
+    const rKey = `${yr}_${parseInt(mo)}_${parseInt(dy)}_${v.equipIdx}`;
+    const existing = (_dResults[rKey] || {})[v.itemNo] || {};
+    // daily_items.id (FK) 조회 — item_no는 설비 내 순번, item_id는 DB PK
+    const equipDbId = (DAILY_EQUIP[v.equipIdx] || {}).id || v.equipIdx;
+    const dItem = DAILY_ITEMS[`${equipDbId}_${v.itemNo}`] || {};
+    if (!dItem.id) return; // item_id 없으면 저장 불가 (items 아직 미로드)
+    grouped.get(gKey).results.push({ item_id: dItem.id, result: v.result || '', remark: v.remark || '', saved_at: now });
+    grouped.get(gKey).meta.push({ itemNo: v.itemNo, rKey, isFirst: !existing.savedAt });
+  });
+  _dPendingResults.clear();
+  for (const [, g] of grouped) {
+    const equip = DAILY_EQUIP[g.equipIdx] || {};
+    const equip_id = equip.id || g.equipIdx;
+    const worker = document.getElementById('d-worker-input')?.value || '';
+    const payload = { equip_id, check_date: g.date, worker, results: g.results };
+    try {
+      await AIT_API.saveDailyResults(payload);
+      g.meta.forEach(({ itemNo, rKey, isFirst }) => {
+        if (!_dResults[rKey]) _dResults[rKey] = {};
+        if (!_dResults[rKey][itemNo]) _dResults[rKey][itemNo] = { result: '', remark: '', savedAt: null, modifiedAt: null };
+        if (isFirst) _dResults[rKey][itemNo].savedAt = now;
+        else _dResults[rKey][itemNo].modifiedAt = now;
+        if (g.equipIdx === curEquip) _dUpdateRowTs(itemNo, _dResults[rKey][itemNo].savedAt, _dResults[rKey][itemNo].modifiedAt);
+      });
+    } catch(e) {
+      console.warn('결과 저장 실패', e);
+      if (typeof showToast === 'function') showToast('저장 실패: 서버 연결을 확인하세요', 'error');
+    }
+  }
+}
+
+/* ── Save handlers — NO full re-render, targeted DOM update only ── */
+window._dSaveRes=function(k,v,rowIdx){
+  // DB에 debounce 저장 (k: daily_${car}_${year}_${month}_${day}_${equipIdx}_${itemNo})
+  const km=k.match(/daily_[^_]+(?:_[^_]+){2}_(\d+)_(\d+)_(\d+)$/);
+  if(km){
+    const m=getTabMonth('daily');
+    const rKey=`${m.year}_${m.month}_${km[1]}_${km[2]}`;
+    if(!_dResults[rKey]) _dResults[rKey]={};
+    if(!_dResults[rKey][km[3]]) _dResults[rKey][km[3]]={result:'',remark:'',savedAt:null,modifiedAt:null};
+    _dResults[rKey][km[3]].result=v||'';
+    const date=`${m.year}-${String(m.month).padStart(2,'0')}-${String(km[1]).padStart(2,'0')}`;
+    _dStageResult(parseInt(km[2]), parseInt(km[3]), date, v, undefined);
+  }
+  const tr=document.querySelector(`#d-check-tbody tr[data-row="${rowIdx}"]`);
+  if(tr){
+    tr.style.background=v==='✕'?'#fff5f5':v==='○'?'#f7fef9':'#fff';
+    // NG 시 비고칸 강조
+    const rmkInput=tr.querySelector('td:last-child input');
+    if(rmkInput){
+      const isNg=v==='✕';
+      rmkInput.style.borderColor=isNg?'#fca5a5':'var(--border)';
+      rmkInput.style.background=isNg?'#fff0f0':'#fff';
+      rmkInput.placeholder=isNg?'이상조치 입력':'비고';
+      if(isNg) rmkInput.focus();
+    }
+  }
+  updateDayBtn(curDay);
+};
+window._dSaveRmk=function(k,v){
+  // DB에 debounce 저장 (k: daily_rmk_${car}_${year}_${month}_${day}_${equipIdx}_${itemNo})
+  const km=k.match(/daily_rmk_[^_]+(?:_[^_]+){2}_(\d+)_(\d+)_(\d+)$/);
+  if(km){
+    const m=getTabMonth('daily');
+    const rKey=`${m.year}_${m.month}_${km[1]}_${km[2]}`;
+    if(!_dResults[rKey]) _dResults[rKey]={};
+    if(!_dResults[rKey][km[3]]) _dResults[rKey][km[3]]={result:'',remark:'',savedAt:null,modifiedAt:null};
+    _dResults[rKey][km[3]].remark=v||'';
+    const date=`${m.year}-${String(m.month).padStart(2,'0')}-${String(km[1]).padStart(2,'0')}`;
+    _dStageResult(parseInt(km[2]), parseInt(km[3]), date, undefined, v);
+  }
+};
+window._dSaveNow=async function(){
+  clearTimeout(_dSaveTimer);
+  const btn=document.getElementById('d-save-btn');
+  if(btn){btn.disabled=true;btn.textContent='저장 중…';}
+  await _dFlushResults();
+  if(btn){btn.disabled=false;btn.textContent='저장';}
+};
+window._dSaveWorker=function(v){
+  const m=getTabMonth('daily');
+  const k=`${m.year}_${m.month}_${curDay}_${curEquip}`;
+  if(v) _dWorkerCache[k]=v; else delete _dWorkerCache[k];
+};
+window._dSaveItemDef=function(td){
+  const k=td.dataset.dk; if(!k) return;
+  const newVal=td.textContent.trim();
+  // data-dk 형식: daily_item_${car}_equip${curEquip}_item${i}_${field}
+  const m=k.match(/_equip(\d+)_item(\d+)_(\w+)$/);
+  if(m){
+    const equipDbId2=parseInt(m[1]), itemNo=m[2], rawField=m[3];
+    const fieldMap={name:'item_name',std:'standard',method:'method',cycle:'cycle'};
+    const dbField=fieldMap[rawField]||rawField;
+    const _dItemKey2=`${equipDbId2}_${itemNo}`;
+    if(!DAILY_ITEMS[_dItemKey2]) DAILY_ITEMS[_dItemKey2]={equip_id:equipDbId2,item_no:itemNo};
+    DAILY_ITEMS[_dItemKey2][dbField]=newVal;
+    // debounce DB sync
+    clearTimeout(window._dItemSyncTimer);
+    window._dItemSyncTimer=setTimeout(()=>{
+      if(!window.currentCarId) return;
+      const itemsArr=Object.values(DAILY_ITEMS).map(it=>({
+        equip_id:it.equip_id,
+        item_no:it.item_no,
+        item_name:it.item_name||'',
+        standard:it.standard||'',
+        method:it.method||'',
+        cycle:it.cycle||''
+      }));
+      window.safeApi?window.safeApi(()=>AIT_API.syncDailyItems(window.currentCarId,itemsArr),{msg:'항목 저장'})
+        :AIT_API.syncDailyItems(window.currentCarId,itemsArr).catch(e=>console.warn('항목 동기화 실패',e));
+    },800);
+  }
+};
+
+/* ── Reset to default ── */
+window.dailyResetToDefault=function(){
+  if(!confirm('CP 기반으로 설비 데이터를 다시 추출합니다.\n점검 결과(체크값)는 유지됩니다. 계속하시겠습니까?')) return;
+  const doReload=()=>{
+    if(typeof loaded!=='undefined'&&typeof loadTab==='function'){
+      loaded['daily']=false;
+      document.getElementById('pane-daily').innerHTML='';
+      loadTab('daily');
+    } else location.reload();
+  };
+  if(!AIT_API.MOCK&&window.currentCarId)
+    AIT_API.syncDailyEquip(window.currentCarId,[]).then(doReload).catch(doReload);
+  else doReload();
+};
+
+/* ── Edit mode hook ── */
+window.dailySetEditable=function(on){
+  dailyEditMode=on;
+  ['d-equip-name','d-proc-no','d-proc-name','d-location','d-manager'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.contentEditable=on?'true':'false';
+  });
+  renderCheckTable(); renderPhotoStrip();
+};
+
+/* ── Init ── */
+if(DAILY_EQUIP.length>0){ renderEquipInfo(); dailyRenderDayPicker(); renderCheckTable(); loadAndRenderPhotos(); }
+
+window.addEventListener('beforeunload', () => { clearTimeout(_dSaveTimer); _dFlushResults(); });
+})();
+</script>

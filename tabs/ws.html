@@ -1,0 +1,561 @@
+<!-- 작표 탭 툴바 -->
+<div class="tab-toolbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">작업표준서</span>
+    <div style="width:1px;height:16px;background:var(--border)"></div>
+    <span id="ws-rev-badge" style="font-size:13px;font-weight:700;color:#111827">Rev. 0</span>
+    <span id="ws-rev-date" style="font-size:13px;color:#374151">개정일: -</span>
+    <button class="btn btn-ghost btn-sm" onclick="openRevModal()">이력</button>
+  </div>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost btn-sm" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}wsResetContent();})()" style="color:var(--red);border-color:var(--red)">🗑 초기화</button>
+  <button class="btn btn-primary btn-sm edit-only" onclick="saveDocument('ws')" style="font-weight:700">💾 저장</button>
+  <button class="btn btn-ghost btn-sm" id="ws-edit-btn" onclick="toggleTabEditMode('ws', this)">✏ 편집 모드</button>
+</div>
+
+<div class="edit-banner edit-only" style="margin:8px 16px 0">
+  ✏ 편집 모드 — STEP 추가·사진 업로드·요점·관리항목 편집이 가능합니다.
+</div>
+
+<!-- 공정 선택 탭 -->
+<div class="process-nav" id="ws-proc-nav"></div>
+
+<!-- ══════════ 문서 본문 ══════════ -->
+<div class="ws-doc-wrap">
+
+  <!-- 문서 헤더 (품번~안전주의 한 줄) -->
+  <table class="ws-hdr-tbl">
+    <colgroup>
+      <col style="width:46px"><col style="width:80px">
+      <col style="width:46px"><col style="width:80px">
+      <col style="width:56px"><col style="width:50px">
+      <col style="width:46px"><col style="width:220px">
+      <col style="width:46px"><col style="width:120px">
+      <col style="width:100px">
+    </colgroup>
+    <tbody>
+      <tr>
+        <td class="ws-hdr-lbl">품번</td>
+        <td class="ws-hdr-val" id="ws-pn" contenteditable="false"></td>
+        <td class="ws-hdr-lbl">품명</td>
+        <td class="ws-hdr-val" id="ws-pname" contenteditable="false"></td>
+        <td class="ws-hdr-lbl">공정번호</td>
+        <td class="ws-hdr-val" id="ws-proc-num">-</td>
+        <td class="ws-hdr-lbl">공정명</td>
+        <td class="ws-hdr-val" data-hdr="name"></td>
+        <td class="ws-hdr-lbl">설비명</td>
+        <td class="ws-hdr-val" data-hdr="equip"></td>
+        <td style="vertical-align:middle;text-align:center;padding:3px;border:1px solid #7a90b8">
+          <img src="../손 압착경고.png" style="width:100%;max-width:90px;height:auto;object-fit:contain;display:block;margin:0 auto">
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ══ 2열 메인 뷰: STEP+사진(좌) + 관리항목(우) ══ -->
+  <div style="display:flex;flex:1;min-height:0;border-bottom:2px solid #c9d4e8">
+
+    <!-- 왼쪽: STEP 헤더 + 사진/동영상 (55%) -->
+    <div style="flex:0 0 55%;display:flex;flex-direction:column;border-right:2px solid #c9d4e8">
+      <!-- STEP 헤더 (왼쪽 컬럼 안) -->
+      <div id="ws-step-hd-bar" style="background:#1e3264;color:#fff;padding:9px 16px;display:flex;align-items:center;gap:12px;flex-shrink:0">
+        <span id="ws-curr-badge" style="background:rgba(255,255,255,.15);font-size:13px;font-weight:800;padding:3px 14px;border-radius:99px;border:1px solid rgba(255,255,255,.35);flex-shrink:0">STEP -</span>
+        <span id="ws-curr-name"
+              style="font-size:16px;font-weight:700;flex:1;min-width:0;white-space:normal;overflow:visible;outline:none;border-radius:3px"
+              onblur="window._wsSyncName && window._wsSyncName(this.textContent.trim())"></span>
+        <input id="ws-curr-name-input" class="edit-only" type="text" placeholder="작업명 입력"
+               oninput="window._wsCurrNameInput&&window._wsCurrNameInput(this.value)"
+               style="display:none;flex:1;min-width:0;background:rgba(255,255,255,.14);border:1px dashed rgba(255,255,255,.45);border-radius:5px;color:#fff;padding:4px 10px;font-size:14px;font-weight:600;font-family:inherit;outline:none">
+        <div class="edit-only" style="display:flex;gap:6px;flex-shrink:0">
+          <button onclick="addStep()" style="padding:4px 11px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);color:#fff;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">＋ STEP 추가</button>
+          <button onclick="window._wsDelCurr&&window._wsDelCurr()" style="padding:4px 11px;background:rgba(239,68,68,.22);border:1px solid rgba(255,100,100,.35);color:#fff;border-radius:6px;font-size:11px;cursor:pointer;font-weight:600">✕ 삭제</button>
+        </div>
+      </div>
+      <!-- 사진 패널 -->
+      <div id="ws-photo-panel" onclick="window._wsPhotoPanelClick&&window._wsPhotoPanelClick(event)" style="flex:1;background:#f3f4f6;position:relative;overflow:hidden;min-height:320px;display:flex;align-items:center;justify-content:center;cursor:default">
+        <div id="ws-photo-display" style="width:100%;height:100%;min-height:320px;display:flex;align-items:center;justify-content:center">
+          <div style="text-align:center;color:#9ca3af">
+            <div style="font-size:52px;margin-bottom:10px">📷</div>
+            <div style="font-size:12px">STEP을 선택하거나 추가하세요</div>
+          </div>
+        </div>
+        <!-- 편집 모드: 사진 업로드/제거 -->
+        <div class="edit-only" id="ws-photo-overlay"
+             style="position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.78));padding:12px 14px;display:none;align-items:center;justify-content:space-between;gap:8px">
+          <label style="background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.28);color:#fff;font-size:11px;padding:5px 13px;border-radius:6px;cursor:pointer;font-weight:600;flex-shrink:0">
+            📷 사진/동영상 변경
+            <input type="file" accept="image/*,video/*" style="display:none" onchange="window._wsUploadPhoto&&window._wsUploadPhoto(this)">
+          </label>
+          <button onclick="window._wsRemovePhoto&&window._wsRemovePhoto()"
+                  style="background:rgba(239,68,68,.32);border:1px solid rgba(255,100,100,.38);color:#fff;font-size:11px;padding:5px 13px;border-radius:6px;cursor:pointer;font-weight:600;flex-shrink:0">
+            🗑 사진 제거
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 관리항목 — 맨 위부터 시작 (45%) -->
+    <div style="flex:1;background:#fff;display:flex;flex-direction:column;overflow:hidden;min-width:0">
+      <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable">
+        <table class="ws-mgmt-tbl" style="table-layout:fixed;font-size:11px">
+          <colgroup>
+            <col style="width:32px"><col style="width:42px"><col style="width:100px">
+            <col><col style="width:86px"><col style="width:58px">
+            <col style="width:90px"><col style="width:58px">
+            <col class="edit-only" style="width:28px">
+          </colgroup>
+          <thead>
+            <tr>
+              <th style="font-size:11px">No.</th>
+              <th style="font-size:11px">구분</th>
+              <th style="font-size:11px;text-align:left">관리항목</th>
+              <th style="font-size:11px;text-align:left">규격·기준</th>
+              <th style="font-size:11px">확인방법</th>
+              <th style="font-size:11px">주기</th>
+              <th style="font-size:11px;text-align:left">이상조치</th>
+              <th style="font-size:11px;text-align:left">비고</th>
+              <th class="edit-only" style="padding:2px 4px">
+                <button onclick="addWsMgmtRow()" title="항목 추가"
+                  style="width:22px;height:22px;border:none;background:#1e3264;color:#fff;border-radius:4px;cursor:pointer;font-size:14px;line-height:1;font-weight:700">＋</button>
+              </th>
+            </tr>
+          </thead>
+          <tbody id="ws-mgmt-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ 하단: STEP 가로 네비 스트립 ══ -->
+  <div style="background:#f8f9fa;padding:0;border-bottom:2px solid #c9d4e8;flex-shrink:0;border-top:1px solid var(--border)">
+    <!-- 레이블 바 -->
+    <div style="padding:6px 14px 4px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:9px;font-weight:700;color:#9ca3af;text-transform:uppercase;letter-spacing:.8px">STEP 네비게이션</span>
+    </div>
+    <!-- 썸네일 스크롤 스트립 -->
+    <div id="ws-thumb-strip" style="display:flex;padding:0 12px 10px;gap:8px;overflow-x:auto;align-items:flex-start;min-height:86px">
+      <div style="color:#000;font-size:12px;margin:auto;padding:20px 0">STEP이 없습니다 — 편집 모드에서 추가하세요</div>
+    </div>
+  </div>
+
+  <!-- STEP 데이터 저장용 hidden div (save/restore 호환) -->
+  <div id="ws-step-area" style="display:none"></div>
+
+</div><!-- /ws-doc-wrap -->
+
+<script>
+// ── 초기화 ──
+function wsResetContent() {
+  if (!confirm('이 차종의 작업표준서 내용을 모두 초기화하시겠습니까?\n(저장된 STEP·관리항목이 모두 삭제됩니다)')) return;
+  const car = typeof getCurrentCar === 'function' ? getCurrentCar() : 'GN7 OHCL';
+  localStorage.removeItem(`ait_ws_content_${car}`);
+  document.getElementById('ws-mgmt-tbody').innerHTML = '';
+  document.getElementById('ws-step-area').innerHTML = '';
+  _wsRenderThumb();
+  _wsShowStep(-1);
+}
+
+// ── 관리항목 추가 ──
+function addWsMgmtRow() {
+  const proc = document.getElementById('ws-proc-num')?.textContent.trim() || '';
+  if (!proc) return;
+  const tbody = document.getElementById('ws-mgmt-tbody');
+  const cnt = tbody.querySelectorAll(`tr[data-proc="${proc}"]`).length + 1;
+  const tr = document.createElement('tr');
+  tr.dataset.proc = proc;
+  tr.innerHTML = `
+    <td contenteditable="false" style="font-family:monospace;font-weight:700">${cnt}</td>
+    <td contenteditable="false" style="color:#1d4ed8;font-weight:600;font-size:11px">제품</td>
+    <td contenteditable="false"></td>
+    <td contenteditable="false"></td>
+    <td contenteditable="false">육안</td>
+    <td contenteditable="false">전수</td>
+    <td contenteditable="false"></td>
+    <td contenteditable="false"></td>
+    <td class="edit-only" style="padding:2px;text-align:center">
+      <button onclick="this.closest('tr').remove()" style="width:24px;height:24px;border:none;background:#fee2e2;color:#ef4444;border-radius:5px;cursor:pointer;font-size:12px;font-weight:700;line-height:1" title="삭제">✕</button>
+    </td>`;
+  const pane = document.getElementById('pane-ws');
+  if (pane && pane.classList.contains('edit-mode')) {
+    tr.querySelectorAll('td:not(.edit-only)').forEach(td => {
+      td.contentEditable = 'true';
+      td.style.background = '#edf3ff';
+      td.style.cursor = 'text';
+    });
+  }
+  tbody.appendChild(tr);
+  tr.querySelector('td:nth-child(3)').focus();
+}
+
+// ══════════════════════════════════
+//   STEP 뷰 렌더링
+// ══════════════════════════════════
+let _wsIdx = 0;
+
+function _wsGetList() {
+  return [...document.querySelectorAll('[id^="ws-step-list-"]')].find(d => d.style.display !== 'none') || null;
+}
+function _wsGetSteps() {
+  const l = _wsGetList();
+  return l ? [...l.querySelectorAll('.ws-step-item')] : [];
+}
+function _wsMediaLabelHidden() {
+  return `<label class="ws-add-photo edit-only"><span style="font-size:24px">📷</span><span style="font-size:11px;color:var(--text3)">사진/동영상</span><input type="file" accept="image/*,video/*" style="display:none" onchange="wsLoadPhoto(this)"></label>`;
+}
+
+// ── 썸네일 스트립 렌더링 ──
+function _wsRenderThumb() {
+  const steps = _wsGetSteps();
+  const strip = document.getElementById('ws-thumb-strip');
+  if (!strip) return;
+
+  if (steps.length === 0) {
+    strip.innerHTML = '<div style="color:#000;font-size:12px;margin:auto;padding:20px 0">STEP이 없습니다 — 편집 모드에서 추가하세요</div>';
+    return;
+  }
+
+  strip.innerHTML = steps.map((step, i) => {
+    const name  = step.querySelector('.ws-step-name')?.textContent.trim() || '';
+    const img   = step.querySelector('.ws-photo-inner img');
+    const vid   = step.querySelector('.ws-photo-inner video');
+    const spec  = step.querySelector('.ws-step-spec')?.textContent.trim() || '';
+    const firstPt = spec.split('\n').map(l=>l.trim()).find(Boolean) || '';
+    const active = (i === _wsIdx);
+
+    // 이전/현재/다음 표시
+    const rel = i === _wsIdx ? 'current' : i === _wsIdx - 1 ? 'prev' : i === _wsIdx + 1 ? 'next' : '';
+    const relLabel = rel === 'current' ? '' : rel === 'prev' ? '◀ 이전' : rel === 'next' ? '다음 ▶' : '';
+
+    const thumb = img
+      ? `<img src="${img.src}" style="width:100%;height:54px;object-fit:cover;border-radius:3px 3px 0 0;display:block">`
+      : vid
+        ? `<div style="width:100%;height:54px;background:#1e3264;border-radius:3px 3px 0 0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);font-size:18px">▶</div>`
+        : `<div style="width:100%;height:54px;background:#252538;border-radius:3px 3px 0 0;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.15);font-size:20px">📷</div>`;
+
+    return `<div onclick="_wsShowStep(${i})" title="${name}" style="flex-shrink:0;width:${active?'140':'110'}px;cursor:pointer;border-radius:5px;overflow:hidden;border:2px solid ${active?'#7eb4ff':rel?'rgba(255,255,255,.18)':'rgba(255,255,255,.06)'};background:${active?'#1e2a45':'#1e2030'};transition:all .14s;position:relative">
+      ${relLabel ? `<div style="position:absolute;top:2px;left:0;right:0;text-align:center;font-size:8px;font-weight:700;color:rgba(255,255,255,.4);letter-spacing:.5px;z-index:1">${relLabel}</div>` : ''}
+      ${thumb}
+      <div style="padding:4px 7px 5px;background:${active?'rgba(126,180,255,.12)':'transparent'}">
+        <div style="font-size:8px;font-weight:800;color:${active?'#7eb4ff':'rgba(255,255,255,.28)'};letter-spacing:.5px;margin-bottom:1px">STEP ${i+1}</div>
+        <div style="font-size:10px;font-weight:700;color:${active?'#fff':'rgba(255,255,255,.55)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${name||'(이름 없음)'}</div>
+        ${firstPt&&active ? `<div style="font-size:9px;color:rgba(255,255,255,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px">${firstPt}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── 특정 STEP 선택 → 메인 뷰 갱신 ──
+function _wsShowStep(idx) {
+  const steps = _wsGetSteps();
+  _wsIdx = idx;
+
+  const badge  = document.getElementById('ws-curr-badge');
+  const nameEl = document.getElementById('ws-curr-name');
+  const disp   = document.getElementById('ws-photo-display');
+
+  const overlay = document.getElementById('ws-photo-overlay');
+  const _inEdit = () => document.getElementById('pane-ws')?.classList.contains('edit-mode');
+
+  if (idx < 0 || steps.length === 0 || !steps[idx]) {
+    if (badge)  badge.textContent  = 'STEP -';
+    if (nameEl) nameEl.textContent = '';
+    if (disp)   disp.innerHTML = '<div style="text-align:center;color:#111827"><div style="font-size:52px">📷</div><div style="font-size:12px;margin-top:10px">STEP을 추가하세요</div></div>';
+    if (overlay) overlay.style.display = 'none';
+    _wsRenderThumb();
+    return;
+  }
+
+  const step  = steps[idx];
+  const name  = step.querySelector('.ws-step-name')?.textContent.trim() || '';
+  const inner = step.querySelector('.ws-photo-inner');
+  const img   = inner?.querySelector('img');
+  const vid   = inner?.querySelector('video');
+
+  if (badge)  badge.textContent  = `STEP ${idx+1}`;
+  if (nameEl) nameEl.textContent = name;
+  const currInput = document.getElementById('ws-curr-name-input');
+  if (currInput) currInput.value = name;
+
+  if (disp) {
+    if (img) {
+      disp.innerHTML = `<img src="${img.src}" style="width:100%;height:100%;object-fit:contain;cursor:zoom-in;display:block;max-height:420px" onclick="openPhoto(this)">`;
+    } else if (vid) {
+      disp.innerHTML = `<video src="${vid.src}" controls style="width:100%;max-height:420px;display:block"></video>`;
+    } else {
+      disp.innerHTML = '<div style="text-align:center;color:#111827"><div style="font-size:52px">📷</div><div style="font-size:12px;margin-top:10px">사진이 없습니다</div></div>';
+    }
+  }
+
+  if (overlay) overlay.style.display = _inEdit() ? 'flex' : 'none';
+  _wsRenderThumb();
+}
+
+// ── 이름 동기화 (blur) ──
+window._wsSyncName = function(txt) {
+  const step = _wsGetSteps()[_wsIdx];
+  if (!step) return;
+  const el = step.querySelector('.ws-step-name');
+  if (el) el.textContent = txt;
+  const inp = step.querySelector('.ws-step-name-input');
+  if (inp) inp.value = txt;
+  _wsRenderThumb();
+};
+
+// ── 헤더 input → step 이름 실시간 반영 ──
+window._wsCurrNameInput = function(val) {
+  const step = _wsGetSteps()[_wsIdx];
+  if (!step) return;
+  const nameEl = step.querySelector('.ws-step-name');
+  if (nameEl) nameEl.textContent = val;
+  const inp = step.querySelector('.ws-step-name-input');
+  if (inp) inp.value = val;
+  const curr = document.getElementById('ws-curr-name');
+  if (curr) curr.textContent = val;
+  _wsRenderThumb();
+};
+
+// ── 사진/영상 업로드 (낙관적 UI: 즉시 base64 표시 → Drive 백그라운드 업로드) ──
+window._wsUploadPhoto = function(input) {
+  const file = input.files[0]; if (!file) return;
+  const step = _wsGetSteps()[_wsIdx]; if (!step) { input.value = ''; return; }
+  const inner = step.querySelector('.ws-photo-inner');
+  const isVid = file.type.startsWith('video/');
+  const car = typeof getCurrentCar === 'function' ? getCurrentCar() : '';
+  const procNum = document.getElementById('ws-proc-num')?.textContent.trim() || '';
+
+  if (file.size > 10 * 1024 * 1024 && !confirm(`파일 크기 ${(file.size/1024/1024).toFixed(1)}MB — 10MB 초과 파일은 업로드에 실패할 수 있습니다. 계속하시겠습니까?`)) {
+    input.value = ''; return;
+  }
+
+  const delBtn = `<button class="edit-only" onclick="wsRemovePhoto(this)" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border:none;background:rgba(0,0,0,.55);color:#fff;border-radius:4px;cursor:pointer;font-size:12px;line-height:1">✕</button>`;
+  const uploadingBadge = `<div id="ws-upload-badge" style="position:absolute;bottom:6px;left:6px;background:rgba(0,0,0,.6);color:#fff;font-size:10px;padding:2px 7px;border-radius:10px">⏳ Drive 저장 중...</div>`;
+  const disp = document.getElementById('ws-photo-display');
+
+  const r = new FileReader();
+  r.onload = e => {
+    const src = e.target.result;
+
+    // 1. 즉시 base64로 표시 (낙관적 UI)
+    inner.style.position = 'relative';
+    inner.innerHTML = isVid
+      ? `<video src="${src}" controls style="width:100%;display:block;border-radius:4px;max-height:400px"></video>${delBtn}${uploadingBadge}`
+      : `<img src="${src}" style="width:100%;height:auto;display:block;border-radius:4px" onclick="openPhoto(this)">${delBtn}${uploadingBadge}`;
+    if (disp) disp.innerHTML = isVid
+      ? `<video src="${src}" controls style="width:100%;max-height:420px;display:block"></video>`
+      : `<img src="${src}" style="width:100%;height:100%;object-fit:contain;cursor:zoom-in;display:block;max-height:420px" onclick="openPhoto(this)">`;
+    _wsRenderThumb();
+
+    // 2. Drive 백그라운드 업로드
+    if (typeof AIT_API !== 'undefined' && !AIT_API.MOCK) {
+      AIT_API.uploadWsPhoto({ car, proc: procNum, step: _wsIdx + 1, filename: file.name, base64: src })
+        .then(res => {
+          const fileId = res && res.fileId ? res.fileId : '';
+          if (!fileId) throw new Error('fileId 없음');
+          const url = AIT_API.driveUrl(fileId);
+          // base64 → Drive URL 교체
+          const imgEl = inner.querySelector('img, video');
+          if (imgEl) { imgEl.src = url; imgEl.dataset.fileId = fileId; }
+          if (disp) {
+            const dispEl = disp.querySelector('img, video');
+            if (dispEl) dispEl.src = url;
+          }
+          inner.querySelector('#ws-upload-badge')?.remove();
+          _wsRenderThumb();
+        })
+        .catch(err => {
+          console.warn('[WS] Drive 업로드 실패:', err.message || err);
+          // base64를 DOM/localStorage에 남기지 않고 원래 상태로 복원
+          inner.style.position = '';
+          inner.innerHTML = _wsMediaLabelHidden();
+          if (disp) disp.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.22)"><div style="font-size:52px">📷</div><div style="font-size:12px;margin-top:10px">사진이 없습니다</div></div>';
+          _wsRenderThumb();
+          alert('Drive 업로드 실패: 서버 연결을 확인하고 다시 시도해주세요.');
+        });
+    }
+  };
+  r.readAsDataURL(file);
+  input.value = '';
+};
+
+// ── 사진 제거 ──
+window._wsRemovePhoto = function() {
+  const step = _wsGetSteps()[_wsIdx]; if (!step) return;
+  const inner = step.querySelector('.ws-photo-inner');
+  const img = inner.querySelector('img[data-file-id]');
+  if (img && img.dataset.fileId && typeof AIT_API !== 'undefined' && !AIT_API.MOCK) {
+    AIT_API.deleteWsPhoto(img.dataset.fileId).catch(e => console.warn('Drive 사진 삭제 실패', e));
+  }
+  inner.style.position = '';
+  inner.innerHTML = _wsMediaLabelHidden();
+  const disp = document.getElementById('ws-photo-display');
+  if (disp) disp.innerHTML = '<div style="text-align:center;color:rgba(255,255,255,.22)"><div style="font-size:52px">📷</div><div style="font-size:12px;margin-top:10px">사진이 없습니다</div></div>';
+  _wsRenderThumb();
+};
+
+// ── 현재 STEP 삭제 ──
+window._wsDelCurr = function() {
+  const steps = _wsGetSteps();
+  const step  = steps[_wsIdx];
+  if (!step) return;
+  if (!confirm(`STEP ${_wsIdx+1}을 삭제하시겠습니까?`)) return;
+  step.remove();
+  const ns = _wsGetSteps();
+  _wsIdx = Math.max(0, Math.min(_wsIdx, ns.length-1));
+  _wsShowStep(ns.length > 0 ? _wsIdx : -1);
+};
+
+// ── 편집 모드 적용 ──
+window._wsApplyEditMode = function(on) {
+  const nameEl = document.getElementById('ws-curr-name');
+  if (nameEl) {
+    nameEl.contentEditable = on ? 'true' : 'false';
+    nameEl.style.outline      = on ? '1px dashed rgba(255,255,255,.45)' : '';
+    nameEl.style.borderRadius = on ? '3px' : '';
+    nameEl.style.padding      = on ? '0 4px' : '';
+    nameEl.style.cursor       = on ? 'text' : '';
+  }
+  const overlay = document.getElementById('ws-photo-overlay');
+  if (overlay) {
+    const hasStep = _wsGetSteps().length > 0 && _wsIdx >= 0 && !!_wsGetSteps()[_wsIdx];
+    overlay.style.display = (on && hasStep) ? 'flex' : 'none';
+  }
+};
+
+// ── 공정 전환 후 뷰 리셋 (main.js showProcess 후 호출) ──
+window._wsOnProcChange = function() {
+  _wsIdx = 0;
+  _wsRenderThumb();
+  _wsShowStep(0);
+  _wsApplyDailyHighlight();
+  _wsSlideRestart();
+};
+
+// ── 사진 패널 클릭 → 편집모드 시 업로드 트리거 ──
+window._wsPhotoPanelClick = function(e) {
+  if (e.target.closest('button,label,input,video,img')) return;
+  const pane = document.getElementById('pane-ws');
+  if (!pane || !pane.classList.contains('edit-mode')) return;
+  const steps = _wsGetSteps();
+  if (!steps.length || _wsIdx < 0 || !steps[_wsIdx]) return;
+  document.querySelector('#ws-photo-overlay input[type="file"]')?.click();
+};
+
+// ── 설비일상 행 하이라이트 ──
+function _wsApplyDailyHighlight() {
+  document.querySelectorAll('#ws-mgmt-tbody tr').forEach(tr => {
+    const bigoCell = tr.cells[7]; // 비고 칸
+    if (!bigoCell) return;
+    const txt = bigoCell.textContent.trim();
+    if (txt.includes('설비일상')) {
+      tr.classList.add('daily-row');
+      bigoCell.classList.add('daily-badge');
+    } else {
+      tr.classList.remove('daily-row');
+      bigoCell.classList.remove('daily-badge');
+    }
+  });
+}
+
+// 관리항목 변경 감지 → 자동 재적용
+(function() {
+  const tbody = document.getElementById('ws-mgmt-tbody');
+  if (!tbody) return;
+  const obs = new MutationObserver(_wsApplyDailyHighlight);
+  obs.observe(tbody, { childList: true, subtree: true, characterData: true });
+})();
+
+// ── addStep 오버라이드 (step-list 자동 생성) ──
+window.addStep = function() {
+  const procNum = document.getElementById('ws-proc-num')?.textContent.trim();
+  if (!procNum || procNum === '-') { alert('공정을 먼저 선택하세요.'); return; }
+
+  const areaId = 'ws-step-list-' + procNum;
+  let list = document.getElementById(areaId);
+  if (!list) {
+    list = document.createElement('div');
+    list.id = areaId;
+    list.style.display = '';
+    document.getElementById('ws-step-area').appendChild(list);
+  }
+  document.querySelectorAll('[id^="ws-step-list-"]').forEach(d => {
+    d.style.display = d.id === areaId ? '' : 'none';
+  });
+
+  const num = list.querySelectorAll('.ws-step-item').length + 1;
+  const item = document.createElement('div');
+  item.className = 'ws-step-item';
+  item.innerHTML = `
+    <div class="ws-step-th">
+      <span class="ws-step-num-badge">STEP ${num}</span>
+      <span class="ws-step-name" contenteditable="false"></span>
+      <button class="edit-only" onclick="wsDelStep(this)"
+        style="margin-left:auto;width:24px;height:24px;border:none;background:rgba(255,255,255,.2);
+               color:#fff;border-radius:4px;cursor:pointer;font-size:13px;flex-shrink:0;line-height:1">✕</button>
+    </div>
+    <div class="ws-step-body">
+      <div class="ws-photo-cell"><div class="ws-photo-inner">${_wsMediaLabelHidden()}</div></div>
+      <div class="ws-spec-cell"><div class="ws-step-spec" contenteditable="false"></div></div>
+    </div>`;
+  list.appendChild(item);
+
+  const pane = document.getElementById('pane-ws');
+  if (pane && pane.classList.contains('edit-mode')) {
+    item.querySelector('.ws-step-name').contentEditable = 'true';
+    item.querySelector('.ws-step-spec').contentEditable = 'true';
+  }
+  _wsIdx = num - 1;
+  _wsShowStep(_wsIdx);
+};
+
+// ── STEP 자동 슬라이드쇼 ──
+let _wsSlideTimer = null;
+const WS_SLIDE_MS = 4000;
+
+function _wsSlideStop() {
+  if (_wsSlideTimer) { clearInterval(_wsSlideTimer); _wsSlideTimer = null; }
+}
+function _wsSlideRestart() {
+  _wsSlideStop();
+  if (_wsGetSteps().length <= 1) return;
+  _wsSlideTimer = setInterval(() => {
+    const steps = _wsGetSteps();
+    if (steps.length > 1) _wsShowStep((_wsIdx + 1) % steps.length);
+  }, WS_SLIDE_MS);
+}
+function _wsSlideNext() {
+  const steps = _wsGetSteps(); if (!steps.length) return;
+  _wsShowStep((_wsIdx + 1) % steps.length);
+  _wsSlideRestart();
+}
+function _wsSlidePrev() {
+  const steps = _wsGetSteps(); if (!steps.length) return;
+  _wsShowStep((_wsIdx - 1 + steps.length) % steps.length);
+  _wsSlideRestart();
+}
+
+// 패널에 화살표 버튼 + 호버 일시정지 주입
+(function() {
+  const panel = document.getElementById('ws-photo-panel');
+  if (!panel) return;
+
+  const btnBase = 'position:absolute;top:50%;transform:translateY(-50%);background:rgba(0,0,0,.42);border:none;color:#fff;font-size:26px;width:38px;height:56px;border-radius:7px;cursor:pointer;z-index:20;line-height:1;transition:background .15s';
+  const prev = Object.assign(document.createElement('button'), { title:'이전 STEP', innerHTML:'&#8249;' });
+  const next = Object.assign(document.createElement('button'), { title:'다음 STEP', innerHTML:'&#8250;' });
+  prev.style.cssText = btnBase + ';left:8px';
+  next.style.cssText = btnBase + ';right:8px';
+  prev.onclick = e => { e.stopPropagation(); _wsSlidePrev(); };
+  next.onclick = e => { e.stopPropagation(); _wsSlideNext(); };
+  [prev, next].forEach(b => {
+    b.onmouseenter = () => b.style.background = 'rgba(0,0,0,.72)';
+    b.onmouseleave = () => b.style.background = 'rgba(0,0,0,.42)';
+  });
+  panel.appendChild(prev);
+  panel.appendChild(next);
+
+  // 호버/터치 시 일시정지
+  panel.addEventListener('mouseenter', _wsSlideStop);
+  panel.addEventListener('mouseleave', _wsSlideRestart);
+  panel.addEventListener('touchstart', _wsSlideStop, { passive: true });
+  panel.addEventListener('touchend',   _wsSlideRestart, { passive: true });
+})();
+</script>
