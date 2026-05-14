@@ -7,7 +7,12 @@
 <link rel="stylesheet" href="style.css">
 <script>
   (function() {
-    if (!localStorage.getItem('ait_token')) {
+    const token = localStorage.getItem('ait_token');
+    const exp   = parseInt(localStorage.getItem('ait_token_exp') || '0');
+    if (!token || exp <= Date.now()) {
+      localStorage.removeItem('ait_token');
+      localStorage.removeItem('ait_token_exp');
+      localStorage.removeItem('ait_user');
       window.location.replace('login.html');
     }
   })();

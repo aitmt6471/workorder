@@ -48,6 +48,7 @@ function _buildWsMgmtFromCpRows(rows, paneEl) {
   const seenProc = {};
   let mgmtHtml = '';
   const delBtn = `<td class="edit-only" style="padding:2px;text-align:center"><button onclick="this.closest('tr').remove()" style="width:28px;height:28px;border:none;background:#fee2e2;color:#ef4444;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;line-height:1" title="삭제">✕</button></td>`;
+  const _n = v => (!v || v === 'null') ? '' : v;
   rows.forEach(r => {
     const procNo = String(r.proc_no || '');
     if (!procNo) return;
@@ -55,9 +56,9 @@ function _buildWsMgmtFromCpRows(rows, paneEl) {
     if (['수입검사','출하검사'].some(k => procNm.includes(k))) return;
     if (!seenProc[procNo]) seenProc[procNo] = 0;
     seenProc[procNo]++;
-    const cat = r.ctrl_category || '', item = r.ctrl_item || '', std = r.standard || '';
-    const method = r.tool || '', cycle = r.sample_freq || '', plan = r.ctrl_method || '';
-    const action = r.reaction_plan || '', note = r.linked_doc || '';
+    const cat = _n(r.ctrl_category), item = _n(r.ctrl_item), std = _n(r.standard);
+    const method = _n(r.tool), cycle = _n(r.sample_freq), plan = _n(r.ctrl_method);
+    const action = _n(r.reaction_plan), note = _n(r.linked_doc);
     const isDaily = plan.includes('설비일상') || plan.includes('점검');
     const catColor = cat.includes('제품') ? '#1d4ed8' : '#15803d';
     mgmtHtml += `<tr data-proc="${procNo}" data-plan="${plan}"${isDaily ? ' class="daily-row"' : ''}>
@@ -342,28 +343,29 @@ async function _saveCpToDb(carName, paneEl) {
   const domDbIds = new Set();
   const saves = [];
 
+  const _cv = s => { const v = (s || '').trim(); return (v && v !== 'null') ? v : null; };
   domRows.forEach((tr, idx) => {
     const cells = tr.cells;
     const flowRaw = (cells[1]?.dataset?.ms || cells[1]?.textContent.trim() || '').toUpperCase();
     const dbId = tr.dataset.dbId ? parseInt(tr.dataset.dbId) : null;
     const data = {
-      proc_no:      cells[0]?.textContent.trim() || null,
+      proc_no:      _cv(cells[0]?.textContent),
       flow_main:    flowRaw.includes('MAIN') ? 1 : 0,
       flow_sub:     flowRaw === 'SUB'         ? 1 : 0,
       flow_outsource: flowRaw.includes('외주') ? 1 : 0,
-      proc_name:    cells[2]?.textContent.trim() || null,
-      equip_name:   cells[3]?.textContent.trim() || null,
-      char_special: cells[4]?.textContent.trim() || null,
-      char_general: cells[5]?.textContent.trim() || null,
-      ctrl_category:cells[6]?.textContent.trim() || null,
-      ctrl_item:    cells[7]?.textContent.trim() || null,
-      standard:     cells[8]?.textContent.trim() || null,
-      tool:         cells[9]?.textContent.trim() || null,
-      sample_freq:  cells[10]?.textContent.trim()|| null,
-      ctrl_method:  cells[11]?.textContent.trim()|| null,
-      owner:        cells[12]?.textContent.trim()|| null,
-      reaction_plan:cells[13]?.textContent.trim()|| null,
-      linked_doc:   cells[14]?.textContent.trim()|| null,
+      proc_name:    _cv(cells[2]?.textContent),
+      equip_name:   _cv(cells[3]?.textContent),
+      char_special: _cv(cells[4]?.textContent),
+      char_general: _cv(cells[5]?.textContent),
+      ctrl_category:_cv(cells[6]?.textContent),
+      ctrl_item:    _cv(cells[7]?.textContent),
+      standard:     _cv(cells[8]?.textContent),
+      tool:         _cv(cells[9]?.textContent),
+      sample_freq:  _cv(cells[10]?.textContent),
+      ctrl_method:  _cv(cells[11]?.textContent),
+      owner:        _cv(cells[12]?.textContent),
+      reaction_plan:_cv(cells[13]?.textContent),
+      linked_doc:   _cv(cells[14]?.textContent),
       sort_order:   idx,
       is_deleted:   0
     };
@@ -667,28 +669,29 @@ async function _buildCpHtmlFromDb(car) {
           <span class="cp-gid-name" onclick="event.stopPropagation()" style="font-size:13px;color:#1e3264">${g.proc_name || ''}</span>
           <span class="cp-chevron" style="float:right;font-size:11px;color:#1e3264">&#x25BC;</span>
         </td></tr>`;
+      const _n = v => (!v || v === 'null') ? '' : v;
       g.rows.forEach(r => {
         const ms = r.flow_main ? 'MAIN' : r.flow_sub ? 'SUB' : r.flow_outsource ? '외주' : 'MAIN';
         const msStyle = ms==='MAIN'?'color:#1e3264;font-weight:700':ms==='SUB'?'color:#6b7280;font-weight:600':'color:#b45309;font-weight:600';
-        const catStyle = (r.ctrl_category||'').includes('제품')?'color:#1e3264;font-weight:600':'color:#6b7280;font-weight:600';
-        const plan = r.ctrl_method||'';
+        const catStyle = _n(r.ctrl_category).includes('제품')?'color:#1e3264;font-weight:600':'color:#6b7280;font-weight:600';
+        const plan = _n(r.ctrl_method);
         const planStyle = plan.includes('작업표준서')||plan.includes('작표')?'color:#1e3264;font-weight:600':plan.includes('설비일상')||plan.includes('점검')?'color:#16a34a;font-weight:600':'color:#6b7280';
         html += `<tr class="cp-child cp-open" data-gid="${gid}" data-db-id="${r.id}" style="background:#fff">
-          <td class="td-center td-mono" contenteditable="false">${r.proc_no||''}</td>
+          <td class="td-center td-mono" contenteditable="false">${_n(r.proc_no)}</td>
           <td class="cp-flow-cell" data-ms="${ms}" style="padding:0;vertical-align:middle;text-align:center">${_cpFlowHtml(ms,false)}</td>
-          <td contenteditable="false">${r.proc_name||''}</td>
-          <td contenteditable="false">${r.equip_name||''}</td>
-          <td class="td-center" contenteditable="false">${r.char_special||'—'}</td>
-          <td class="td-center" contenteditable="false">${r.char_general||'—'}</td>
-          <td class="td-center" contenteditable="false"><span style="${catStyle}">${r.ctrl_category||''}</span></td>
-          <td contenteditable="false">${r.ctrl_item||''}</td>
-          <td contenteditable="false">${r.standard||''}</td>
-          <td class="td-center" contenteditable="false">${r.tool||''}</td>
-          <td class="td-center" contenteditable="false">${r.sample_freq||''}</td>
+          <td contenteditable="false">${_n(r.proc_name)}</td>
+          <td contenteditable="false">${_n(r.equip_name)}</td>
+          <td class="td-center" contenteditable="false">${_n(r.char_special)||'—'}</td>
+          <td class="td-center" contenteditable="false">${_n(r.char_general)||'—'}</td>
+          <td class="td-center" contenteditable="false"><span style="${catStyle}">${_n(r.ctrl_category)}</span></td>
+          <td contenteditable="false">${_n(r.ctrl_item)}</td>
+          <td contenteditable="false">${_n(r.standard)}</td>
+          <td class="td-center" contenteditable="false">${_n(r.tool)}</td>
+          <td class="td-center" contenteditable="false">${_n(r.sample_freq)}</td>
           <td contenteditable="false"><span style="${planStyle}">${plan}</span></td>
-          <td class="td-center" contenteditable="false">${r.owner||''}</td>
-          <td contenteditable="false">${r.reaction_plan||''}</td>
-          <td contenteditable="false">${r.linked_doc||''}</td>
+          <td class="td-center" contenteditable="false">${_n(r.owner)}</td>
+          <td contenteditable="false">${_n(r.reaction_plan)}</td>
+          <td contenteditable="false">${_n(r.linked_doc)}</td>
           <td class="td-center edit-only" style="width:36px;padding:4px 2px;vertical-align:top">
             <button onclick="this.closest('tr').remove()" style="display:block;width:28px;height:28px;border:none;background:#fee2e2;color:#ef4444;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;line-height:1" title="행 삭제">✕</button>
           </td></tr>`;

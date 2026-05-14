@@ -186,7 +186,13 @@
 
   (function() {
     const token = localStorage.getItem('ait_token');
-    if (token) window.location.replace('index.html');
+    const exp   = parseInt(localStorage.getItem('ait_token_exp') || '0');
+    if (token && exp > Date.now()) window.location.replace('index.html');
+    else if (token) {
+      localStorage.removeItem('ait_token');
+      localStorage.removeItem('ait_token_exp');
+      localStorage.removeItem('ait_user');
+    }
   })();
 
   async function doLogin(e) {
@@ -211,6 +217,7 @@
 
       if (res.ok && data.token) {
         localStorage.setItem('ait_token', data.token);
+        localStorage.setItem('ait_token_exp', String(Date.now() + 8 * 3600 * 1000));
         localStorage.setItem('ait_user', JSON.stringify({
           name:       data.name,
           email:      data.email,

@@ -802,6 +802,7 @@ function _renderWsMgmtFromItems(items, paneEl, car) {
   const tb = paneEl.querySelector('#ws-mgmt-tbody');
   if (!tb || !items || !items.length) return;
   const seenProc = {};
+  const _n = v => (!v || v === 'null') ? '' : v;
   const delBtn = `<td class="edit-only" style="padding:2px;text-align:center"><button onclick="this.closest('tr').remove()" style="width:28px;height:28px;border:none;background:#fee2e2;color:#ef4444;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;line-height:1" title="삭제">✕</button></td>`;
   tb.innerHTML = items.map(r => {
     const proc = r.proc_no || '';
@@ -809,15 +810,15 @@ function _renderWsMgmtFromItems(items, paneEl, car) {
     seenProc[proc]++;
     const isDaily = (r.plan_type || '').includes('설비일상');
     const catColor = (r.category || '').includes('제품') ? '#1d4ed8' : '#15803d';
-    return `<tr data-proc="${proc}" data-plan="${r.plan_type||''}"${isDaily ? ' class="daily-row"' : ''}>
+    return `<tr data-proc="${proc}" data-plan="${_n(r.plan_type)}"${isDaily ? ' class="daily-row"' : ''}>
       <td contenteditable="false" style="font-family:monospace;font-weight:700">${seenProc[proc]}</td>
-      <td contenteditable="false" style="color:${catColor};font-weight:600;font-size:11px">${r.category||''}</td>
-      <td contenteditable="false">${r.item_name||''}</td>
-      <td contenteditable="false">${r.standard||''}</td>
-      <td contenteditable="false">${r.method||''}</td>
-      <td contenteditable="false">${r.cycle||''}</td>
-      <td contenteditable="false">${r.action_plan||''}</td>
-      <td contenteditable="false"${isDaily ? ' class="daily-badge"' : ''}>${r.note||''}</td>
+      <td contenteditable="false" style="color:${catColor};font-weight:600;font-size:11px">${_n(r.category)}</td>
+      <td contenteditable="false">${_n(r.item_name)}</td>
+      <td contenteditable="false">${_n(r.standard)}</td>
+      <td contenteditable="false">${_n(r.method)}</td>
+      <td contenteditable="false">${_n(r.cycle)}</td>
+      <td contenteditable="false">${_n(r.action_plan)}</td>
+      <td contenteditable="false"${isDaily ? ' class="daily-badge"' : ''}>${_n(r.note)}</td>
       ${delBtn}</tr>`;
   }).join('');
   refreshMgmtRowColors(paneEl);
