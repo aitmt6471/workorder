@@ -434,7 +434,7 @@ function initCpMeta(paneEl, car) {
   const modelEl = paneEl.querySelector('#cp-meta-model');
   const pnoEl   = paneEl.querySelector('#cp-meta-partno');
   const pnmEl   = paneEl.querySelector('#cp-meta-partname');
-  if (modelEl) modelEl.textContent = car;
+  if (modelEl) modelEl.textContent = meta.carmodel || car;
   if (pnoEl)   pnoEl.textContent   = meta.partno   || '';
   if (pnmEl)   pnmEl.textContent   = meta.partname || '';
   const linenameEl = paneEl.querySelector('#cp-meta-linename');
@@ -453,30 +453,35 @@ function initCpMeta(paneEl, car) {
 function openPartModal() {
   const car = getCurrentCar();
   const meta = _cpMetaGet(car);
+  document.getElementById('part-modal-carmodel').value = meta.carmodel || car || '';
   document.getElementById('part-modal-partno').value   = meta.partno   || '';
   document.getElementById('part-modal-partname').value = meta.partname || '';
   document.getElementById('part-modal').classList.add('open');
-  document.getElementById('part-modal-partno').focus();
+  document.getElementById('part-modal-carmodel').focus();
 }
 function closePartModal() {
   document.getElementById('part-modal').classList.remove('open');
 }
 function savePartModal() {
+  const carmodel = document.getElementById('part-modal-carmodel').value.trim();
   const partno   = document.getElementById('part-modal-partno').value.trim();
   const partname = document.getElementById('part-modal-partname').value.trim();
   const car = getCurrentCar();
   const meta = _cpMetaGet(car);
+  meta.carmodel = carmodel;
   meta.partno   = partno;
   meta.partname = partname;
   _cpMetaSet(car, meta);
   if (!AIT_API.MOCK && window.currentCarId) {
-    AIT_API.updateCar(window.currentCarId, { partno, partname })
-      .then(() => _updateCarCache(window.currentCarId, { partno, partname }))
-      .catch(e => console.warn('품번/품명 DB 저장 실패', e));
+    AIT_API.updateCar(window.currentCarId, { carmodel, partno, partname })
+      .then(() => _updateCarCache(window.currentCarId, { carmodel, partno, partname }))
+      .catch(e => console.warn('차종/품번/품명 DB 저장 실패', e));
   }
   // 메타바 표시 갱신
+  const mdl = document.getElementById('cp-meta-model');
   const pno = document.getElementById('cp-meta-partno');
   const pnm = document.getElementById('cp-meta-partname');
+  if (mdl) mdl.textContent = carmodel;
   if (pno) pno.textContent = partno;
   if (pnm) pnm.textContent = partname;
   // ws 헤더 실시간 반영

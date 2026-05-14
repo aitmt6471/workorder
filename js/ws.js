@@ -16,16 +16,23 @@ function showProcess(num, el) {
 
   // CP 테이블에서 해당 공정 정보 읽기
   // 공정흐름도 변환 여부에 따라 인덱스 분기 (변환 후: 0=번호,1=흐름도,2=공정명,3=설비명)
-  const cpRows = [...document.querySelectorAll('#cp-tbody tr.cp-child')]
+  const cpDomRows = [...document.querySelectorAll('#cp-tbody tr.cp-child')]
     .filter(tr => parseInt(tr.cells[0]?.textContent.trim()) === num);
-  const isTransformed = cpRows[0]?.cells[1]?.classList.contains('cp-flow-cell');
-  const nameIdx  = isTransformed ? 2 : 1;
-  const equipIdx = isTransformed ? 3 : 2;
-  const equips = [...new Set(cpRows.map(tr => tr.cells[equipIdx]?.textContent.trim()).filter(v => v && v !== 'MAIN' && v !== 'SUB' && !v.includes('외주')))];
-  const info = {
-    name:  cpRows[0]?.cells[nameIdx]?.textContent.trim() || '',
-    equip: equips.join(', ')
-  };
+  let info;
+  if (cpDomRows.length) {
+    const isTransformed = cpDomRows[0]?.cells[1]?.classList.contains('cp-flow-cell');
+    const nameIdx  = isTransformed ? 2 : 1;
+    const equipIdx = isTransformed ? 3 : 2;
+    const equips = [...new Set(cpDomRows.map(tr => tr.cells[equipIdx]?.textContent.trim()).filter(v => v && v !== 'MAIN' && v !== 'SUB' && !v.includes('외주')))];
+    info = { name: cpDomRows[0]?.cells[nameIdx]?.textContent.trim() || '', equip: equips.join(', ') };
+  } else if (window._cpRowsForWs) {
+    // CP 탭 DOM이 아직 로드되지 않은 경우 → WS 로드 시 캐시한 DB 행으로 폴백
+    const dbMatched = window._cpRowsForWs.filter(r => parseInt(r.proc_no) === num);
+    const equips = [...new Set(dbMatched.map(r => r.equip_name).filter(v => v && v !== 'MAIN' && v !== 'SUB' && !(v||'').includes('외주')))];
+    info = { name: dbMatched[0]?.proc_name || '', equip: equips.join(', ') };
+  } else {
+    info = { name: '', equip: '' };
+  }
   document.querySelectorAll('#pane-ws [data-hdr]').forEach(c => {
     c.textContent = info[c.dataset.hdr] ?? '';
   });

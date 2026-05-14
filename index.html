@@ -5,6 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>공정문서 관리시스템</title>
 <link rel="stylesheet" href="style.css">
+<script>
+  (function() {
+    if (!localStorage.getItem('ait_token')) {
+      window.location.replace('login.html');
+    }
+  })();
+</script>
 </head>
 <body>
 
@@ -47,6 +54,14 @@
         <span class="nav-icon">📊</span>
         <span class="nav-label">사양표</span>
       </div>
+      <div class="nav-item" data-tab="insp" onclick="showTab('insp',this)">
+        <span class="nav-icon">📐</span>
+        <span class="nav-label">공정검사기준서</span>
+      </div>
+      <div class="nav-item" data-tab="qpoint" onclick="showTab('qpoint',this)">
+        <span class="nav-icon">⚠</span>
+        <span class="nav-label">Q-Point</span>
+      </div>
     </nav>
 
     <div class="sidebar-footer">
@@ -66,6 +81,8 @@
     <div id="pane-imf" class="pane"></div>
     <div id="pane-ms" class="pane"></div>
     <div id="pane-spec" class="pane"></div>
+    <div id="pane-insp" class="pane"></div>
+    <div id="pane-qpoint" class="pane"></div>
   </main>
 
 </div>
@@ -102,6 +119,10 @@
       <button class="btn btn-ghost btn-sm" onclick="closePartModal()">✕</button>
     </div>
     <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#6b7280;font-weight:600">차종</label>
+        <input id="part-modal-carmodel" type="text" placeholder="차종 입력 (예: GN7 FL)" style="border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;font-family:inherit">
+      </div>
       <div style="display:flex;flex-direction:column;gap:4px">
         <label style="font-size:11px;color:#6b7280;font-weight:600">품번</label>
         <input id="part-modal-partno" type="text" placeholder="품번 입력" style="border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;font-family:inherit">
@@ -150,16 +171,45 @@
       <table class="rev-tbl">
         <thead>
           <tr>
-            <th style="width:80px">개정번호</th>
-            <th style="width:100px">개정일</th>
-            <th style="width:80px">작성자</th>
+            <th style="width:72px">개정번호</th>
+            <th style="width:88px">개정일</th>
             <th>개정 내용</th>
-            <th style="width:120px">해당 문서</th>
+            <th style="width:90px">작성자</th>
+            <th style="width:90px">검토자</th>
+            <th style="width:90px">승인자</th>
             <th style="width:40px"></th>
           </tr>
         </thead>
         <tbody id="rev-modal-tbody"></tbody>
       </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── 서명 모달 ── -->
+<div class="rev-modal-overlay" id="sign-modal" onclick="if(event.target===this)closeSignModal()" style="z-index:3100">
+  <div class="rev-modal" style="max-width:430px">
+    <div class="rev-modal-hd">
+      <div class="rev-modal-title" id="sign-modal-title">서명</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeSignModal()">✕</button>
+    </div>
+    <div class="rev-modal-body" style="padding:20px">
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:5px">이름</label>
+        <input id="sign-name-input" type="text" placeholder="이름 입력"
+          style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;box-sizing:border-box;outline:none;font-family:inherit">
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">서명 (아래에 직접 그려주세요)</div>
+      <div style="border:1.5px solid #d1d5db;border-radius:8px;background:#fff;overflow:hidden">
+        <canvas id="sign-canvas" width="390" height="160"
+          style="display:block;width:100%;touch-action:none;cursor:crosshair"></canvas>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+        <button onclick="signClear()"
+          style="padding:8px 16px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;font-size:13px;color:#374151">지우기</button>
+        <button class="sign-save-btn" onclick="signSave()"
+          style="padding:8px 22px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">저장</button>
+      </div>
     </div>
   </div>
 </div>
@@ -264,7 +314,7 @@
 
 <!-- 탭 콘텐츠 fetch 로드 -->
 <script>
-const TABS = ['cp','ws','daily','imf','ms','spec'];
+const TABS = ['cp','ws','daily','imf','ms','spec','insp','qpoint'];
 const loaded = {};
 async function loadTab(id) {
   if (loaded[id]) return;
@@ -297,6 +347,24 @@ window.showTab = function(id, el) {
   _origShowTab(id, el);
   loadTab(id);
 };
+
+/* ── 라이트박스 ── */
+window.openLightbox = function(src, caption) {
+  var box = document.getElementById('lightbox-box');
+  var cap = document.getElementById('lightbox-caption');
+  if (!box) return;
+  box.innerHTML = '<img src="' + src + '" style="width:100%;height:100%;object-fit:contain;display:block">';
+  if (cap) cap.textContent = caption || '';
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+};
+window.closeLightbox = function() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+};
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') window.closeLightbox();
+});
 </script>
 
 <!-- ── Toast 컨테이너 ── -->

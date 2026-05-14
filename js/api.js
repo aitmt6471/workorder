@@ -18,7 +18,7 @@ const AIT_API = (() => {
   }
   async function _get(path, params = {}) {
     const qs = new URLSearchParams(params).toString();
-    const r  = await _fetchT(`${N8N}/${path}${qs ? '?' + qs : ''}`);
+    const r  = await _fetchT(`${N8N}/${path}${qs ? '?' + qs : ''}`, { cache: 'no-store' });
     if (!r.ok) throw new Error(`GET ${path} ${r.status}`);
     const txt = await r.text();
     return txt ? JSON.parse(txt) : [];
@@ -62,6 +62,11 @@ const AIT_API = (() => {
     /* ── 개정이력 ──────────────────────────────── */
     getRevisions:     (carId, docType) => _get('ait/revisions', { carId, docType }),
     addRevision:      (carId, docType, data) => _post('ait/revisions', { carId, docType, ...data }),
+    signRevision:     (carId, docType, rev, role, name, base64, filename) => _post('ait/revisions/sign', { carId, docType, rev, role, name, base64, filename }, 30000).then(r => Array.isArray(r) ? r[0] : r),
+    getRevisionSigns: (carId, docType) => _get('ait/revisions/signs', { carId, docType }),
+    deleteSign:       (carId, docType, rev, role) => _post('ait/sign/del', { carId, docType, rev, role }),
+    uploadSignSimple: (docType, base64, filename) => _post('ait/sign/upload', { docType, base64, filename }, 30000).then(r => Array.isArray(r) ? r[0] : r),
+    deleteSignFile:   (fileId) => _post('ait/sign/delete-file', { fileId }),
 
     /* ── CP ────────────────────────────────────── */
     getCpRows:        (carId)   => _get('ait/cp/rows', { carId }),
@@ -76,6 +81,8 @@ const AIT_API = (() => {
     updateDailyEquip:   (id, data) => _put('ait/daily/equipments', { id, ...data }),
     syncDailyEquip:     (carId, equipments) => _post('ait/daily/sync', { carId, equipments }),
     getDailyResults:    (equipId, date) => _get('ait/daily/results', { equipId, date }),
+    getDailyMonthStatus:(equipId, yearMonth) => _get('ait/daily/month-status', { equipId, yearMonth }),
+    getMsMonthStatus:   (sampleId, yearMonth) => _get('ait/ms/month-status', { sampleId, yearMonth }),
     saveDailyResults:   (payload) => _post('ait/daily/results', payload),
     // payload = { equip_id, check_date, worker, results:[{item_id,result,remark}] }
 
@@ -90,6 +97,7 @@ const AIT_API = (() => {
 
     /* ── 마스터샘플 ────────────────────────────── */
     getMsSamples:     (carId)   => _get('ait/ms/samples', { carId }),
+    getMsItems:       (carId)   => _get('ait/ms/items', { carId }),
     createMsSample:   (carId, data) => _post('ait/ms/samples', { carId, ...data }),
     updateMsSample:   (id, data)=> _put('ait/ms/samples',  { id, ...data }),
     deleteMsSample:   (id)      => _del('ait/ms/samples',  { id }),
@@ -98,12 +106,18 @@ const AIT_API = (() => {
     // payload = { sample_id, check_date, worker, results:[{item_id,result,remark}] }
 
     /* ── 사양표 ──────────────────────────────────── */
-    getSpecMes:       (date, carModel) => _get('ait/spec/mes', { date, carModel }),
+    getSpecCatalog:   ()                         => _get('ait/spec/catalog'),
+    getSpecMes:       (date, carModel, lineName) => _get('ait/spec/mes', { date, carModel, lineName }),
     getSpecMaster:    (carModel)       => _get('ait/spec/master', carModel ? { carModel } : {}),
     createSpecMaster: (data)           => _post('ait/spec/master', data),
     updateSpecMaster: (id, data)       => _put('ait/spec/master', { id, ...data }),
     deleteSpecMaster: (id)             => _del('ait/spec/master', { id }),
-    getSpecBom:       (cdItem)         => _get('ait/spec/bom', { cdItem }),
+    getSpecBom:            (partNo)              => _get('ait/spec/bom', { partNo }),
+    deleteSpecBomRow:      (partNo, subPartNo)   => _post('ait/spec/bom/delete', { partNo, subPartNo }),
+    getSpecBomParents:     (subPartNo)           => _get('ait/spec/bom/lookup', { subPartNo }),
+    getSpecLineProducts:   (lineName, fromDate) => _get('ait/spec/line-products', { lineName, fromDate }),
+    getSpecItemNames:      ()                   => _get('ait/spec/item-names'),
+    getSpecDriveIndex:     ()                   => _get('ait/spec/drive-index'),
     getSpecPhotos:    (cdItem)         => _get('ait/spec/photos', { cdItem }),
     uploadSpecPhoto:  (data)           => _post('ait/spec/photos', data, 30000).then(r => Array.isArray(r) ? r[0] : r),
     deleteSpecPhoto:  (data)           => _del('ait/spec/photos', data),
@@ -130,12 +144,16 @@ const AIT_API = (() => {
     deleteWsPhoto:    (fileId)  => _del('ait/ws/photos',     { fileId }),
     getWsPhotos:      ()        => _get('ait/ws/photos'),
     // body: { car, equip, filename, base64 }       → { fileId, url }
-    uploadDailyPhoto: (data)    => _post('ait/daily/photos', data).then(r => Array.isArray(r) ? r[0] : r),
+    uploadDailyPhoto: (data)    => _post('ait/daily/photos', data, 30000).then(r => Array.isArray(r) ? r[0] : r),
     deleteDailyPhoto: (fileId)  => _del('ait/daily/photos',  { fileId }),
     getDailyPhotos:   ()        => _get('ait/daily/photos'),
+    uploadMsPhoto:    (data)    => _post('ait/ms/photos', data, 30000).then(r => Array.isArray(r) ? r[0] : r),
+    deleteMsPhoto:    (data)    => _del('ait/ms/photos', data),
+    getMsPhotos:      (sampleId)=> _get('ait/ms/photos', { sampleId }),
     getDailyEquipPhotos:  (carId, equipId) => _get('ait/daily/equip/photos', { carId, equipId }),
     syncDailyEquipPhotos: (carId, equipId, photos) => _post('ait/daily/equip/photos/sync', { carId, equipId, photos }),
-    driveUrl:         (fileId)  => `https://lh3.googleusercontent.com/d/${fileId}`,
+    driveUrl:         (fileId)  => `https://lh3.googleusercontent.com/d/${fileId}=w1200`,
+    normalizePhotoUrl:(url)     => { if(!url) return url; const m=url.match(/(?:lh3\.googleusercontent\.com\/d\/|drive\.google\.com\/(?:uc\?.*[?&]id=|thumbnail\?.*[?&]id=))([^?&\s]+)/); return m ? `https://lh3.googleusercontent.com/d/${m[1]}=w1200` : url; },
 
     /* ── 커스텀 항목 메타 ─────────────────────── */
     getDailyItems:    (carId)        => _get('ait/daily/items', { carId }),
@@ -219,6 +237,9 @@ const AIT_API = (() => {
     /* 개정 */
     getRevisions:       (cId, dt)    => _real.getRevisions(cId, dt),
     addRevision:        (cId, dt, d) => _real.addRevision(cId, dt, d),
+    signRevision:       (cId, dt, rv, role, name, b64, fn) => _real.signRevision(cId, dt, rv, role, name, b64, fn),
+    getRevisionSigns:   (cId, dt) => _real.getRevisionSigns(cId, dt),
+    deleteSign:         (cId, dt, rv, role) => _real.deleteSign(cId, dt, rv, role),
     /* CP */
     getCpRows:          (carId)      => _real.getCpRows(carId),
     createCpRow:        (cId, d)     => _real.createCpRow(cId, d),
@@ -229,6 +250,8 @@ const AIT_API = (() => {
     getDailyEquipments: (carId)      => impl.getDailyEquipment ? impl.getDailyEquipment(carId) : _real.getDailyEquipments(carId),
     syncDailyEquip:     (carId, equipments) => _real.syncDailyEquip(carId, equipments),
     getDailyResults:    (eId, date)  => _real.getDailyResults(eId, date),
+    getDailyMonthStatus:(eId, ym)    => _real.getDailyMonthStatus(eId, ym),
+    getMsMonthStatus:   (sId, ym)    => _real.getMsMonthStatus(sId, ym),
     saveDailyResults:   (payload)    => _real.saveDailyResults(payload),
     resetDailyOnCpChange: (carId, fromDate) => _post('ait/cp/reset-daily', { carId, fromDate }),
     /* IMF */
@@ -240,6 +263,7 @@ const AIT_API = (() => {
     saveImfResults:     (payload)    => _real.saveImfResults(payload),
     /* MS */
     getMsSamples:       (carId)      => _real.getMsSamples(carId),
+    getMsItems:         (carId)      => _real.getMsItems(carId),
     createMsSample:     (cId, d)     => _real.createMsSample(cId, d),
     updateMsSample:     (id, d)      => _real.updateMsSample(id, d),
     deleteMsSample:     (id)         => _real.deleteMsSample(id),
@@ -267,9 +291,13 @@ const AIT_API = (() => {
     uploadDailyPhoto:   (data)       => _real.uploadDailyPhoto(data),
     deleteDailyPhoto:   (fileId)     => _real.deleteDailyPhoto(fileId),
     getDailyPhotos:     ()           => _real.getDailyPhotos(),
+    uploadMsPhoto:      (data)       => _real.uploadMsPhoto(data),
+    deleteMsPhoto:      (data)       => _real.deleteMsPhoto(data),
+    getMsPhotos:        (sampleId)   => _real.getMsPhotos(sampleId),
     getDailyEquipPhotos:  (cId, eId)         => _real.getDailyEquipPhotos(cId, eId),
     syncDailyEquipPhotos: (cId, eId, photos) => _real.syncDailyEquipPhotos(cId, eId, photos),
-    driveUrl:           (fileId)     => `https://lh3.googleusercontent.com/d/${fileId}`,
+    driveUrl:           (fileId)     => `https://lh3.googleusercontent.com/d/${fileId}=w1200`,
+    normalizePhotoUrl:  (url)        => { if(!url) return url; const m=url.match(/(?:lh3\.googleusercontent\.com\/d\/|drive\.google\.com\/(?:uc\?.*[?&]id=|thumbnail\?.*[?&]id=))([^?&\s]+)/); return m ? `https://lh3.googleusercontent.com/d/${m[1]}=w1200` : url; },
     getCpMeta:          (carId)        => _real.getCpMeta(carId),
     saveCpMeta:         (carId, data)  => _real.saveCpMeta(carId, data),
     getWsMgmt:          (carId)        => _real.getWsMgmt(carId),
@@ -282,12 +310,18 @@ const AIT_API = (() => {
     getMsItems:         (carId)         => _real.getMsItems(carId),
     syncMsItems:        (carId, items)  => _real.syncMsItems(carId, items),
     /* 사양표 */
-    getSpecMes:         (date, carModel) => _real.getSpecMes(date, carModel),
+    getSpecCatalog:     ()                         => _real.getSpecCatalog(),
+    getSpecMes:         (date, carModel, lineName) => _real.getSpecMes(date, carModel, lineName),
     getSpecMaster:      (carModel)       => _real.getSpecMaster(carModel),
     createSpecMaster:   (data)           => _real.createSpecMaster(data),
     updateSpecMaster:   (id, data)       => _real.updateSpecMaster(id, data),
     deleteSpecMaster:   (id)             => _real.deleteSpecMaster(id),
-    getSpecBom:         (cdItem)         => _real.getSpecBom(cdItem),
+    getSpecBom:            (partNo)              => _real.getSpecBom(partNo),
+    deleteSpecBomRow:      (partNo, subPartNo)   => _real.deleteSpecBomRow(partNo, subPartNo),
+    getSpecBomParents:     (subPartNo)           => _real.getSpecBomParents(subPartNo),
+    getSpecLineProducts:   (lineName, fromDate) => _real.getSpecLineProducts(lineName, fromDate),
+    getSpecItemNames:      ()                   => _real.getSpecItemNames(),
+    getSpecDriveIndex:     ()                   => _real.getSpecDriveIndex(),
     getSpecPhotos:      (cdItem)         => _real.getSpecPhotos(cdItem),
     uploadSpecPhoto:    (data)           => _real.uploadSpecPhoto(data),
     deleteSpecPhoto:    (data)           => _real.deleteSpecPhoto(data),

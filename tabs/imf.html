@@ -8,6 +8,10 @@
     <button class="btn btn-ghost btn-sm" onclick="openRevModal('imf')">이력</button>
   </div>
   <div style="flex:1"></div>
+  <button id="alarm-toggle-btn" class="btn btn-ghost btn-sm edit-only" onclick="window._aitOpenAlarmModal()"
+    style="display:flex;align-items:center;gap:4px;font-size:12px">
+    <span id="alarm-toggle-icon">🔔</span><span id="alarm-toggle-label">알람설정</span>
+  </button>
   <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('imf')">저장</button>
   <button class="btn btn-ghost btn-sm" id="imf-edit-btn" onclick="toggleTabEditMode('imf',this)">&#x270F; 편집 모드</button>
 </div>
@@ -146,7 +150,16 @@ async function _imfFlushResults() {
     const sheet_id = _imfSheetIds[g.sheetIdx] || g.sheetIdx;
     const worker = document.getElementById('imf-worker-input')?.value || '';
     const payload = { sheet_id, check_date: g.date, worker, results: g.results };
-    try { await AIT_API.saveImfResults(payload); } catch(e) { console.warn('IMF 결과 저장 실패', e); }
+    try {
+      await AIT_API.saveImfResults(payload);
+      if (typeof window._aitAlarmValidate === 'function') {
+        const alarmRes = g.results.map(r => {
+          const imfItem = IMF_ITEMS[`${g.sheetIdx}_${r.item_no}`] || {};
+          return { item_no: String(r.item_no), result: r.result, item_name: imfItem.item_name || '' };
+        });
+        window._aitAlarmValidate('imf', sheet_id, g.date, alarmRes).catch(() => {});
+      }
+    } catch(e) { console.warn('IMF 결과 저장 실패', e); }
   }
 }
 
@@ -631,5 +644,6 @@ window.imfSetEditable = function(on){
 
 /* ── Init ── */
 imfRenderAll();
+if (typeof window._aitLoadAlarmState === 'function') window._aitLoadAlarmState();
 })();
 </script>

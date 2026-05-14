@@ -8,11 +8,14 @@ function showTab(id, el) {
 
 /* ── 활성 문서 탭 표시/숨김 ── */
 const ALL_DOC_TYPES = [
-  { id: 'cp',    label: '관리계획서' },
-  { id: 'ws',    label: '작업표준서' },
-  { id: 'daily', label: '설비일상점검표' },
-  { id: 'imf',   label: '초중종물' },
-  { id: 'ms',    label: '마스터샘플' }
+  { id: 'cp',     label: '관리계획서' },
+  { id: 'ws',     label: '작업표준서' },
+  { id: 'daily',  label: '설비일상점검표' },
+  { id: 'imf',    label: '초중종물' },
+  { id: 'ms',     label: '마스터샘플' },
+  { id: 'spec',   label: '사양표' },
+  { id: 'insp',   label: '공정검사기준서' },
+  { id: 'qpoint', label: 'Q-Point' }
 ];
 function applyEnabledDocs(docs) {
   const enabled = docs || ALL_DOC_TYPES.map(d => d.id);
@@ -101,6 +104,7 @@ function toggleTabEditMode(pane, btn) {
     if (pane === 'daily' && typeof window.dailySetEditable === 'function') window.dailySetEditable(true);
     if (pane === 'imf' && typeof window.imfSetEditable === 'function') window.imfSetEditable(true);
     if (pane === 'ms' && typeof window.msSetEditable === 'function') window.msSetEditable(true);
+    if (pane === 'insp' && typeof window.inspSetEditable === 'function') window.inspSetEditable(true);
   }
 }
 
@@ -149,23 +153,22 @@ function saveRevData(carName, data) {
 }
 
 /* ── 초중종물·마스터샘플 독립 개정 ── */
-const _STANDALONE_PANES = ['imf', 'ms'];
+const _STANDALONE_PANES = ['cp', 'ws', 'daily', 'imf', 'ms', 'insp', 'qpoint', 'spec'];
+// cp / ws / daily 는 동일한 개정 이력 공유
+function _revGroupKey(pane) {
+  return (pane === 'ws' || pane === 'daily') ? 'cp' : pane;
+}
+const _revMemStore = {}; // localStorage 대신 메모리 캐시 사용
 function getRevDataFor(pane, carName) {
   if (!_STANDALONE_PANES.includes(pane)) return getRevData(carName);
-  const key = `ait_${pane}_revisions`;
-  const all = JSON.parse(localStorage.getItem(key) || '{}');
-  if (!all[carName]) {
-    all[carName] = { rev: 0, history: [] };
-    localStorage.setItem(key, JSON.stringify(all));
-  }
-  return all[carName];
+  const key = `${_revGroupKey(pane)}:${carName}`;
+  if (!_revMemStore[key]) _revMemStore[key] = { rev: 0, history: [] };
+  return _revMemStore[key];
 }
 function saveRevDataFor(pane, carName, data) {
   if (!_STANDALONE_PANES.includes(pane)) { saveRevData(carName, data); return; }
-  const key = `ait_${pane}_revisions`;
-  const all = JSON.parse(localStorage.getItem(key) || '{}');
-  all[carName] = data;
-  localStorage.setItem(key, JSON.stringify(all));
+  const key = `${_revGroupKey(pane)}:${carName}`;
+  _revMemStore[key] = data;
 }
 
 function updateRevDisplay(pane) {
@@ -178,10 +181,38 @@ function updateRevDisplay(pane) {
 }
 
 function updateAllRevDisplays() {
-  ['cp','ws','daily','imf','ms'].forEach(updateRevDisplay);
+  ['cp','ws','daily','imf','ms','insp','spec'].forEach(updateRevDisplay);
 }
 
 let _revModalPane = null;
+let _revDbMap = {};
+let _signsMap = {};
+
+function _signCell(rev, role, fileId, name, liveMode) {
+  if (fileId) {
+    const proxyUrl = `https://aitechn8n.ngrok.app/webhook/ait/sign-img?fileId=${fileId}`;
+    const delBtn = liveMode
+      ? `<button onclick="event.stopPropagation();removeSign(${rev},'${role}')" title="서명 삭제"
+           style="position:absolute;top:0;right:0;background:#ef4444;border:none;border-radius:3px;color:#fff;font-size:9px;padding:1px 4px;cursor:pointer;line-height:1.4">✕</button>`
+      : '';
+    return `<div style="position:relative;display:inline-block">
+      <img data-proxy-img="${proxyUrl}" src="" style="max-height:44px;max-width:80px;display:block;margin:0 auto;object-fit:contain">
+      ${name ? `<div style="font-size:10px;color:var(--text2);margin-top:1px">${name}</div>` : ''}
+      ${delBtn}</div>`;
+  }
+  if (!liveMode) return `<span style="color:var(--text2)">—</span>`;
+  return `<button onclick="openSignModal(${rev},'${role}')"
+    style="background:none;border:1px dashed #d1d5db;border-radius:4px;color:#9ca3af;font-size:11px;padding:3px 8px;cursor:pointer;white-space:nowrap">서명</button>`;
+}
+
+function removeSign(rev, role) {
+  const pw = prompt('비밀번호를 입력하세요');
+  if (pw === null) return;
+  if (pw !== 'ait1234') { alert('비밀번호가 올바르지 않습니다.'); return; }
+  AIT_API.deleteSign(window.currentCarId, _revGroupKey(_revModalPane), rev, role)
+    .then(() => openRevModal(_revModalPane))
+    .catch(e => alert('삭제 실패: ' + (e.message || e)));
+}
 
 function openRevModal(pane) {
   _revModalPane = pane || null;
@@ -192,34 +223,62 @@ function openRevModal(pane) {
     const label = pane === 'imf' ? '초중종물' : pane === 'ms' ? '마스터샘플' : '';
     document.getElementById('rev-modal-car').textContent = carName + (label ? ` — ${label}` : '');
     const tbody = document.getElementById('rev-modal-tbody');
+    const liveMode = !AIT_API.MOCK;
     tbody.innerHTML = rd.history.length === 0
-      ? `<tr><td colspan="6" style="text-align:center;color:var(--text2);padding:20px">개정 이력이 없습니다</td></tr>`
-      : rd.history.map((h, i) => `
-      <tr>
-        <td class="td-center"><span class="rev-num">Rev.${h.rev}</span></td>
-        <td class="td-center">${h.date}</td>
-        <td class="td-center">${h.user || '—'}</td>
-        <td>${h.desc}</td>
-        <td style="color:var(--text2);font-size:11px">${h.docs}</td>
-        <td class="td-center"><button onclick="deleteRevEntry(${i})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;padding:2px 4px" title="이력 삭제">🗑</button></td>
-      </tr>
-    `).join('');
+      ? `<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:20px">개정 이력이 없습니다</td></tr>`
+      : rd.history.map((h, i) => {
+        const sg = _signsMap[h.rev] || {};
+        const au = sg.author   || {}, rv = sg.reviewer || {}, ap = sg.approver || {};
+        return `<tr>
+          <td class="td-center"><span class="rev-num">Rev.${h.rev}</span></td>
+          <td class="td-center">${h.date}</td>
+          <td>${h.desc}</td>
+          <td class="td-center">${_signCell(h.rev,'author',  au.fileId||'', au.name||h.user||'', liveMode)}</td>
+          <td class="td-center">${_signCell(h.rev,'reviewer',rv.fileId||'', rv.name||'',          liveMode)}</td>
+          <td class="td-center">${_signCell(h.rev,'approver',ap.fileId||'', ap.name||'',          liveMode)}</td>
+          <td class="td-center"><button onclick="deleteRevEntry(${i})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;padding:2px 4px" title="이력 삭제">🗑</button></td>
+        </tr>`;
+      }).join('');
+    // 서명 이미지 비동기 로드 (n8n proxy → base64 data URL)
+    tbody.querySelectorAll('img[data-proxy-img]').forEach(img => {
+      fetch(img.dataset.proxyImg, {cache: 'no-store'})
+        .then(r => r.json())
+        .then(data => {
+          const d = Array.isArray(data) ? data[0] : data;
+          if (d && d.dataUrl) img.src = d.dataUrl;
+        })
+        .catch(() => {});
+    });
     document.getElementById('rev-modal').classList.add('open');
   }
 
-  // DB에서 이력 로드 → localStorage 동기화 후 렌더링
+  // DB에서 이력+서명 로드 → localStorage 동기화 후 렌더링
   if (!AIT_API.MOCK && window.currentCarId) {
-    AIT_API.getRevisions(window.currentCarId, pane).then(rows => {
-      if (rows && rows.length) {
+    Promise.all([
+      AIT_API.getRevisions(window.currentCarId, _revGroupKey(pane)),
+      AIT_API.getRevisionSigns(window.currentCarId, _revGroupKey(pane))
+    ]).then(([rows, signs]) => {
+      _revDbMap = {};
+      _signsMap = {};
+      const validRows = (rows || []).filter(r => r && r.id != null);
+      if (validRows.length) {
         const rd = { rev: 0, history: [] };
-        rows.forEach(r => {
+        validRows.forEach(r => {
           const rev = parseInt(r.rev) || 0;
           if (rev > rd.rev) rd.rev = rev;
-          rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane });
+          _revDbMap[rev] = r;
+          rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane, dbId: r.id });
         });
         rd.history.sort((a, b) => b.rev - a.rev);
         saveRevDataFor(pane, carName, rd);
         updateAllRevDisplays();
+      }
+      if (signs && signs.length) {
+        signs.forEach(s => {
+          const rev = parseInt(s.rev);
+          if (!_signsMap[rev]) _signsMap[rev] = {};
+          _signsMap[rev][s.role] = { name: s.signer_name || '', fileId: s.sign_file_id || '' };
+        });
       }
       _renderRevModal();
     }).catch(() => _renderRevModal());
@@ -248,6 +307,98 @@ function closeRevModal() {
   document.getElementById('rev-modal').classList.remove('open');
 }
 
+/* ── 전자서명 모달 ── */
+let _signRev = null, _signRole = null, _signCanvasReady = false;
+let _signCallback = null; // Q-Point 등 외부 컨텍스트용 콜백
+
+function openSignModal(rev, role) {
+  _signRev = rev;
+  _signRole = role;
+  const labels = { author: '작성자', reviewer: '검토자', approver: '승인자' };
+  document.getElementById('sign-modal-title').textContent = (labels[role] || role) + ' 서명';
+  document.getElementById('sign-name-input').value = '';
+  const btn = document.querySelector('#sign-modal .sign-save-btn');
+  if (btn) btn.disabled = false;
+  if (!_signCanvasReady) { _initSignCanvas(); _signCanvasReady = true; }
+  signClear();
+  document.getElementById('sign-modal').classList.add('open');
+}
+
+function closeSignModal() {
+  document.getElementById('sign-modal').classList.remove('open');
+}
+
+function signClear() {
+  const canvas = document.getElementById('sign-canvas');
+  if (!canvas) return;
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function signSave() {
+  const name = (document.getElementById('sign-name-input').value || '').trim();
+  if (!name) { alert('이름을 입력하세요'); return; }
+  const canvas = document.getElementById('sign-canvas');
+  const px = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+  if (!Array.from(px).some((v, i) => i % 4 === 3 && v > 0)) { alert('서명을 그려주세요'); return; }
+  const base64 = canvas.toDataURL('image/png');
+  if (_signCallback) {
+    const cb = _signCallback; _signCallback = null;
+    cb(name, base64); closeSignModal(); return;
+  }
+  const btn = document.querySelector('#sign-modal .sign-save-btn');
+  if (btn) btn.disabled = true;
+  const _roleSeq = {author:'01', reviewer:'02', approver:'03'};
+  const _seq = _roleSeq[_signRole] || '01';
+  const _safeCar = (window.currentCar || '').replace(/[^a-zA-Z0-9가-힣]/g,'_').slice(0,20) || 'car';
+  let _fn;
+  if (_revModalPane === 'insp') {
+    _fn = _safeCar + '-' + String(_signRev||0) + '-' + _seq + '.png';
+  } else {
+    _fn = (_revModalPane||'cp') + '_' + _safeCar + '_r' + String(_signRev||0) + '_' + (_signRole||'x') + '.png';
+  }
+  _fn = _fn.replace(/[^a-zA-Z0-9가-힣._-]/g,'_');
+  AIT_API.signRevision(window.currentCarId, _revGroupKey(_revModalPane), _signRev, _signRole, name, base64, _fn)
+    .then(() => { closeSignModal(); openRevModal(_revModalPane); })
+    .catch(e => { alert('저장 실패: ' + (e.message || e)); if (btn) btn.disabled = false; });
+}
+
+function openSignModalWith(title, prefillName, callback) {
+  _signCallback = callback;
+  document.getElementById('sign-modal-title').textContent = title;
+  document.getElementById('sign-name-input').value = prefillName || '';
+  const btn = document.querySelector('#sign-modal .sign-save-btn');
+  if (btn) btn.disabled = false;
+  if (!_signCanvasReady) { _initSignCanvas(); _signCanvasReady = true; }
+  signClear();
+  document.getElementById('sign-modal').classList.add('open');
+}
+
+function _initSignCanvas() {
+  const canvas = document.getElementById('sign-canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.strokeStyle = '#1a1a1a';
+  ctx.lineWidth = 2.5;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  let drawing = false;
+  function pos(e) {
+    const r = canvas.getBoundingClientRect();
+    const sx = canvas.width / r.width, sy = canvas.height / r.height;
+    const src = e.touches ? e.touches[0] : e;
+    return [(src.clientX - r.left) * sx, (src.clientY - r.top) * sy];
+  }
+  function start(e) { e.preventDefault(); drawing = true; const [x,y] = pos(e); ctx.beginPath(); ctx.moveTo(x,y); }
+  function move(e)  { if (!drawing) return; e.preventDefault(); const [x,y] = pos(e); ctx.lineTo(x,y); ctx.stroke(); ctx.beginPath(); ctx.moveTo(x,y); }
+  function end()    { drawing = false; }
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  canvas.addEventListener('mouseup', end);
+  canvas.addEventListener('mouseleave', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  canvas.addEventListener('touchend', end);
+}
+
 /* ── 저장 + 개정 처리 ── */
 function snapshotPane(pane) {
   const paneEl = document.getElementById('pane-' + pane);
@@ -270,7 +421,7 @@ function saveDocument(pane) {
     const current = snapshotPane(pane);
     const prev = snapshots[pane] ?? null;
 
-    const paneLabels = { cp:'CP', ws:'작업표준서', daily:'설비일상점검표', imf:'초중종물', ms:'마스터샘플' };
+    const paneLabels = { cp:'CP', ws:'작업표준서', daily:'설비일상점검표', imf:'초중종물', ms:'마스터샘플', insp:'공정검사기준서', spec:'사양표' };
     let doRevise = confirm(`개정하시겠습니까?\n\n[확인] 예 — 개정번호 자동 부여\n[취소] 아니오 — 저장만 (개정번호 유지)`);
 
     if (doRevise) {
@@ -287,7 +438,7 @@ function saveDocument(pane) {
         saveRevDataFor(pane, carName, rd);
         updateAllRevDisplays();
         if (!AIT_API.MOCK && window.currentCarId) {
-          AIT_API.addRevision(window.currentCarId, pane, {
+          AIT_API.addRevision(window.currentCarId, _revGroupKey(pane), {
             rev_date: dateStr, note: desc || '내용 변경', author: ''
           }).catch(e => console.warn('개정이력 DB 저장 실패', e));
         }
@@ -355,6 +506,7 @@ function saveDocument(pane) {
       if (pane === 'daily' && typeof window.dailySetEditable === 'function') window.dailySetEditable(false);
       if (pane === 'imf' && typeof window.imfSetEditable === 'function') window.imfSetEditable(false);
       if (pane === 'ms' && typeof window.msSetEditable === 'function') window.msSetEditable(false);
+      if (pane === 'insp' && typeof window.inspSetEditable === 'function') window.inspSetEditable(false);
     }
   }
 }
@@ -470,17 +622,26 @@ async function initCars() {
     }
     // 개정이력 DB → localStorage 초기 동기화
     if (!AIT_API.MOCK && cur.id) {
-      ['cp','ws','daily','imf','ms'].forEach(pane => {
+      [...new Set(['cp','ws','daily','imf','ms','spec'].map(p => _revGroupKey(p)))].forEach(pane => {
         AIT_API.getRevisions(cur.id, pane).then(rows => {
-          if (!rows || !rows.length) return;
+          const validRows = (rows || []).filter(r => r && r.id != null);
+          if (!validRows.length) return;
           const rd = { rev: 0, history: [] };
-          rows.forEach(r => {
+          _revDbMap = {};
+          validRows.forEach(r => {
             const rev = parseInt(r.rev) || 0;
             if (rev > rd.rev) rd.rev = rev;
-            rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane });
+            _revDbMap[rev] = r;
+            rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane,
+              dbId: r.id,
+              authorSign: r.author_sign || '',
+              reviewerName: r.reviewer_name || '', reviewerSign: r.reviewer_sign || '',
+              approverName: r.approver_name || '', approverSign: r.approver_sign || ''
+            });
           });
           rd.history.sort((a, b) => b.rev - a.rev);
           saveRevDataFor(pane, window.currentCar, rd);
+          updateAllRevDisplays();
         }).catch(() => {});
       });
     }
@@ -492,7 +653,7 @@ function renderCarSelect(cars) {
   if (!sel) return;
   const cur = window.currentCar || localStorage.getItem('ait_cur_car') || cars[0]?.name || '';
   sel.innerHTML = cars.map(c =>
-    `<option value="${c.id}" ${c.name === cur ? 'selected' : ''}>${c.name}</option>`
+    `<option value="${c.id}" data-linename="${c.linename || ''}" ${c.name === cur ? 'selected' : ''}>${c.name}</option>`
   ).join('');
 }
 function openCarModal() {
@@ -594,7 +755,8 @@ async function addCar() {
     renderCarListInModal();
   } else {
     try {
-      await AIT_API.createCar({ name, enabled_docs: JSON.stringify(ALL_DOC_TYPES.map(d => d.id)) });
+      const code = name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 20);
+      await AIT_API.createCar({ code, name, stage: '', partno: '', partname: '', linename: '', enabled_docs: JSON.stringify(ALL_DOC_TYPES.map(d => d.id)) });
       await initCars();
       renderCarListInModal();
     } catch(e) {
@@ -628,9 +790,12 @@ function _wsExtractSteps(paneEl) {
 }
 function _toDirectDriveUrl(url) {
   if (!url) return url;
-  // 구 프록시 URL → CDN URL 변환
   const m = url.match(/[?&]fileId=([^&]+)/);
-  if (m) return `https://lh3.googleusercontent.com/d/${m[1]}`;
+  if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`;
+  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^?&\s]+)/);
+  if (lh3) return `https://drive.google.com/thumbnail?id=${lh3[1]}&sz=w1200`;
+  const uc = url.match(/drive\.google\.com\/(?:uc\?.*[?&]id=|thumbnail\?.*[?&]id=)([^&\s]+)/);
+  if (uc) return `https://drive.google.com/thumbnail?id=${uc[1]}&sz=w1200`;
   return url;
 }
 function _renderWsMgmtFromItems(items, paneEl, car) {
@@ -823,6 +988,7 @@ function _saveCarContent(pane, car) {
       localStorage.setItem(`ait_ws_content_${car}`, JSON.stringify(lsData));
     } catch(e) {}
   }
+  if (pane === 'insp' && typeof window.inspSaveDocData === 'function') window.inspSaveDocData();
   // imf/ms: 항목 정의는 AIT_API.saveImfMeta / saveMsMeta 로 관리, 일별 체크 결과는 개별 localStorage 키
   if (pane === 'daily') {
     // DOM에서 편집된 설비 정보를 DAILY_EQUIP 배열에 반영
@@ -1062,6 +1228,7 @@ function loadCarContent(pane) {
         // 2. 관리항목: CP rows에서 직접 빌드 (단일 진실 소스, STEP 렌더 후 mgmt-tbody 덮어씀)
         let cpProcs = [];
         if (cpRows && cpRows.length) {
+          window._cpRowsForWs = cpRows; // showProcess 폴백용 캐시
           cpProcs = _buildWsMgmtFromCpRows(cpRows, paneEl);
         }
         // 3. STEP이 없어 공정 nav가 비어있으면 CP rows의 공정으로 빌드
@@ -1080,16 +1247,246 @@ function loadCarContent(pane) {
   } else if (pane === 'ms') {
     if (typeof msRenderAll === 'function') msRenderAll();
   } else if (pane === 'daily') {
-    // 설비일상: CP DB rows를 단일 진실 소스로 사용 (복사 없이 직접 렌더)
     if (!AIT_API.MOCK && window.currentCarId) {
-      const linename = _cpMetaGet(car).linename || '';
-      AIT_API.getCpRows(window.currentCarId).then(rows => {
-        if (rows && rows.length) {
-          const list = _buildDailyFromCpRows(rows, linename);
+      AIT_API.getDailyEquipments(window.currentCarId).then(async dbRows => {
+        if (dbRows && dbRows.length) {
+          // items는 별도 API로 조회 (GROUP_CONCAT 한계 회피)
+          let itemRows = [];
+          try { itemRows = await AIT_API.getDailyItems(window.currentCarId); } catch(e) {}
+
+          // items가 전부 비어있으면 CP rows에서 항목 복원
+          const hasContent = itemRows.some(r => r.item_name || r.standard || r.method);
+          let cpItemMap = {};
+          if (!hasContent) {
+            try {
+              const linename = _cpMetaGet(car).linename || '';
+              const cpRows = await AIT_API.getCpRows(window.currentCarId);
+              if (cpRows && cpRows.length) {
+                const cpList = _buildDailyFromCpRows(cpRows, linename);
+                cpList.forEach(e => {
+                  const equip = dbRows.find(r => r.equip_name === e.sheet);
+                  if (equip) cpItemMap[equip.id] = e.items;
+                });
+              }
+            } catch(e) {}
+          }
+
+          const itemsByEquip = {};
+          itemRows.forEach(r => {
+            if (!itemsByEquip[r.equip_id]) itemsByEquip[r.equip_id] = [];
+            itemsByEquip[r.equip_id].push(r);
+          });
+
+          const list = dbRows.map(r => ({
+            id: r.id,
+            sheet: r.equip_name,
+            proc_no: String(r.proc_no || ''),
+            proc_name: r.proc_name || '',
+            location: r.location || '',
+            manager: r.manager || '',
+            sort_order: r.sort_order || 0,
+            photo_count: r.photo_count || 0,
+            items: cpItemMap[r.id] || (itemsByEquip[r.id] || []).map(item => ({
+              no: String(item.item_no || ''),
+              name: item.item_name || '',
+              std: item.standard || '',
+              method: item.method || '',
+              cycle: item.cycle || ''
+            }))
+          }));
           if (list.length && typeof window._dInitEquip === 'function') window._dInitEquip(list);
           else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
-        } else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
+        } else {
+          // DB에 데이터 없으면 CP rows에서 빌드 (fallback)
+          const linename = _cpMetaGet(car).linename || '';
+          AIT_API.getCpRows(window.currentCarId).then(rows => {
+            if (rows && rows.length) {
+              const list = _buildDailyFromCpRows(rows, linename);
+              if (list.length && typeof window._dInitEquip === 'function') window._dInitEquip(list);
+              else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
+            } else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
+          }).catch(() => { if (typeof window._dFlushInfo === 'function') window._dFlushInfo(); });
+        }
       }).catch(() => { if (typeof window._dFlushInfo === 'function') window._dFlushInfo(); });
     } else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
   }
 }
+
+/* ── 즉시 알람 검증 (54_AIT_alarm_validate_POST webhook) ── */
+window._aitAlarmValidate = async function(doc_type, parent_id, check_date, results, extra) {
+  if (!parent_id || !check_date || !results || !results.length) return;
+  try {
+    const res = await fetch('https://aitechn8n.ngrok.app/webhook/ait/alarm/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ doc_type, parent_id, check_date, results, ...(extra || {}) })
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.hasViolation && data.violations && data.violations.length) {
+      const lines = data.violations.slice(0, 3)
+        .map(v => `• ${v.item_name || ('항목 ' + v.item_no)}: ${v.issue_type}`);
+      if (data.violations.length > 3) lines.push(`외 ${data.violations.length - 3}건`);
+      if (typeof showToast === 'function')
+        showToast('⚠ 이상 감지 ' + data.violations.length + '건\n' + lines.join('\n'), 'error');
+    }
+  } catch(e) {
+    console.warn('[알람검증] webhook 호출 실패', e);
+  }
+};
+
+/* ── 알람 설정 모달 (55_AIT_alarm_settings_POST webhook) ── */
+const _ALARM_SETTINGS_URL = 'https://aitechn8n.ngrok.app/webhook/ait/alarm/settings';
+let _alarmEnabled = null;
+let _alarmReceivers = [];
+
+function _alarmUpdateBtn(enabled) {
+  _alarmEnabled = enabled;
+  document.querySelectorAll('#alarm-toggle-btn').forEach(btn => {
+    const icon  = btn.querySelector('#alarm-toggle-icon');
+    const label = btn.querySelector('#alarm-toggle-label');
+    if (icon)  icon.textContent  = enabled ? '🔔' : '🔕';
+    if (label) label.textContent = enabled ? '알람설정 (ON)' : '알람설정 (OFF)';
+    btn.style.color      = enabled ? '#16a34a' : '#6b7280';
+    btn.style.borderColor= enabled ? '#86efac' : '#d1d5db';
+  });
+}
+
+window._aitLoadAlarmState = async function() {
+  try {
+    const res = await fetch(_ALARM_SETTINGS_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'get' })
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    _alarmEnabled = !!data.immediate_enabled;
+    try { _alarmReceivers = JSON.parse(data.receivers || '[]'); } catch(e) { _alarmReceivers = []; }
+    _alarmUpdateBtn(_alarmEnabled);
+  } catch(e) {
+    document.querySelectorAll('#alarm-toggle-label').forEach(el => { el.textContent = '알람설정'; });
+    console.warn('[알람설정] 로드 실패', e);
+  }
+};
+
+function _alarmModalRenderList(receivers) {
+  const ul = document.getElementById('alarm-email-list');
+  if (!ul) return;
+  ul.innerHTML = receivers.length ? receivers.map((email, i) =>
+    `<li style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #f3f4f6">
+      <span style="flex:1;font-size:12px;color:#111827">${email}</span>
+      <button onclick="window._alarmRemoveEmail(${i})" style="border:none;background:none;color:#ef4444;cursor:pointer;font-size:14px;line-height:1;padding:2px 6px">&times;</button>
+    </li>`).join('')
+    : '<li style="font-size:12px;color:#9ca3af;padding:8px 0">수신자 없음</li>';
+}
+
+window._alarmRemoveEmail = function(idx) {
+  _alarmReceivers.splice(idx, 1);
+  _alarmModalRenderList(_alarmReceivers);
+};
+
+window._aitOpenAlarmModal = async function() {
+  if (_alarmEnabled === null) await window._aitLoadAlarmState();
+
+  // 기존 모달 제거
+  const old = document.getElementById('alarm-settings-modal');
+  if (old) old.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'alarm-settings-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:8000;display:flex;align-items:center;justify-content:center';
+  overlay.onclick = e => { if (e.target === overlay) overlay.remove(); };
+
+  overlay.innerHTML = `
+  <div style="background:#fff;border-radius:12px;width:380px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.18);overflow:hidden">
+    <div style="background:#1e3264;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">
+      <span style="color:#fff;font-weight:700;font-size:14px">🔔 알람 설정</span>
+      <button onclick="document.getElementById('alarm-settings-modal').remove()"
+        style="background:none;border:none;color:rgba(255,255,255,.7);font-size:20px;cursor:pointer;line-height:1">&times;</button>
+    </div>
+    <div style="padding:18px">
+      <!-- 즉시알람 토글 -->
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #e5e7eb;margin-bottom:14px">
+        <div>
+          <div style="font-size:13px;font-weight:600;color:#111827">즉시알람</div>
+          <div style="font-size:11px;color:#6b7280">저장 시 이상값 감지 → 즉시 이메일 발송</div>
+        </div>
+        <label style="position:relative;display:inline-block;width:44px;height:24px;cursor:pointer">
+          <input type="checkbox" id="alarm-modal-toggle" ${_alarmEnabled ? 'checked' : ''}
+            style="opacity:0;width:0;height:0;position:absolute"
+            onchange="document.getElementById('alarm-modal-track').style.background=this.checked?'#16a34a':'#d1d5db'">
+          <span id="alarm-modal-track" style="position:absolute;inset:0;border-radius:12px;background:${_alarmEnabled ? '#16a34a' : '#d1d5db'};transition:.2s"></span>
+          <span style="position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:.2s;transform:translateX(0)"
+            id="alarm-modal-thumb"></span>
+        </label>
+      </div>
+      <!-- 체크박스로 thumb 위치 동기화 -->
+      <style>#alarm-modal-toggle:checked ~ #alarm-modal-thumb{transform:translateX(20px)}</style>
+      <!-- 수신 이메일 -->
+      <div style="font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">수신 이메일</div>
+      <ul id="alarm-email-list" style="list-style:none;padding:0;margin:0 0 10px"></ul>
+      <div style="display:flex;gap:6px">
+        <input id="alarm-email-input" type="email" placeholder="이메일 주소 입력"
+          style="flex:1;border:1px solid #d1d5db;border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit;outline:none"
+          onkeydown="if(event.key==='Enter'){window._alarmAddEmail();event.preventDefault()}">
+        <button onclick="window._alarmAddEmail()"
+          style="border:1px solid #1e3264;background:#1e3264;color:#fff;border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer;white-space:nowrap">+ 추가</button>
+      </div>
+    </div>
+    <div style="padding:12px 18px;background:#f9fafb;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #e5e7eb">
+      <button onclick="document.getElementById('alarm-settings-modal').remove()"
+        style="border:1px solid #d1d5db;background:#fff;border-radius:6px;padding:7px 18px;font-size:12px;cursor:pointer">취소</button>
+      <button id="alarm-save-btn" onclick="window._aitSaveAlarmSettings()"
+        style="border:1px solid #1e3264;background:#1e3264;color:#fff;border-radius:6px;padding:7px 18px;font-size:12px;cursor:pointer;font-weight:600">저장</button>
+    </div>
+  </div>`;
+
+  document.body.appendChild(overlay);
+  _alarmModalRenderList(_alarmReceivers);
+
+  // 토글 thumb 위치 동기화 (CSS :checked 불가 → JS)
+  const cb = document.getElementById('alarm-modal-toggle');
+  const thumb = document.getElementById('alarm-modal-thumb');
+  if (cb && thumb) {
+    const sync = () => { thumb.style.transform = cb.checked ? 'translateX(20px)' : 'translateX(0)'; };
+    sync();
+    cb.addEventListener('change', sync);
+  }
+};
+
+window._alarmAddEmail = function() {
+  const input = document.getElementById('alarm-email-input');
+  if (!input) return;
+  const email = input.value.trim();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    input.style.borderColor = '#ef4444'; setTimeout(() => { input.style.borderColor = '#d1d5db'; }, 1500); return;
+  }
+  if (_alarmReceivers.includes(email)) { input.value = ''; return; }
+  _alarmReceivers.push(email);
+  _alarmModalRenderList(_alarmReceivers);
+  input.value = '';
+};
+
+window._aitSaveAlarmSettings = async function() {
+  const btn = document.getElementById('alarm-save-btn');
+  const cb  = document.getElementById('alarm-modal-toggle');
+  if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
+  const enabled = cb ? cb.checked : _alarmEnabled;
+  try {
+    const res = await fetch(_ALARM_SETTINGS_URL, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'save', enabled, receivers: _alarmReceivers })
+    });
+    if (!res.ok) throw new Error('응답 오류');
+    const data = await res.json();
+    _alarmEnabled = !!data.immediate_enabled;
+    _alarmUpdateBtn(_alarmEnabled);
+    document.getElementById('alarm-settings-modal')?.remove();
+    if (typeof showToast === 'function')
+      showToast('알람 설정 저장 완료', 'success');
+  } catch(e) {
+    console.warn('[알람설정] 저장 실패', e);
+    if (typeof showToast === 'function') showToast('알람 설정 저장 실패', 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+  }
+};

@@ -8,6 +8,10 @@
     <button class="btn btn-ghost btn-sm" onclick="openRevModal('ms')">이력</button>
   </div>
   <div style="flex:1"></div>
+  <button id="alarm-toggle-btn" class="btn btn-ghost btn-sm edit-only" onclick="window._aitOpenAlarmModal()"
+    style="display:flex;align-items:center;gap:4px;font-size:12px">
+    <span id="alarm-toggle-icon">🔔</span><span id="alarm-toggle-label">알람설정</span>
+  </button>
   <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('ms')">저장</button>
   <button class="btn btn-ghost btn-sm" id="ms-edit-btn" onclick="toggleTabEditMode('ms',this)">&#x270F; 편집 모드</button>
 </div>
@@ -36,10 +40,10 @@
 </div>
 
 <!-- 샘플 콘텐츠 (샘플 있을 때만 표시) -->
-<div id="ms-content">
+<div id="ms-content" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden">
 
   <!-- 샘플 정보 헤더 -->
-  <div style="padding:0;border-bottom:3px solid #fff">
+  <div style="padding:0;border-bottom:3px solid #fff;flex-shrink:0">
     <table style="border-collapse:collapse;font-size:12px;width:100%;table-layout:fixed">
       <colgroup>
         <col style="width:58px"><col>
@@ -70,15 +74,15 @@
   </div>
 
   <!-- 하단: 사진패널 + 점검표 -->
-  <div style="display:flex;min-height:0;border-top:1px solid var(--border)">
+  <div style="display:flex;flex:1;min-height:0;overflow:hidden;border-top:1px solid var(--border)">
 
     <!-- 왼쪽: 사진 패널 (앞/뒤/식별표) -->
-    <div id="ms-photo-panel" style="flex:1;min-width:0;display:flex;flex-direction:column;border-right:2px solid #c9d4e8;background:#fff">
+    <div id="ms-photo-panel" style="flex:1;min-width:0;display:flex;flex-direction:column;border-right:2px solid #c9d4e8;background:#fff;overflow:hidden">
       <div style="background:#1e3264;color:#fff;padding:9px 14px;display:flex;align-items:center;gap:8px;flex-shrink:0">
         <span style="font-size:12px;font-weight:700;letter-spacing:.6px">샘플 사진</span>
         <span id="ms-photo-status" style="font-size:11px;color:rgba(255,255,255,.6)"></span>
       </div>
-      <div id="ms-photo-main" style="flex:1;background:#f3f4f6;position:relative;overflow:hidden;min-height:180px;display:flex;align-items:center;justify-content:center">
+      <div id="ms-photo-main" style="flex:1;min-height:0;background:#f3f4f6;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center">
         <div style="text-align:center;color:#9ca3af">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
           <div style="font-size:11px;margin-top:6px">사진을 선택하세요</div>
@@ -90,7 +94,7 @@
     </div>
 
     <!-- 오른쪽: 점검표 -->
-    <div style="flex:1;overflow-y:auto;min-width:0;display:flex;flex-direction:column">
+    <div style="flex:1;min-width:0;display:flex;flex-direction:column;overflow:hidden">
 
       <!-- 월 선택 -->
       <div style="padding:10px 16px;border-bottom:3px solid #fff;background:#1e3264;display:flex;align-items:center;gap:10px;flex-shrink:0">
@@ -104,9 +108,23 @@
         <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px">
           <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.8)">점검자</span>
           <input id="ms-worker-input" type="text" placeholder="이름 입력"
-            style="border:none;background:transparent;font-size:11px;font-family:inherit;width:90px;outline:none;color:#fff;caret-color:#fff"
+            style="border:none;background:transparent;font-size:11px;font-family:inherit;width:70px;outline:none;color:#fff;caret-color:#fff"
             onchange="window._msSaveWorker(this.value)">
         </div>
+        <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px">
+          <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.8)">확인자</span>
+          <input id="ms-verifier-input" type="text" placeholder="이름 입력"
+            style="border:none;background:transparent;font-size:11px;font-family:inherit;width:70px;outline:none;color:#fff;caret-color:#fff"
+            onchange="window._msSaveVerifier(this.value)">
+        </div>
+        <button onclick="window._msSaveNow()" id="ms-save-btn"
+          style="font-size:11px;font-weight:700;padding:5px 14px;border-radius:8px;border:1px solid #fff;background:#fff;color:#1e3264;cursor:pointer;letter-spacing:.5px">
+          저장
+        </button>
+        <button onclick="window._msEditMode()" id="ms-edit-result-btn"
+          style="display:none;font-size:11px;font-weight:700;padding:5px 14px;border-radius:8px;border:1px solid #d97706;background:#d97706;color:#fff;cursor:pointer;letter-spacing:.5px">
+          수정
+        </button>
       </div>
 
       <!-- 날짜 선택 -->
@@ -114,11 +132,11 @@
         <div style="display:flex;flex-wrap:wrap;gap:4px" id="ms-day-picker"></div>
       </div>
 
-      <!-- 점검 항목 -->
-      <div style="padding:14px 16px;overflow-x:auto;background:#fff">
+      <!-- 점검 항목 + 추가버튼 (스크롤 영역) -->
+      <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:auto;background:#fff">
         <table id="ms-check-table" style="width:100%;border-collapse:collapse;font-size:12px">
           <thead>
-            <tr style="background:#1e3264">
+            <tr style="background:#1e3264;position:sticky;top:0;z-index:1">
               <th class="ms-edit-col" style="display:none;padding:7px 8px;text-align:center;font-weight:600;color:#fff;width:40px">삭제</th>
               <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:36px">No.</th>
               <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">점검항목</th>
@@ -131,14 +149,13 @@
           </thead>
           <tbody id="ms-check-tbody"></tbody>
         </table>
-      </div>
-
-      <!-- 항목 추가 버튼 (편집 모드) -->
-      <div class="ms-edit-col" style="display:none;padding:6px 16px 14px;background:#fff">
-        <button onclick="window.msAddItem()"
-          style="padding:5px 14px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">
-          &#xFF0B; 항목 추가
-        </button>
+        <!-- 항목 추가 버튼 (편집 모드) -->
+        <div class="ms-edit-col" style="display:none;padding:6px 16px 14px;background:#fff">
+          <button onclick="window.msAddItem()"
+            style="padding:5px 14px;background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer">
+            &#xFF0B; 항목 추가
+          </button>
+        </div>
       </div>
 
     </div><!-- /오른쪽 점검표 -->
@@ -154,6 +171,13 @@ let MS_DATA = [];
 /* ── 작업 A: MS_ITEMS – 항목 메타 DB 캐시 ── */
 let MS_ITEMS = {}; // { "sampleIdx_itemNo": { id, sample_id, item_name, standard, method, cycle } }
 let _msSampleIds = []; // parallel to MS_DATA: _msSampleIds[tabIdx] = DB sample_id
+let _msWorkerCache = {};   // { "year_month_day_sampleIdx": name }
+let _msVerifierCache = {}; // { "year_month_day_sampleIdx": name }
+const _msMonthStatusLoaded = new Set();
+const _msMonthStatusData = {}; // { "year_month_day_sampleIdx": 'ok'|'ng'|'partial' }
+let _msTsCache = {}; // { "year_month_day_sampleIdx": { [itemNo]: { savedAt, modifiedAt } } }
+let _msReadOnly = false;
+const _msHasDBData = new Set();
 
 async function _msLoadItems() {
   if (!window.currentCarId) return;
@@ -190,12 +214,63 @@ async function _msFlushResults() {
     const MS_SAMPLES_ARR = Array.isArray(MS_DATA) ? MS_DATA : [];
     const sample_id = _msSampleIds[g.sampleIdx] || g.sampleIdx;
     const worker = document.getElementById('ms-worker-input')?.value || '';
-    const payload = { sample_id, check_date: g.date, worker, results: g.results };
-    try { await AIT_API.saveMsResults(payload); } catch(e) { console.warn('MS 결과 저장 실패', e); }
+    const verifier = document.getElementById('ms-verifier-input')?.value || '';
+    const payload = { sample_id, check_date: g.date, worker, verifier, results: g.results };
+    try {
+      await AIT_API.saveMsResults(payload);
+      const st=document.getElementById('ms-photo-status');
+      if(st){st.textContent='저장됨 ✓';setTimeout(()=>{if(st.textContent==='저장됨 ✓')st.textContent='';},1500);}
+      const now = new Date().toISOString();
+      const [yr,mo,dd] = g.date.split('-');
+      const tsCKey = `${yr}_${parseInt(mo)}_${parseInt(dd)}_${g.sampleIdx}`;
+      if (!_msTsCache[tsCKey]) _msTsCache[tsCKey] = {};
+      g.results.forEach(r => {
+        const ex = _msTsCache[tsCKey][r.item_no] || {};
+        if (!ex.savedAt) _msTsCache[tsCKey][r.item_no] = { savedAt: now, modifiedAt: null };
+        else _msTsCache[tsCKey][r.item_no] = { ...ex, modifiedAt: now };
+        if (g.sampleIdx === curSample) {
+          const ts = _msTsCache[tsCKey][r.item_no];
+          _msUpdateRowTs(r.item_no, ts.savedAt, ts.modifiedAt);
+        }
+      });
+      if (typeof window._aitAlarmValidate === 'function') {
+        const alarmRes = g.results.map(r => {
+          const msItem = MS_ITEMS[`${g.sampleIdx}_${r.item_no}`] || {};
+          return { item_no: String(r.item_no), result: r.result, item_name: msItem.item_name || '' };
+        });
+        const _msTabData = MS_DATA[g.sampleIdx] || {};
+        const _msTabLabel = _msDeriveTabLabel(_msTabData, g.sampleIdx);
+        window._aitAlarmValidate('ms', sample_id, g.date, alarmRes, { tab_label: _msTabLabel, equip_name: _msTabData.name || '' }).catch(() => {});
+      }
+    } catch(e) { console.warn('MS 결과 저장 실패', e); window.showToast&&window.showToast('결과 저장 실패','error'); }
   }
 }
 
 window.addEventListener('beforeunload', () => { clearTimeout(_msSaveTimer); _msFlushResults(); });
+
+function _msSetReadOnly(flag) {
+  _msReadOnly = flag;
+  const saveBtn = document.getElementById('ms-save-btn');
+  const editBtn = document.getElementById('ms-edit-result-btn');
+  if (saveBtn) saveBtn.style.display = flag ? 'none' : '';
+  if (editBtn) editBtn.style.display = flag ? '' : 'none';
+  const wi = document.getElementById('ms-worker-input');
+  const vi = document.getElementById('ms-verifier-input');
+  if (wi) { wi.disabled = flag; wi.style.color = flag ? 'rgba(255,255,255,.4)' : ''; }
+  if (vi) { vi.disabled = flag; vi.style.color = flag ? 'rgba(255,255,255,.4)' : ''; }
+}
+window._msSaveNow = async function() {
+  clearTimeout(_msSaveTimer);
+  const btn = document.getElementById('ms-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
+  await _msFlushResults();
+  if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+  const m = getTabMonth('ms');
+  _msHasDBData.add(`${curSample}_${curDay}_${m.year}_${m.month}`);
+  _msSetReadOnly(true);
+  renderMsCheckTable();
+};
+window._msEditMode = function() { _msSetReadOnly(false); renderMsCheckTable(); };
 
 async function _msInitFromDb() {
   if (!window.currentCarId || AIT_API.MOCK) return;
@@ -286,7 +361,7 @@ function msUpdateVisibility(){
     if(hint) hint.style.display = msEditMode ? '' : 'none';
   } else {
     empty.style.display   = 'none';
-    content.style.display = '';
+    content.style.display = 'flex';
   }
 }
 
@@ -365,12 +440,14 @@ window.msDeleteSample = function(idx){
 
 window._msSelSample = function(idx){
   curSample = idx;
+  const _mm = getTabMonth('ms');
+  _msSetReadOnly(_msHasDBData.has(`${idx}_${curDay}_${_mm.year}_${_mm.month}`));
   msRenderSampleTabs();
   renderMsSampleInfo();
   msRenderDayPicker();
   renderMsCheckTable();
   renderMsPhotoStrip();
-  _msLoadWorker();
+  _msLoadWorkerVerifier();
   _msLoadItems().then(() => {
     renderMsCheckTable();
     if (!_msHasLocalResults(idx, curDay)) _msLoadResultsFromDB(idx, curDay);
@@ -386,16 +463,19 @@ function msRenderAll(){
     msRenderDayPicker();
     renderMsCheckTable();
     renderMsPhotoStrip();
-    _msLoadWorker();
+    _msLoadWorkerVerifier();
   }
   _msCheckAllExpire();
 }
 
-/* ── 점검자 로드 ── */
-function _msLoadWorker(){
+/* ── 점검자/확인자 로드 ── */
+function _msLoadWorkerVerifier(){
   const m = getTabMonth('ms'), car = getCar();
-  const wk = localStorage.getItem(`ms_worker_${car}_${m.year}_${m.month}_${curDay}_${curSample}`) || '';
+  const cKey = `${m.year}_${m.month}_${curDay}_${curSample}`;
+  const wk = _msWorkerCache[cKey] || localStorage.getItem(`ms_worker_${car}_${m.year}_${m.month}_${curDay}_${curSample}`) || '';
+  const vf = _msVerifierCache[cKey] || localStorage.getItem(`ms_verifier_${car}_${m.year}_${m.month}_${curDay}_${curSample}`) || '';
   const wi = document.getElementById('ms-worker-input'); if(wi) wi.value = wk;
+  const vi = document.getElementById('ms-verifier-input'); if(vi) vi.value = vf;
 }
 
 /* ── 샘플 정보 헤더 ── */
@@ -436,7 +516,24 @@ function renderMsSampleInfo(){
   set('ms-sample-expire', exp ? `~${exp}` : '', 'expire');
   set('ms-manager',       mgr || '—', 'manager');
   const contentEl = document.getElementById('ms-sample-content');
-  if(contentEl) contentEl.textContent = s.sheet || '';
+  if(contentEl){
+    contentEl.textContent = s.sheet || '';
+    contentEl.contentEditable = msEditMode ? 'true' : 'false';
+    contentEl.style.background = msEditMode ? '#edf3ff' : '';
+    contentEl.style.cursor = msEditMode ? 'text' : '';
+    contentEl.onblur = () => {
+      const val = contentEl.textContent.trim();
+      MS_DATA[curSample].sheet = val;
+      msSaveData();
+      if(window.currentCarId && typeof AIT_API !== 'undefined'){
+        clearTimeout(window._msSampSyncTimer);
+        window._msSampSyncTimer = setTimeout(() => {
+          const sId = _msSampleIds[curSample]; if(!sId) return;
+          AIT_API.updateMsSample(sId, { sheet_name: val }).catch(e => console.warn('내용 저장 실패', e));
+        }, 800);
+      }
+    };
+  }
   const typeEl = document.getElementById('ms-sample-type');
   if(typeEl){
     const isOk = s.type === 'OK';
@@ -501,7 +598,7 @@ function getMsDaySt(day){
   const s = MS_DATA[curSample], m = getTabMonth('ms'), car = getCar();
   if(!s) return '';
   const res = s.items.map(it => localStorage.getItem(`ms_${car}_${m.year}_${m.month}_${day}_${curSample}_${it.no}`));
-  if(res.every(r=>r===null)) return '';
+  if(res.every(r=>r===null)) return _msMonthStatusData[`${m.year}_${m.month}_${day}_${curSample}`]||'';
   if(res.some(r=>r==='✕')) return 'ng';
   if(res.every(r=>r!==null&&r!=='')) return 'ok';
   return 'partial';
@@ -531,6 +628,7 @@ window.msRenderDayPicker = function(){
     return `<button data-mday="${d}" onclick="window._msSelDay(${d})"
       style="min-width:30px;height:30px;padding:0 4px;border:1px solid ${s.bdr};border-radius:6px;background:${s.bg};color:${s.col};font-size:11px;font-weight:600;cursor:pointer">${d}</button>`;
   }).join('');
+  _msLoadMonthStatus(curSample);
 };
 function msRenderDayPicker(){ window.msRenderDayPicker(); }
 function _msUpdateDayBtn(day){
@@ -552,22 +650,65 @@ async function _msLoadResultsFromDB(sampleIdx, day) {
   try {
     const rows = await AIT_API.getMsResults(sampleId, dateStr);
     if (!rows || !rows.length) return;
+    _msHasDBData.add(cacheKey);
+    const cKey = `${m.year}_${m.month}_${day}_${sampleIdx}`;
+    if (!_msTsCache[cKey]) _msTsCache[cKey] = {};
+    const _toIso = s => s ? String(s).replace(' ','T') : null;
     rows.forEach(r => {
       if (r.result != null && r.result !== '') localStorage.setItem(`ms_${car}_${m.year}_${m.month}_${day}_${sampleIdx}_${r.item_no}`, r.result);
       if (r.remark) localStorage.setItem(`ms_rmk_${car}_${m.year}_${m.month}_${day}_${sampleIdx}_${r.item_no}`, r.remark);
+      const savedAt = _toIso(r.created_at);
+      const modifiedAt = _toIso(r.updated_at);
+      if (savedAt || modifiedAt) _msTsCache[cKey][r.item_no] = { savedAt, modifiedAt };
     });
-    if (sampleIdx === curSample && day === curDay) { renderMsCheckTable(); window.msRenderDayPicker && window.msRenderDayPicker(); }
+    const workerFromDb = rows[0]?.worker || '';
+    const verifierFromDb = rows[0]?.verifier || '';
+    if (workerFromDb) { _msWorkerCache[cKey] = workerFromDb; localStorage.setItem(`ms_worker_${car}_${m.year}_${m.month}_${day}_${sampleIdx}`, workerFromDb); }
+    if (verifierFromDb) { _msVerifierCache[cKey] = verifierFromDb; localStorage.setItem(`ms_verifier_${car}_${m.year}_${m.month}_${day}_${sampleIdx}`, verifierFromDb); }
+    if (sampleIdx === curSample && day === curDay) { _msSetReadOnly(true); _msLoadWorkerVerifier(); renderMsCheckTable(); window.msRenderDayPicker && window.msRenderDayPicker(); }
   } catch(e) { console.warn('MS 결과 DB 로드 실패', e); }
 }
 function _msHasLocalResults(sampleIdx, day) {
-  const m = getTabMonth('ms'), car = getCar(), s = MS_DATA[sampleIdx];
-  return !!s && s.items.some(it => localStorage.getItem(`ms_${car}_${m.year}_${m.month}_${day}_${sampleIdx}_${it.no}`) !== null);
+  const m = getTabMonth('ms');
+  return _msDBLoadedDays.has(`${sampleIdx}_${day}_${m.year}_${m.month}`);
+}
+
+async function _msLoadMonthStatus(sampleIdx) {
+  const sampleId = _msSampleIds[sampleIdx];
+  if (!sampleId || !window.currentCarId || AIT_API.MOCK) return;
+  const m = getTabMonth('ms');
+  const statusKey = `${sampleIdx}_${m.year}_${m.month}`;
+  if (_msMonthStatusLoaded.has(statusKey)) return;
+  _msMonthStatusLoaded.add(statusKey);
+  const yearMonth = `${m.year}-${String(m.month).padStart(2,'0')}`;
+  try {
+    const rows = await AIT_API.getMsMonthStatus(sampleId, yearMonth);
+    if (!rows || !rows.length) return;
+    const mNow = getTabMonth('ms');
+    if (mNow.year !== m.year || mNow.month !== m.month) return;
+    rows.forEach(r => {
+      const day = new Date(r.check_date + 'T00:00:00').getDate();
+      const rKey = `${m.year}_${m.month}_${day}_${sampleIdx}`;
+      const ng = parseInt(r.ng_count) > 0;
+      const filled = parseInt(r.filled_count);
+      const total = parseInt(r.total_items);
+      let st = filled > 0 ? 'partial' : '';
+      if (ng) st = 'ng';
+      else if (total > 0 && filled >= total) st = 'ok';
+      _msMonthStatusData[rKey] = st;
+      if (sampleIdx === curSample && !_msDBLoadedDays.has(`${sampleIdx}_${day}_${m.year}_${m.month}`)) {
+        _msUpdateDayBtn(day);
+      }
+    });
+  } catch(e) { console.warn('MS 월 상태 로드 실패', e); }
 }
 window._msSelDay = function(day){
   const prev=curDay; curDay=day;
   _msUpdateDayBtn(prev); _msUpdateDayBtn(day);
+  const _mm=getTabMonth('ms');
+  _msSetReadOnly(_msHasDBData.has(`${curSample}_${day}_${_mm.year}_${_mm.month}`));
   renderMsCheckTable();
-  _msLoadWorker();
+  _msLoadWorkerVerifier();
   if (!_msHasLocalResults(curSample, day)) _msLoadResultsFromDB(curSample, day);
 };
 
@@ -578,6 +719,15 @@ function renderMsCheckTable(){
   const m=getTabMonth('ms'), car=getCar();
   const ce=msEditMode?'true':'false', es=msEditMode?'background:#edf3ff;cursor:text;':'';
   const tbody=document.getElementById('ms-check-tbody'); if(!tbody) return;
+  const saveBtn=document.getElementById('ms-save-btn');
+  const editBtn=document.getElementById('ms-edit-result-btn');
+  if(saveBtn) saveBtn.style.display=_msReadOnly?'none':'';
+  if(editBtn) editBtn.style.display=_msReadOnly?'':'none';
+  const wi=document.getElementById('ms-worker-input');
+  const vi=document.getElementById('ms-verifier-input');
+  if(wi){wi.disabled=_msReadOnly;wi.style.color=_msReadOnly?'rgba(255,255,255,.4)':'';}
+  if(vi){vi.disabled=_msReadOnly;vi.style.color=_msReadOnly?'rgba(255,255,255,.4)':'';}
+
 
   tbody.innerHTML = s.items.map((item,i) => {
     const k  =`ms_${car}_${m.year}_${m.month}_${curDay}_${curSample}_${item.no}`;
@@ -603,7 +753,9 @@ function renderMsCheckTable(){
     const delTd=msEditMode
       ?`<td style="padding:5px 6px;text-align:center;vertical-align:middle"><button onclick="window.msDeleteItem(${i})" style="background:#fee2e2;color:#991b1b;border:none;border-radius:4px;padding:2px 7px;cursor:pointer;font-size:12px;font-weight:700">✕</button></td>`:'';
 
-    return `<tr data-mrow="${i}" style="background:${bg};border-bottom:1px solid var(--border)">
+    const _tsCKey=`${m.year}_${m.month}_${curDay}_${curSample}`;
+    const _tsEntry=(_msTsCache[_tsCKey]||{})[item.no]||{};
+    return `<tr data-mrow="${i}" data-mino="${item.no}" style="background:${bg};border-bottom:1px solid var(--border)">
       ${delTd}
       <td style="padding:7px 8px;text-align:center;border-right:1px solid var(--border);color:var(--text3);font-size:11px">${i+1}</td>
       <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_name"  style="padding:7px 10px;border-right:1px solid var(--border);font-weight:500;${es}" onblur="window._msSaveItemDef(this)">${n}</td>
@@ -611,19 +763,20 @@ function renderMsCheckTable(){
       <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_method" style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._msSaveItemDef(this)">${mt}</td>
       <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_cycle"  style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._msSaveItemDef(this)">${cy}</td>
       <td style="padding:4px 5px;border-right:1px solid var(--border);text-align:center;vertical-align:middle">
-        <select onchange="window._msSaveRes('${k}',this.value,${i},${sIdx},'${ino}',${day})"
-          style="width:52px;border:1px solid ${resBdr};border-radius:5px;padding:3px;font-size:12px;background:${resBg};font-family:inherit;cursor:pointer">
+        <select onchange="window._msSaveRes('${k}',this.value,${i},${sIdx},'${ino}',${day})"${_msReadOnly?' disabled':''}
+          style="width:52px;border:1px solid ${resBdr};border-radius:5px;padding:3px;font-size:12px;background:${_msReadOnly?'#f3f4f6':resBg};font-family:inherit;cursor:${_msReadOnly?'default':'pointer'}">
           <option value=""${val===''?' selected':''}></option>
           <option value="○"${val==='○'?' selected':''}>○</option>
           <option value="✕"${val==='✕'?' selected':''}>✕</option>
           <option value="N"${val==='N'?' selected':''}>N</option>
         </select>
+        <div class="ms-ts-badge" style="font-size:9px;text-align:center;margin-top:2px;min-height:11px;line-height:1.3">${_msTsBadgeHtml(_tsEntry.savedAt,_tsEntry.modifiedAt)}</div>
       </td>
       <td style="padding:5px 6px">
         <input type="text" value="${rmk}" placeholder="${isNg?'이상조치 입력':'비고'}"
           data-samp="${sIdx}" data-ino="${ino}" data-day="${day}"
-          onchange="window._msSaveRmk('${kr}',this.value,${sIdx},'${ino}',${day})"
-          style="width:100%;border:1px solid;${rmkStyle}border-radius:5px;padding:3px 6px;font-size:11px;font-family:inherit;color:var(--text)">
+          onchange="window._msSaveRmk('${kr}',this.value,${sIdx},'${ino}',${day})"${_msReadOnly?' disabled':''}
+          style="width:100%;border:1px solid;${_msReadOnly?'border-color:var(--border);background:#f3f4f6;':rmkStyle}border-radius:5px;padding:3px 6px;font-size:11px;font-family:inherit;color:var(--text)">
       </td>
     </tr>`;
   }).join('');
@@ -641,6 +794,23 @@ function _msUpdateRowBg(rowIdx,v){
     rmkInput.placeholder=isNg?'이상조치 입력':'비고';
   }
 }
+function _msFmtTs(iso){
+  const d=new Date(iso);
+  return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+}
+function _msTsBadgeHtml(savedAt,modifiedAt){
+  if(!savedAt&&!modifiedAt) return '';
+  const parts=[];
+  if(savedAt) parts.push(`<span style="color:#9ca3af" title="최초 저장">저장&nbsp;${_msFmtTs(savedAt)}</span>`);
+  if(modifiedAt) parts.push(`<span style="color:#f59e0b" title="수정 저장">수정&nbsp;${_msFmtTs(modifiedAt)}</span>`);
+  return parts.join('<br>');
+}
+function _msUpdateRowTs(itemNo,savedAt,modifiedAt){
+  const tr=document.querySelector(`#ms-check-tbody tr[data-mino="${itemNo}"]`);
+  if(!tr) return;
+  const badge=tr.querySelector('.ms-ts-badge');
+  if(badge) badge.innerHTML=_msTsBadgeHtml(savedAt,modifiedAt);
+}
 window._msSaveRes=function(k,v,rowIdx,sIdx,ino,day){
   if(v) localStorage.setItem(k,v); else localStorage.removeItem(k);
   _msUpdateRowBg(rowIdx,v); _msUpdateDayBtn(curDay);
@@ -652,43 +822,73 @@ window._msSaveRes=function(k,v,rowIdx,sIdx,ino,day){
   }
   const rmkEl=tr?tr.querySelector('td:last-child input'):null;
   const rmk=rmkEl?rmkEl.value:'';
-  _msStageResult(sIdx,ino,day,v,rmk);
+  const m=getTabMonth('ms');
+  const dateStr=`${m.year}-${String(m.month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  _msStageResult(sIdx,ino,dateStr,v,rmk);
 };
 window._msSaveRmk=function(k,v,sIdx,ino,day){
-  // 작업 E: localStorage 유지(UI상태) + DB debounce 저장
   if(v) localStorage.setItem(k,v); else localStorage.removeItem(k);
-  // 결과값을 같은 행 input에서 읽어 함께 stage
   const resKey = k.replace(/^ms_rmk_/,'ms_');
   const resVal = localStorage.getItem(resKey) || '';
-  _msStageResult(sIdx ?? curSample, ino ?? '', day ?? curDay, resVal, v);
+  const m=getTabMonth('ms');
+  const d=day??curDay;
+  const dateStr=`${m.year}-${String(m.month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+  _msStageResult(sIdx??curSample, ino??'', dateStr, resVal, v);
 };
-window._msSaveWorker =function(v){
-  const m=getTabMonth('ms'),car=getCar();
-  const k=`ms_worker_${car}_${m.year}_${m.month}_${curDay}_${curSample}`;
-  if(v) localStorage.setItem(k,v); else localStorage.removeItem(k);
+window._msSaveWorker = function(v){
+  const m = getTabMonth('ms'), car = getCar();
+  const k = `ms_worker_${car}_${m.year}_${m.month}_${curDay}_${curSample}`;
+  const cKey = `${m.year}_${m.month}_${curDay}_${curSample}`;
+  if(v){ localStorage.setItem(k,v); _msWorkerCache[cKey]=v; } else { localStorage.removeItem(k); delete _msWorkerCache[cKey]; }
+  _msStageCurDay();
 };
-/* ── 샘플 사진 (앞/뒤/식별표) ── */
-const MS_PHOTO_SLOTS = ['앞','뒤','식별표'];
-const _msPhotoCache = {};
-function _msPhotoKey(sId){ return `ms_photos_${sId}`; }
-function _msLoadPhotoCache(sId){
-  if(_msPhotoCache[sId]!==undefined) return;
-  try{ _msPhotoCache[sId]=JSON.parse(localStorage.getItem(_msPhotoKey(sId))||'null')||{}; }catch{ _msPhotoCache[sId]={}; }
+window._msSaveVerifier = function(v){
+  const m = getTabMonth('ms'), car = getCar();
+  const k = `ms_verifier_${car}_${m.year}_${m.month}_${curDay}_${curSample}`;
+  const cKey = `${m.year}_${m.month}_${curDay}_${curSample}`;
+  if(v){ localStorage.setItem(k,v); _msVerifierCache[cKey]=v; } else { localStorage.removeItem(k); delete _msVerifierCache[cKey]; }
+  _msStageCurDay();
+};
+function _msStageCurDay(){
+  const s = MS_DATA[curSample]; if(!s) return;
+  const m = getTabMonth('ms'), car = getCar();
+  const dateStr = `${m.year}-${String(m.month).padStart(2,'0')}-${String(curDay).padStart(2,'0')}`;
+  s.items.forEach(item => {
+    const val = localStorage.getItem(`ms_${car}_${m.year}_${m.month}_${curDay}_${curSample}_${item.no}`) || '';
+    const rmk = localStorage.getItem(`ms_rmk_${car}_${m.year}_${m.month}_${curDay}_${curSample}_${item.no}`) || '';
+    _msStageResult(curSample, item.no, dateStr, val, rmk);
+  });
 }
-function _msSavePhotoCache(sId){ localStorage.setItem(_msPhotoKey(sId),JSON.stringify(_msPhotoCache[sId]||{})); }
+/* ── 샘플 사진 (앞/뒤) — DB(ms_photos) 기반 ── */
+const MS_PHOTO_SLOTS = ['앞','뒤'];
+const _msPhotoCache = {}; // sId → { slot: fileId }
+async function _msLoadPhotosFromDb(sId){
+  try{
+    const rows = await AIT_API.getMsPhotos(sId);
+    const map = {};
+    (Array.isArray(rows)?rows:[]).forEach(r=>{ map[r.slot]=r.file_id; });
+    _msPhotoCache[sId] = map;
+  }catch(e){ _msPhotoCache[sId] = {}; }
+}
 function _msShowMainPhoto(url){
   const main=document.getElementById('ms-photo-main'); if(!main) return;
   if(url){
     const safe=url.replace(/'/g,'%27');
-    main.innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:contain;cursor:zoom-in;display:block;max-height:100%" onclick="window.open('${safe}','_blank')">`;
+    main.innerHTML=`<img src="${url}" style="width:100%;height:100%;object-fit:contain;cursor:zoom-in;display:block;max-height:100%" onclick="window._msOpenLightbox('${safe}')">`;
   } else {
     main.innerHTML=`<div style="text-align:center;color:#9ca3af"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><div style="font-size:11px;margin-top:6px">사진 없음</div></div>`;
   }
 }
 window._msShowMainPhoto=_msShowMainPhoto;
-function renderMsPhotoStrip(){
+window._msOpenLightbox=function(url,caption){
+  const box=document.getElementById('lightbox-box'); if(!box) return;
+  box.innerHTML=`<img src="${url}" style="max-width:90vw;max-height:80vh;object-fit:contain;border-radius:8px">`;
+  const cap=document.getElementById('lightbox-caption'); if(cap) cap.textContent=caption||'';
+  const lb=document.getElementById('lightbox'); if(lb) lb.classList.add('open');
+};
+async function renderMsPhotoStrip(){
   const sId=_msSampleIds[curSample]; if(!sId) return;
-  _msLoadPhotoCache(sId);
+  if(_msPhotoCache[sId]===undefined) await _msLoadPhotosFromDb(sId);
   const photos=_msPhotoCache[sId]||{};
   const strip=document.getElementById('ms-photo-strip'); if(!strip) return;
   let html='', firstUrl='';
@@ -700,13 +900,13 @@ function renderMsPhotoStrip(){
     const imgHtml=url
       ?`<img src="${url}" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="window._msShowMainPhoto('${safe}')">`
       :`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#9ca3af"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span style="font-size:9px">없음</span></div>`;
-    const delBtn=url?`<button onclick="window._msDelPhoto('${slot}')" style="position:absolute;top:3px;right:3px;background:rgba(180,0,0,.75);color:#fff;border:none;border-radius:3px;font-size:9px;padding:2px 5px;cursor:pointer;z-index:3">✕</button>`:'';
-    html+=`<div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:4px">
-      <div style="width:72px;height:72px;border:2px solid ${url?'#3b82f6':'#d1d5db'};border-radius:8px;overflow:hidden;position:relative;background:#f9fafb">
-        ${imgHtml}${delBtn}
-        <label style="position:absolute;bottom:3px;left:50%;transform:translateX(-50%);background:rgba(30,50,100,.75);color:#fff;font-size:9px;padding:2px 6px;border-radius:4px;cursor:pointer;z-index:2;white-space:nowrap">📷<input type="file" accept="image/*" style="display:none" onchange="window._msUploadPhoto('${slot}',this)"></label>
+    const uploadBtn=msEditMode?`<label style="position:absolute;bottom:5px;right:5px;background:rgba(30,50,100,.75);color:#fff;font-size:9px;padding:3px 7px;border-radius:4px;cursor:pointer;z-index:2">📷<input type="file" accept="image/*" style="display:none" onchange="window._msUploadPhoto('${slot}',this)"></label>`:'';
+    const delBtn=(url&&msEditMode)?`<button onclick="window._msDelPhoto('${slot}')" style="position:absolute;top:4px;right:4px;width:20px;height:20px;background:rgba(220,38,38,.8);color:#fff;border:none;border-radius:50%;font-size:10px;line-height:1;cursor:pointer;z-index:2">✕</button>`:'';
+    html+=`<div style="flex-shrink:0;width:90px">
+      <div style="font-size:12px;font-weight:600;color:#111827;margin-bottom:4px;text-align:center">${slot}</div>
+      <div style="position:relative;background:#f3f4f6;border:1px dashed #d1d5db;border-radius:6px;height:70px;overflow:hidden">
+        ${imgHtml}${uploadBtn}${delBtn}
       </div>
-      <span style="font-size:10px;font-weight:600;color:#374151">${slot}</span>
     </div>`;
   });
   strip.innerHTML=html;
@@ -722,11 +922,9 @@ window._msUploadPhoto=async function(slot,input){
     try{
       const base64=ev.target.result.split(',')[1];
       const car=getCar(), ext=(file.name.split('.').pop()||'jpg');
-      const res=await AIT_API.uploadDailyPhoto({car,filename:`ms_${car}_s${sId}_${slot}_${Date.now()}.${ext}`,base64});
-      _msLoadPhotoCache(sId);
+      const res=await AIT_API.uploadMsPhoto({sampleId:sId,slot,car,filename:`ms_${car}_s${sId}_${slot}_${Date.now()}.${ext}`,base64});
       if(!_msPhotoCache[sId]) _msPhotoCache[sId]={};
       _msPhotoCache[sId][slot]=res.fileId;
-      _msSavePhotoCache(sId);
       if(st) st.textContent=''; renderMsPhotoStrip();
     }catch(err){ if(st) st.textContent=''; alert('업로드 실패: '+(err.message||err)); }
   };
@@ -734,11 +932,9 @@ window._msUploadPhoto=async function(slot,input){
 };
 window._msDelPhoto=async function(slot){
   const sId=_msSampleIds[curSample]; if(!sId) return;
-  _msLoadPhotoCache(sId);
   const fileId=(_msPhotoCache[sId]||{})[slot];
-  if(fileId){try{await AIT_API.deleteDailyPhoto(fileId);}catch(e){}}
+  if(fileId){try{await AIT_API.deleteMsPhoto({fileId,sampleId:sId,slot});}catch(e){}}
   if(_msPhotoCache[sId]) delete _msPhotoCache[sId][slot];
-  _msSavePhotoCache(sId);
   renderMsPhotoStrip();
 };
 
@@ -799,12 +995,23 @@ window._msSaveItemDef=function(td){
 };
 
 /* ── 항목 추가 / 삭제 ── */
+function _msSyncCurrentItems(){
+  if(!window.currentCarId||AIT_API.MOCK) return;
+  const s=MS_DATA[curSample]; if(!s) return;
+  const sId=_msSampleIds[curSample]; if(!sId) return;
+  const itemsArr=s.items.map((it,iIdx)=>({
+    sample_id:sId, item_no:parseInt(it.no)||(iIdx+1),
+    item_name:it.name, standard:it.std||'', method:it.method||'', cycle:it.cycle||''
+  }));
+  AIT_API.syncMsItems(window.currentCarId,itemsArr).catch(e=>console.warn('항목 저장 실패',e));
+}
 window.msAddItem=function(){
   const s=MS_DATA[curSample]; if(!s) return;
   const maxNo=s.items.reduce((m,it)=>Math.max(m,parseInt(it.no)||0),0);
   s.items.push({no:String(maxNo+1),name:'(항목명)',std:'(판정기준)',method:s.items[0]?.method||'',cycle:'시업 전'});
   msSaveData();
   renderMsCheckTable();
+  _msSyncCurrentItems();
 };
 window.msDeleteItem=function(idx){
   const s=MS_DATA[curSample]; if(!s) return;
@@ -813,6 +1020,7 @@ window.msDeleteItem=function(idx){
   s.items.splice(idx,1);
   msSaveData();
   renderMsCheckTable();
+  _msSyncCurrentItems();
 };
 
 /* ── 편집 모드 ── */
@@ -822,7 +1030,7 @@ window.msSetEditable=function(on){
   const addBtn=document.getElementById('ms-add-tab-btn'); if(addBtn) addBtn.style.display=on?'':'none';
   const hint=document.getElementById('ms-empty-edit-hint'); if(hint) hint.style.display=(on&&MS_DATA.length===0)?'':'none';
   msRenderSampleTabs();
-  if(MS_DATA.length>0){ renderMsSampleInfo(); renderMsCheckTable(); }
+  if(MS_DATA.length>0){ renderMsSampleInfo(); renderMsCheckTable(); renderMsPhotoStrip(); }
 };
 
 /* ── Init ── */
@@ -834,6 +1042,7 @@ window.msSetEditable=function(on){
   if (MS_DATA.length > 0 && !_msHasLocalResults(curSample, curDay)) {
     _msLoadResultsFromDB(curSample, curDay);
   }
+  if (typeof window._aitLoadAlarmState === 'function') window._aitLoadAlarmState();
 })();
 })();
 </script>
