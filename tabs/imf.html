@@ -531,6 +531,10 @@ window._imfSaveResInput = function(inputEl, k, rowIdx){
   // DB stage
   const km = k.match(/_s(\d+)_(\w+)_(cho|jung|jong)_res$/);
   if(km){
+    if(!document.getElementById('imf-worker-input')?.value.trim()){
+      if(typeof showToast==='function') showToast('점검자를 먼저 입력해주세요.','warning');
+      return;
+    }
     const timeVal = localStorage.getItem(k.replace(/_res$/, '_time')) || '';
     const rmkBase = k.replace(`_${km[3]}_res`, '_rmk');
     const rmkVal = localStorage.getItem(rmkBase) || '';
@@ -546,6 +550,10 @@ window._imfQuickRes = function(btn, k, v, rowIdx){
   // DB stage
   const km = k.match(/_s(\d+)_(\w+)_(cho|jung|jong)_res$/);
   if(km){
+    if(!document.getElementById('imf-worker-input')?.value.trim()){
+      if(typeof showToast==='function') showToast('점검자를 먼저 입력해주세요.','warning');
+      return;
+    }
     const timeVal = localStorage.getItem(k.replace(/_res$/, '_time')) || '';
     const rmkBase = k.replace(`_${km[3]}_res`, '_rmk');
     const rmkVal = localStorage.getItem(rmkBase) || '';
@@ -584,6 +592,7 @@ window._imfSaveWorker = function(v){
   const m = getTabMonth('imf'), car = getCar();
   const k = `imf_daily_worker_${car}_${m.year}_${m.month}_${imfCurDay}_s${curSheet}`;
   if(v) localStorage.setItem(k,v); else localStorage.removeItem(k);
+  if(v && _imfPendingResults.size){ clearTimeout(_imfSaveTimer); _imfFlushResults(); }
 };
 window._imfSaveItemDef = function(td){
   // 작업 D: localStorage 대신 IMF_ITEMS 업데이트 + syncImfItems debounce

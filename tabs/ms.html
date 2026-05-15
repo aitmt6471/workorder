@@ -256,10 +256,13 @@ function _msSetReadOnly(flag) {
   if (editBtn) editBtn.style.display = flag ? '' : 'none';
   const wi = document.getElementById('ms-worker-input');
   const vi = document.getElementById('ms-verifier-input');
-  if (wi) { wi.disabled = flag; wi.style.color = flag ? 'rgba(255,255,255,.4)' : ''; }
-  if (vi) { vi.disabled = flag; vi.style.color = flag ? 'rgba(255,255,255,.4)' : ''; }
+  if (wi) { wi.disabled = flag; wi.style.color = flag ? 'rgba(255,255,255,.4)' : '#fff'; }
+  if (vi) { vi.disabled = flag; vi.style.color = flag ? 'rgba(255,255,255,.4)' : '#fff'; }
 }
 window._msSaveNow = async function() {
+  const _w=document.getElementById('ms-worker-input')?.value.trim()||'';
+  const _v=document.getElementById('ms-verifier-input')?.value.trim()||'';
+  if(!_w||!_v){alert('점검자와 확인자를 모두 입력해주세요.');return;}
   clearTimeout(_msSaveTimer);
   const btn = document.getElementById('ms-save-btn');
   if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
@@ -725,8 +728,8 @@ function renderMsCheckTable(){
   if(editBtn) editBtn.style.display=_msReadOnly?'':'none';
   const wi=document.getElementById('ms-worker-input');
   const vi=document.getElementById('ms-verifier-input');
-  if(wi){wi.disabled=_msReadOnly;wi.style.color=_msReadOnly?'rgba(255,255,255,.4)':'';}
-  if(vi){vi.disabled=_msReadOnly;vi.style.color=_msReadOnly?'rgba(255,255,255,.4)':'';}
+  if(wi){wi.disabled=_msReadOnly;wi.style.color=_msReadOnly?'rgba(255,255,255,.4)':'#fff';}
+  if(vi){vi.disabled=_msReadOnly;vi.style.color=_msReadOnly?'rgba(255,255,255,.4)':'#fff';}
 
 
   tbody.innerHTML = s.items.map((item,i) => {
@@ -840,14 +843,12 @@ window._msSaveWorker = function(v){
   const k = `ms_worker_${car}_${m.year}_${m.month}_${curDay}_${curSample}`;
   const cKey = `${m.year}_${m.month}_${curDay}_${curSample}`;
   if(v){ localStorage.setItem(k,v); _msWorkerCache[cKey]=v; } else { localStorage.removeItem(k); delete _msWorkerCache[cKey]; }
-  _msStageCurDay();
 };
 window._msSaveVerifier = function(v){
   const m = getTabMonth('ms'), car = getCar();
   const k = `ms_verifier_${car}_${m.year}_${m.month}_${curDay}_${curSample}`;
   const cKey = `${m.year}_${m.month}_${curDay}_${curSample}`;
   if(v){ localStorage.setItem(k,v); _msVerifierCache[cKey]=v; } else { localStorage.removeItem(k); delete _msVerifierCache[cKey]; }
-  _msStageCurDay();
 };
 function _msStageCurDay(){
   const s = MS_DATA[curSample]; if(!s) return;

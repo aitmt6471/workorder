@@ -84,6 +84,28 @@
           style="color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.08)">&#x203A;</button>
         <span style="color:rgba(255,255,255,.35);margin:0 4px">|</span>
         <span id="d-sel-date" style="font-size:13px;font-weight:700;color:#fff;background:rgba(255,255,255,.15);padding:3px 12px;border-radius:6px;letter-spacing:.5px">날짜 선택</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px">
+            <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.8)">점검자</span>
+            <input id="d-worker-input" type="text" placeholder="이름 입력"
+              style="border:none;background:transparent;font-size:11px;font-family:inherit;width:70px;outline:none;color:#fff;caret-color:#fff"
+              onchange="window._dSaveWorker(this.value)">
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px">
+            <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.8)">확인자</span>
+            <input id="d-verifier-input" type="text" placeholder="이름 입력"
+              style="border:none;background:transparent;font-size:11px;font-family:inherit;width:70px;outline:none;color:#fff;caret-color:#fff"
+              onchange="window._dSaveVerifier(this.value)">
+          </div>
+          <button onclick="window._dSaveNow()" id="d-save-btn"
+            style="font-size:11px;font-weight:700;padding:5px 14px;border-radius:8px;border:1px solid #fff;background:#fff;color:#1e3264;cursor:pointer;letter-spacing:.5px">
+            저장
+          </button>
+          <button onclick="window._dEditMode()" id="d-edit-result-btn"
+            style="display:none;font-size:11px;font-weight:700;padding:5px 14px;border-radius:8px;border:1px solid #d97706;background:#d97706;color:#fff;cursor:pointer;letter-spacing:.5px">
+            수정
+          </button>
+        </div>
       </div>
 
       <!-- 날짜 선택 -->
@@ -93,31 +115,7 @@
 
       <!-- 점검 항목 -->
       <div style="padding:14px 16px;overflow-x:auto;background:#fff">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-          <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px">점검 항목</div>
-          <div style="display:flex;align-items:center;gap:8px;margin-left:auto">
-            <div style="display:flex;align-items:center;gap:6px;background:#eef2fb;border:1px solid #c4d4ef;border-radius:8px;padding:4px 10px">
-              <span style="font-size:11px;font-weight:600;color:#1e3264">점검자</span>
-              <input id="d-worker-input" type="text" placeholder="이름 입력"
-                style="border:none;background:transparent;font-size:11px;font-family:inherit;width:70px;outline:none;color:var(--text)"
-                onchange="window._dSaveWorker(this.value)">
-            </div>
-            <div style="display:flex;align-items:center;gap:6px;background:#eef2fb;border:1px solid #c4d4ef;border-radius:8px;padding:4px 10px">
-              <span style="font-size:11px;font-weight:600;color:#1e3264">확인자</span>
-              <input id="d-verifier-input" type="text" placeholder="이름 입력"
-                style="border:none;background:transparent;font-size:11px;font-family:inherit;width:70px;outline:none;color:var(--text)"
-                onchange="window._dSaveVerifier(this.value)">
-            </div>
-            <button onclick="window._dSaveNow()" id="d-save-btn"
-              style="font-size:11px;font-weight:700;padding:5px 14px;border-radius:8px;border:1px solid #1e3264;background:#1e3264;color:#fff;cursor:pointer;letter-spacing:.5px">
-              저장
-            </button>
-            <button onclick="window._dEditMode()" id="d-edit-result-btn"
-              style="display:none;font-size:11px;font-weight:700;padding:5px 14px;border-radius:8px;border:1px solid #d97706;background:#d97706;color:#fff;cursor:pointer;letter-spacing:.5px">
-              수정
-            </button>
-          </div>
-        </div>
+        <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">점검 항목</div>
         <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
           <colgroup>
             <col style="width:36px">
@@ -635,10 +633,10 @@ function renderCheckTable(){
   // Load worker name for this day/equip
   const wk=_dWorkerCache[`${m.year}_${m.month}_${curDay}_${curEquip}`]||'';
   const wi=document.getElementById('d-worker-input');
-  if(wi){wi.value=wk;wi.disabled=_dReadOnly;wi.style.color=_dReadOnly?'#9ca3af':'';}
+  if(wi){wi.value=wk;wi.disabled=_dReadOnly;wi.style.color=_dReadOnly?'rgba(255,255,255,.4)':'#fff';}
   const vf=_dVerifierCache[`${m.year}_${m.month}_${curDay}_${curEquip}`]||'';
   const vi=document.getElementById('d-verifier-input');
-  if(vi){vi.value=vf;vi.disabled=_dReadOnly;vi.style.color=_dReadOnly?'#9ca3af':'';}
+  if(vi){vi.value=vf;vi.disabled=_dReadOnly;vi.style.color=_dReadOnly?'rgba(255,255,255,.4)':'#fff';}
   const saveBtn=document.getElementById('d-save-btn');
   const editBtn=document.getElementById('d-edit-result-btn');
   if(saveBtn) saveBtn.style.display=_dReadOnly?'none':'';
@@ -848,6 +846,9 @@ window._dSaveRmk=function(k,v){
   }
 };
 window._dSaveNow=async function(){
+  const _w=document.getElementById('d-worker-input')?.value.trim()||'';
+  const _v=document.getElementById('d-verifier-input')?.value.trim()||'';
+  if(!_w||!_v){alert('점검자와 확인자를 모두 입력해주세요.');return;}
   clearTimeout(_dSaveTimer);
   const btn=document.getElementById('d-save-btn');
   if(btn){btn.disabled=true;btn.textContent='저장 중…';}
@@ -866,8 +867,8 @@ function _dSetReadOnly(flag) {
   if (editBtn) editBtn.style.display = flag ? '' : 'none';
   const wi = document.getElementById('d-worker-input');
   const vi = document.getElementById('d-verifier-input');
-  if (wi) { wi.disabled = flag; wi.style.color = flag ? '#9ca3af' : ''; }
-  if (vi) { vi.disabled = flag; vi.style.color = flag ? '#9ca3af' : ''; }
+  if (wi) { wi.disabled = flag; wi.style.color = flag ? 'rgba(255,255,255,.4)' : '#fff'; }
+  if (vi) { vi.disabled = flag; vi.style.color = flag ? 'rgba(255,255,255,.4)' : '#fff'; }
 }
 window._dEditMode = function() { _dSetReadOnly(false); renderCheckTable(); };
 
@@ -886,13 +887,11 @@ window._dSaveWorker=function(v){
   const m=getTabMonth('daily');
   const k=`${m.year}_${m.month}_${curDay}_${curEquip}`;
   if(v) _dWorkerCache[k]=v; else delete _dWorkerCache[k];
-  _dStageCurrentDayResults();
 };
 window._dSaveVerifier=function(v){
   const m=getTabMonth('daily');
   const k=`${m.year}_${m.month}_${curDay}_${curEquip}`;
   if(v) _dVerifierCache[k]=v; else delete _dVerifierCache[k];
-  _dStageCurrentDayResults();
 };
 window._dSaveItemDef=function(td){
   const k=td.dataset.dk; if(!k) return;

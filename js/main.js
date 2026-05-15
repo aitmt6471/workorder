@@ -1231,6 +1231,13 @@ function loadCarContent(pane) {
         if (cpRows && cpRows.length) {
           window._cpRowsForWs = cpRows; // showProcess 폴백용 캐시
           cpProcs = _buildWsMgmtFromCpRows(cpRows, paneEl);
+          // _buildWsMgmtFromCpRows가 전체 행을 재빌드하므로, 현재 공정 필터를 재적용
+          const activeProcNum = parseInt(paneEl.querySelector('#ws-proc-num')?.textContent.trim()) || 0;
+          if (activeProcNum) {
+            paneEl.querySelectorAll('#ws-mgmt-tbody tr').forEach(r => {
+              r.style.display = (parseInt(r.dataset.proc) === activeProcNum) ? '' : 'none';
+            });
+          }
         }
         // 3. STEP이 없어 공정 nav가 비어있으면 CP rows의 공정으로 빌드
         if (cpProcs.length && !paneEl.querySelector('#ws-proc-nav .proc-btn')) {
