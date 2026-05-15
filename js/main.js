@@ -987,20 +987,8 @@ function _saveCarContent(pane, car) {
       .map(d => parseInt(d.id.replace('ws-step-list-', ''))).filter(Boolean).sort((a,b)=>a-b);
     if (!AIT_API.MOCK && window.currentCarId) {
       AIT_API.syncWsSteps(window.currentCarId, _wsExtractSteps(paneEl)).catch(e => console.warn('WS DB 동기화 실패', e));
+      AIT_API.saveWsMeta(window.currentCarId, data.safety || '').catch(e => console.warn('WS 안전주의사항 DB 저장 실패', e));
     }
-    // localStorage: base64 제거 후 저장 (5MB 한계 우회)
-    try {
-      const _tmp = document.createElement('div');
-      const lsData = { safety: data.safety, mgmt: data.mgmt, procs: data.procs, steps: {} };
-      Object.entries(data.steps).forEach(([proc, s]) => {
-        _tmp.innerHTML = s.list || '';
-        _tmp.querySelectorAll('img, video').forEach(el => {
-          if (el.src && el.src.startsWith('data:')) { const w = el.closest('.ws-photo-inner'); if (w) w.innerHTML = ''; }
-        });
-        lsData.steps[proc] = { list: _tmp.innerHTML };
-      });
-      localStorage.setItem(`ait_ws_content_${car}`, JSON.stringify(lsData));
-    } catch(e) {}
   }
   if (pane === 'insp' && typeof window.inspSaveDocData === 'function') window.inspSaveDocData();
   // imf/ms: 항목 정의는 AIT_API.saveImfMeta / saveMsMeta 로 관리, 일별 체크 결과는 개별 localStorage 키
@@ -1229,19 +1217,21 @@ function loadCarContent(pane) {
         }
       }
     };
-    // DB 우선 → localStorage 폴백 (관리항목은 항상 CP rows에서 직접 빌드)
-    const _lsFallback = () => _applyWsData(localStorage.getItem(`ait_ws_content_${car}`));
     if (!AIT_API.MOCK && window.currentCarId) {
-      // 작표: STEP은 ws_steps에서 로드, 관리항목은 CP rows에서 직접 빌드 (단일 진실 소스)
+      // 작표: STEP·안전주의사항은 DB에서 로드, 관리항목은 CP rows에서 직접 빌드
       Promise.all([
         AIT_API.getWsSteps(window.currentCarId).catch(() => []),
-        AIT_API.getCpRows(window.currentCarId).catch(() => [])
-      ]).then(([stepsRows, cpRows]) => {
-        // 1. STEP: DB에서 로드, 없으면 localStorage 폴백 (공정 nav · step list 빌드)
+        AIT_API.getCpRows(window.currentCarId).catch(() => []),
+        AIT_API.getWsMeta(window.currentCarId).catch(() => null)
+      ]).then(([stepsRows, cpRows, meta]) => {
+        // 1. 안전주의사항: DB에서 로드
+        if (meta && meta.safety_html !== undefined) {
+          const safetyEl = paneEl.querySelector('#ws-safety');
+          if (safetyEl) safetyEl.innerHTML = meta.safety_html || '';
+        }
+        // 2. STEP: DB에서 로드
         if (stepsRows && stepsRows.length) {
           _wsRenderStepsFromDb(stepsRows, paneEl, car);
-        } else {
-          _lsFallback();
         }
         // 2. 관리항목: CP rows에서 직접 빌드 (단일 진실 소스, STEP 렌더 후 mgmt-tbody 덮어씀)
         let cpProcs = [];
@@ -1262,8 +1252,6 @@ function loadCarContent(pane) {
         }
         refreshMgmtRowColors(paneEl);
       });
-    } else {
-      _lsFallback();
     }
 
   } else if (pane === 'imf') {
