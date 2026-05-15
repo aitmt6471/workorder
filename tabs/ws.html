@@ -459,6 +459,9 @@ window._wsApplyEditMode = function(on) {
 // ── 공정 전환 후 뷰 리셋 (main.js showProcess 후 호출) ──
 window._wsOnProcChange = function() {
   _wsIdx = 0;
+  _wsSlidePaused = false;
+  const tb = document.getElementById('ws-slide-toggle-btn');
+  if (tb) { tb.innerHTML = '&#9646;&#9646;'; tb.title = '슬라이드 정지'; tb.style.background = 'rgba(0,0,0,.42)'; }
   _wsRenderThumb();
   _wsShowStep(0);
   _wsApplyDailyHighlight();
@@ -544,6 +547,7 @@ window.addStep = function() {
 
 // ── STEP 자동 슬라이드쇼 ──
 let _wsSlideTimer = null;
+let _wsSlidePaused = false;
 const WS_SLIDE_MS = 4000;
 
 function _wsSlideStop() {
@@ -551,11 +555,26 @@ function _wsSlideStop() {
 }
 function _wsSlideRestart() {
   _wsSlideStop();
+  if (_wsSlidePaused) return;
   if (_wsGetSteps().length <= 1) return;
   _wsSlideTimer = setInterval(() => {
     const steps = _wsGetSteps();
     if (steps.length > 1) _wsShowStep((_wsIdx + 1) % steps.length);
   }, WS_SLIDE_MS);
+}
+function _wsSlideToggle() {
+  _wsSlidePaused = !_wsSlidePaused;
+  if (_wsSlidePaused) {
+    _wsSlideStop();
+  } else {
+    _wsSlideRestart();
+  }
+  const btn = document.getElementById('ws-slide-toggle-btn');
+  if (btn) {
+    btn.innerHTML = _wsSlidePaused ? '&#9654;' : '&#9646;&#9646;';
+    btn.title = _wsSlidePaused ? '슬라이드 시작' : '슬라이드 정지';
+    btn.style.background = _wsSlidePaused ? 'rgba(30,50,100,.75)' : 'rgba(0,0,0,.42)';
+  }
 }
 function _wsSlideNext() {
   const steps = _wsGetSteps(); if (!steps.length) return;
@@ -568,7 +587,7 @@ function _wsSlidePrev() {
   _wsSlideRestart();
 }
 
-// 패널에 화살표 버튼 + 호버 일시정지 주입
+// 패널에 화살표 버튼 + 정지/시작 버튼 + 호버 일시정지 주입
 (function() {
   const panel = document.getElementById('ws-photo-panel');
   if (!panel) return;
@@ -587,7 +606,18 @@ function _wsSlidePrev() {
   panel.appendChild(prev);
   panel.appendChild(next);
 
-  // 호버/터치 시 일시정지
+  // 정지/시작 토글 버튼
+  const toggleBtn = document.createElement('button');
+  toggleBtn.id = 'ws-slide-toggle-btn';
+  toggleBtn.title = '슬라이드 정지';
+  toggleBtn.innerHTML = '&#9646;&#9646;';
+  toggleBtn.style.cssText = 'position:absolute;bottom:10px;right:10px;background:rgba(0,0,0,.42);border:none;color:#fff;font-size:14px;width:36px;height:36px;border-radius:7px;cursor:pointer;z-index:20;line-height:1;transition:background .15s;display:flex;align-items:center;justify-content:center';
+  toggleBtn.onclick = e => { e.stopPropagation(); _wsSlideToggle(); };
+  toggleBtn.onmouseenter = () => { if (!_wsSlidePaused) toggleBtn.style.background = 'rgba(0,0,0,.72)'; };
+  toggleBtn.onmouseleave = () => { if (!_wsSlidePaused) toggleBtn.style.background = 'rgba(0,0,0,.42)'; };
+  panel.appendChild(toggleBtn);
+
+  // 호버/터치 시 일시정지 (수동 정지 상태면 재시작 안 함)
   panel.addEventListener('mouseenter', _wsSlideStop);
   panel.addEventListener('mouseleave', _wsSlideRestart);
   panel.addEventListener('touchstart', _wsSlideStop, { passive: true });
