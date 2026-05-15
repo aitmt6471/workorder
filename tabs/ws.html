@@ -362,13 +362,19 @@ window._wsUploadPhoto = function(input) {
         .then(res => {
           const fileId = res && res.fileId ? res.fileId : '';
           if (!fileId) throw new Error('fileId 없음');
-          const url = AIT_API.driveUrl(fileId);
-          // base64 → Drive URL 교체
-          const imgEl = inner.querySelector('img, video');
-          if (imgEl) { imgEl.src = url; imgEl.dataset.fileId = fileId; }
-          if (disp) {
-            const dispEl = disp.querySelector('img, video');
-            if (dispEl) dispEl.src = url;
+          if (isVid) {
+            // 영상: Drive iframe 임베드로 교체
+            inner.innerHTML = `<div class="ws-drive-video" data-file-id="${fileId}" style="width:100%;background:#0a1628;border-radius:4px;overflow:hidden;position:relative"><iframe src="https://drive.google.com/file/d/${fileId}/preview" style="width:100%;height:280px;border:none;display:block" allow="autoplay" allowfullscreen></iframe>${delBtn}</div>`;
+            if (disp) disp.innerHTML = `<iframe src="https://drive.google.com/file/d/${fileId}/preview" style="width:100%;height:420px;border:none;display:block" allow="autoplay" allowfullscreen></iframe>`;
+          } else {
+            // 이미지: lh3 CDN URL로 교체
+            const url = AIT_API.driveUrl(fileId);
+            const imgEl = inner.querySelector('img, video');
+            if (imgEl) { imgEl.src = url; imgEl.dataset.fileId = fileId; }
+            if (disp) {
+              const dispEl = disp.querySelector('img, video');
+              if (dispEl) dispEl.src = url;
+            }
           }
           inner.querySelector('#ws-upload-badge')?.remove();
           _wsRenderThumb();
@@ -392,9 +398,9 @@ window._wsUploadPhoto = function(input) {
 window._wsRemovePhoto = function() {
   const step = _wsGetSteps()[_wsIdx]; if (!step) return;
   const inner = step.querySelector('.ws-photo-inner');
-  const img = inner.querySelector('img[data-file-id]');
+  const img = inner.querySelector('img[data-file-id], video[data-file-id], .ws-drive-video[data-file-id]');
   if (img && img.dataset.fileId && typeof AIT_API !== 'undefined' && !AIT_API.MOCK) {
-    AIT_API.deleteWsPhoto(img.dataset.fileId).catch(e => console.warn('Drive 사진 삭제 실패', e));
+    AIT_API.deleteWsPhoto(img.dataset.fileId).catch(e => console.warn('Drive 미디어 삭제 실패', e));
   }
   // Drive 링크 영상은 파일 자체를 건드리지 않고 DOM만 초기화
   inner.style.position = '';

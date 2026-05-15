@@ -774,6 +774,7 @@ function _wsExtractSteps(paneEl) {
     list.querySelectorAll('.ws-step-item').forEach((item, idx) => {
       const vid = item.querySelector('.ws-photo-inner video[src]');
       const img = item.querySelector('.ws-photo-inner img[src]');
+      const driveVid = item.querySelector('.ws-photo-inner .ws-drive-video[data-file-id]');
       const mediaEl = vid || img;
       const mediaSrc = mediaEl?.src || '';
       const _procIdMap = (window._wsProcIdMap?.[getCurrentCar()]) || {};
@@ -784,8 +785,8 @@ function _wsExtractSteps(paneEl) {
         step_name: item.querySelector('.ws-step-name')?.textContent.trim() || item.querySelector('.ws-step-name-input')?.value.trim() || '',
         spec_html: item.querySelector('.ws-step-spec')?.innerHTML || '',
         media_url: (mediaSrc && !mediaSrc.startsWith('data:')) ? mediaSrc : '',
-        media_type: vid ? 'video' : 'image',
-        media_file_id: mediaEl?.dataset?.fileId || '',
+        media_type: (vid || driveVid) ? 'video' : 'image',
+        media_file_id: mediaEl?.dataset?.fileId || driveVid?.dataset?.fileId || '',
         sort_order: idx
       });
     });
@@ -853,11 +854,13 @@ function _wsRenderStepsFromDb(rows, paneEl, car) {
       const item = document.createElement('div');
       item.className = 'ws-step-item';
       let mediaHtml = typeof _wsMediaLabel === 'function' ? _wsMediaLabel() : '';
-      if (row.media_url) {
+      if (row.media_url || row.media_file_id) {
         const fid = row.media_file_id || '';
-        const mUrl = _toDirectDriveUrl(row.media_url);
+        const mUrl = _toDirectDriveUrl(row.media_url || '');
         mediaHtml = (row.media_type === 'video')
-          ? `<video src="${mUrl}" data-file-id="${fid}" controls style="width:100%;display:block;border-radius:4px;max-height:400px"></video>${delBtn}`
+          ? (fid
+            ? `<div class="ws-drive-video" data-file-id="${fid}" style="width:100%;background:#0a1628;border-radius:4px;overflow:hidden;position:relative"><iframe src="https://drive.google.com/file/d/${fid}/preview" style="width:100%;height:280px;border:none;display:block" allow="autoplay" allowfullscreen></iframe>${delBtn}</div>`
+            : `<video src="${mUrl}" data-file-id="${fid}" controls style="width:100%;display:block;border-radius:4px;max-height:400px"></video>${delBtn}`)
           : `<img src="${mUrl}" data-file-id="${fid}" style="width:100%;height:auto;display:block;border-radius:4px" onclick="openPhoto(this)">${delBtn}`;
       }
       const safeName = (row.step_name||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');
@@ -899,9 +902,9 @@ function _wsRenderStepsFromDb(rows, paneEl, car) {
           const dbItem = dbItems[i];
           if (!dbItem) return;
           const inner = dbItem.querySelector('.ws-photo-inner');
-          if (!inner || inner.querySelector('img[src], video[src]')) return; // DB에 이미 이미지 있음
+          if (!inner || inner.querySelector('img[src], video[src], .ws-drive-video[data-file-id]')) return; // DB에 이미 미디어 있음
           const idbInner = idbItem.querySelector('.ws-photo-inner');
-          if (!idbInner?.querySelector('img[src], video[src]')) return;
+          if (!idbInner?.querySelector('img[src], video[src], .ws-drive-video[data-file-id]')) return;
           inner.innerHTML = idbInner.innerHTML;
           inner.style.position = 'relative';
           // data-file-id 있는 base64 → CDN URL 변환

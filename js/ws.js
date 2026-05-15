@@ -162,7 +162,7 @@ function wsLoadPhoto(input) {
 
 function wsRemovePhoto(btn) {
   const inner = btn.closest('.ws-photo-inner');
-  const mediaEl = inner.querySelector('img[data-file-id], video[data-file-id]');
+  const mediaEl = inner.querySelector('img[data-file-id], video[data-file-id], .ws-drive-video[data-file-id]');
   if (mediaEl && mediaEl.dataset.fileId && typeof AIT_API !== 'undefined' && !AIT_API.MOCK) {
     AIT_API.deleteWsPhoto(mediaEl.dataset.fileId).catch(e => console.warn('Drive 미디어 삭제 실패', e));
   }
