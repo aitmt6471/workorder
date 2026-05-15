@@ -776,13 +776,17 @@ function _wsExtractSteps(paneEl) {
       const img = item.querySelector('.ws-photo-inner img[src]');
       const mediaEl = vid || img;
       const mediaSrc = mediaEl?.src || '';
+      const _procIdMap = (window._wsProcIdMap?.[getCurrentCar()]) || {};
       steps.push({
-        procNum, stepNum: idx + 1,
-        stepName: item.querySelector('.ws-step-name')?.textContent.trim() || item.querySelector('.ws-step-name-input')?.value.trim() || '',
-        specHtml: item.querySelector('.ws-step-spec')?.innerHTML || '',
-        mediaUrl: (mediaSrc && !mediaSrc.startsWith('data:')) ? mediaSrc : '',
-        mediaType: vid ? 'video' : 'image',
-        mediaFileId: mediaEl?.dataset?.fileId || ''
+        proc_no: procNum,
+        process_id: _procIdMap[procNum] || null,
+        step_no: idx + 1,
+        step_name: item.querySelector('.ws-step-name')?.textContent.trim() || item.querySelector('.ws-step-name-input')?.value.trim() || '',
+        spec_html: item.querySelector('.ws-step-spec')?.innerHTML || '',
+        media_url: (mediaSrc && !mediaSrc.startsWith('data:')) ? mediaSrc : '',
+        media_type: vid ? 'video' : 'image',
+        media_file_id: mediaEl?.dataset?.fileId || '',
+        sort_order: idx
       });
     });
   });
@@ -831,7 +835,13 @@ function _renderWsMgmtFromItems(items, paneEl, car) {
 
 function _wsRenderStepsFromDb(rows, paneEl, car) {
   const byProc = {};
-  rows.forEach(r => { const p = parseInt(r.proc_num)||0; (byProc[p]||(byProc[p]=[])).push(r); });
+  window._wsProcIdMap = window._wsProcIdMap || {};
+  window._wsProcIdMap[car] = {};
+  rows.forEach(r => {
+    const p = parseInt(r.proc_num)||0;
+    if (r.process_id) window._wsProcIdMap[car][p] = r.process_id;
+    (byProc[p]||(byProc[p]=[])).push(r);
+  });
   const procs = Object.keys(byProc).map(Number).filter(Boolean).sort((a,b)=>a-b);
   if (!procs.length) return false;
   buildWsProcs(procs, paneEl);
@@ -1206,6 +1216,10 @@ function loadCarContent(pane) {
         )].sort((a,b)=>a-b);
         const fallbackProcs = cpProcs.length > 0 ? cpProcs : [20,30,40,50,60];
         buildWsProcs(fallbackProcs, paneEl);
+        const _fm = _cpMetaGet(car);
+        const _fpn = paneEl.querySelector('#ws-pn'); const _fpnm = paneEl.querySelector('#ws-pname');
+        if (_fpn)  _fpn.textContent  = _fm.partno   || '';
+        if (_fpnm) _fpnm.textContent = _fm.partname || '';
         if (!isBase) {
           const tb2 = paneEl.querySelector('#ws-mgmt-tbody');
           if (tb2) tb2.innerHTML = '';
