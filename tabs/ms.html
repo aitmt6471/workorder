@@ -1046,6 +1046,8 @@ window.msSetEditable=function(on){
   }
   if (typeof window._aitLoadAlarmState === 'function') window._aitLoadAlarmState();
 })();
+window._msGetCurDay = () => curDay;
+window._msGetMonth = () => getTabMonth('ms');
 })();
 
 window.print_ms = async function() {
@@ -1059,6 +1061,11 @@ window.print_ms = async function() {
   const rev        = document.getElementById('ms-rev-badge')?.textContent.trim() || '';
   const revDate    = document.getElementById('ms-rev-date')?.textContent.trim() || '';
   const revNum     = parseInt((rev || '').replace(/[^0-9]/g, '')) || 0;
+  const msDay    = typeof window._msGetCurDay === 'function' ? window._msGetCurDay() : new Date().getDate();
+  const msMth    = typeof window._msGetMonth === 'function' ? window._msGetMonth() : { year: new Date().getFullYear(), month: new Date().getMonth()+1 };
+  const selDate  = `${msMth.year}년 ${msMth.month}월 ${msDay}일`;
+  const worker   = document.getElementById('ms-worker-input')?.value.trim() || '';
+  const verifier = document.getElementById('ms-verifier-input')?.value.trim() || '';
 
   let authorSignUrl = '', authorName = '';
   let reviewerSignUrl = '', reviewerName = '';
@@ -1125,6 +1132,7 @@ body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px
 table{border-collapse:collapse;width:100%}
 </style></head>
 <body>
+<div id="pset" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e3264;color:#fff;padding:6px 14px;display:flex;align-items:center;gap:10px;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.4)"><b style="margin-right:4px">🖨 인쇄 설정</b><label>여백 <select id="pm" style="font-size:11px;padding:2px 5px;border-radius:4px;color:#111"><option value="3mm">3mm 최소</option><option value="6mm">6mm 좁게</option><option value="10mm" selected>10mm 보통</option><option value="14mm">14mm 넓게</option><option value="18mm">18mm</option></select></label><label style="margin-left:6px">배율 <select id="ps" style="font-size:11px;padding:2px 5px;border-radius:4px;color:#111"><option value="100">100%</option><option value="95" selected>95%</option><option value="90">90%</option><option value="85">85%</option><option value="80">80%</option><option value="75">75%</option></select></label><button onclick="(function(){var m=document.getElementById('pm').value,s=parseInt(document.getElementById('ps').value,10),st=document.createElement('style');st.textContent='@page{size:A4 landscape;margin:'+m+'}body{zoom:'+(s/100)+'}';document.head.appendChild(st);document.getElementById('pset').style.display='none';document.getElementById('pss').style.display='none';setTimeout(function(){window.print();},200);})()" style="margin-left:8px;padding:4px 14px;background:#fff;color:#1e3264;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">인쇄</button><span style="margin-left:8px;font-size:10px;opacity:.65">※ 설정 바는 인쇄에서 제외됩니다</span></div><div id="pss" style="height:42px"></div>
 <table style="border:1.5px solid #1e3264;margin-bottom:4px;width:100%;border-collapse:collapse">
   <tr>
     <td style="width:70px;border-right:1px solid #7a90b8;padding:3px;text-align:center;vertical-align:middle">
@@ -1162,6 +1170,14 @@ table{border-collapse:collapse;width:100%}
     <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">관리책임자</td>
     <td style="padding:3px 8px;color:#1e3264">${manager}</td>
   </tr>
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">점검일</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${selDate}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">점검자</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${worker}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">확인자</td>
+    <td colspan="7" style="padding:3px 8px;color:#1e3264">${verifier}</td>
+  </tr>
   ${content ? `<tr><td style="background:#1e3264;color:#fff;padding:3px 7px;font-weight:700">내용</td><td colspan="11" style="padding:3px 8px;font-size:9px;color:#374151">${content}</td></tr>` : ''}
 </table>
 ${photosHtml}
@@ -1179,18 +1195,6 @@ ${photosHtml}
   </thead>
   <tbody>${tbodyHtml}</tbody>
 </table>
-<script>
-window.onload = function() {
-  var imgs = document.querySelectorAll('img');
-  if (!imgs.length) { window.print(); return; }
-  var done = 0, total = imgs.length;
-  var go = function() { if (++done >= total) window.print(); };
-  imgs.forEach(function(img) {
-    if (img.complete) go(); else { img.onload = go; img.onerror = go; }
-  });
-  setTimeout(function() { window.print(); }, 10000);
-};
-<\/script>
 </body></html>`;
 
   const win = window.open('', '_blank', 'width=1120,height=820');
