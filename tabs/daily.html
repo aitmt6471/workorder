@@ -14,6 +14,7 @@
   </button>
   <button class="btn btn-ghost btn-sm edit-only" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}dailyResetToDefault();})()" style="color:#dc2626">기본값 복원</button>
   <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('daily')">저장</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_daily && window.print_daily()">🖨 인쇄</button>
   <button class="btn btn-ghost btn-sm" id="daily-edit-btn" onclick="toggleTabEditMode('daily',this)">&#x270F; 편집 모드</button>
 </div>
 
@@ -952,5 +953,195 @@ if(DAILY_EQUIP.length>0){ renderEquipInfo(); dailyRenderDayPicker(); renderCheck
 if(typeof window._aitLoadAlarmState==='function') window._aitLoadAlarmState();
 
 window.addEventListener('beforeunload', () => { clearTimeout(_dSaveTimer); _dFlushResults(); });
+  window._dailyPhotosObj = _dailyPhotos;
+  window._dailyPhotoKey = e => _photoKey(e);
+  window._dailyLoadEquipPhotos = loadEquipPhotos;
 })();
+
+window.print_daily = async function() {
+  const car      = document.getElementById('car-sel')?.options[document.getElementById('car-sel')?.selectedIndex]?.text || '';
+  const selDate  = document.getElementById('d-sel-date')?.textContent.trim() || '';
+  const worker   = document.getElementById('d-worker-input')?.value.trim() || '';
+  const verifier = document.getElementById('d-verifier-input')?.value.trim() || '';
+  const rev      = document.getElementById('daily-rev-badge')?.textContent.trim() || '';
+  const revDate  = document.getElementById('daily-rev-date')?.textContent.trim() || '';
+  const revNum   = parseInt((rev || '').replace(/[^0-9]/g, '')) || 0;
+
+  // 모든 설비 탭 가져오기
+  const allEquip = typeof window._dailyGetEquip === 'function' ? window._dailyGetEquip() : [];
+  if (!allEquip.length) { alert('설비 데이터가 없습니다.'); return; }
+
+  let authorSignUrl = '', authorName = '';
+  let reviewerSignUrl = '', reviewerName = '';
+  let approverSignUrl = '', approverName = '';
+  try {
+    const signs = await AIT_API.getRevisionSigns(window.currentCarId, 'cp');
+    const sigMap = {};
+    signs.filter(s => s.rev === revNum || s.rev === String(revNum)).forEach(s => { sigMap[s.role] = s; });
+    const driveUrl = fid => (fid && typeof AIT_API.driveUrl === 'function') ? AIT_API.driveUrl(fid) : '';
+    authorSignUrl   = driveUrl(sigMap.author?.sign_file_id);   authorName   = sigMap.author?.signer_name   || '';
+    reviewerSignUrl = driveUrl(sigMap.reviewer?.sign_file_id); reviewerName = sigMap.reviewer?.signer_name || '';
+    approverSignUrl = driveUrl(sigMap.approver?.sign_file_id); approverName = sigMap.approver?.signer_name || '';
+  } catch(e) { console.warn('서명 로드 실패', e); }
+
+  const _signCell = (imgUrl, name) => {
+    const img = imgUrl ? `<img src="${imgUrl}" style="max-height:30px;max-width:56px;object-fit:contain;display:block;margin:0 auto" onerror="this.style.display='none'">` : '';
+    return (img || name) ? `<div style="font-size:8px;color:#374151;margin-bottom:2px">${name}</div>${img}` : '';
+  };
+
+  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+
+  // 현재 탭의 결과 DOM에서 수집 (결과는 현재 선택된 설비만 DOM에 존재)
+  const _curDomResults = {};
+  [...document.querySelectorAll('#d-check-tbody tr')].forEach((tr, i) => {
+    const cells = [...tr.querySelectorAll('td')];
+    if (!cells.length) return;
+    const resultEl = cells[5]?.querySelector('select, input');
+    _curDomResults[i] = {
+      result: resultEl ? (resultEl.value || '') : (cells[5]?.textContent.trim() || ''),
+      remark: cells[6]?.querySelector('input')?.value || cells[6]?.textContent.trim() || ''
+    };
+  });
+
+  // 현재 탭 인덱스 파악
+  const activeTabBtn = document.querySelector('#d-equip-tabs .proc-btn.active');
+  const curEquipIdx = activeTabBtn ? [...document.querySelectorAll('#d-equip-tabs .proc-btn')].indexOf(activeTabBtn) : 0;
+
+  // 모든 설비 사진 미리 로드 (방문하지 않은 탭 포함)
+  try {
+    await Promise.all(allEquip.map(async e => {
+      const key = window._dailyPhotoKey(e);
+      if (!window._dailyPhotosObj[key]) {
+        try { await window._dailyLoadEquipPhotos(e); } catch(err) {}
+      }
+    }));
+  } catch(err) { console.warn('사진 pre-load 실패', err); }
+
+  // 설비별 페이지 빌드
+  const TH = s => `<th style="background:#1e3264;color:#fff;padding:5px 6px;text-align:center;font-weight:600;border:1px solid rgba(255,255,255,.2)">${s}</th>`;
+  const hdrRow = `<tr>${TH('No.')}${TH('점검항목')}${TH('관리기준')}${TH('확인방법')}${TH('주기')}${TH('결과')}${TH('비고')}</tr>`;
+  const signHdr = `
+<table style="border:1.5px solid #1e3264;margin-bottom:4px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="width:70px;border-right:1px solid #7a90b8;padding:3px;text-align:center;vertical-align:middle">
+      <img src="${logoUrl}" style="height:28px;object-fit:contain" onerror="this.style.display='none'">
+    </td>
+    <td style="text-align:center;font-size:18px;font-weight:900;letter-spacing:6px;color:#1e3264;padding:5px 0">설 비 일 상 점 검 표</td>
+    <td style="width:190px;border-left:1px solid #7a90b8;padding:0">
+      <table style="width:100%;height:100%;border-collapse:collapse">
+        <tr>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">작성</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">검토</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;width:34%">승인</td>
+        </tr>
+        <tr>
+          <td style="height:40px;border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(authorSignUrl, authorName)}</td>
+          <td style="border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(reviewerSignUrl, reviewerName)}</td>
+          <td style="border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(approverSignUrl, approverName)}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>`;
+
+  const pagesHtml = allEquip.map((e, idx) => {
+    const isCur = idx === curEquipIdx;
+    const photoKey = window._dailyPhotoKey(e);
+    const equipPhotos = (window._dailyPhotosObj[photoKey] || [])
+      .sort((a, b) => (a.photo_order||0) - (b.photo_order||0));
+    const photoUrls = equipPhotos.map(p => {
+      const url = p.photo_url || '';
+      return typeof AIT_API?.normalizePhotoUrl === 'function' ? AIT_API.normalizePhotoUrl(url) : url;
+    }).filter(Boolean);
+    const photosHtml = photoUrls.length ? `
+<div style="margin-bottom:6px">
+  <div style="background:#1e3264;color:#fff;font-size:9px;font-weight:700;padding:3px 8px;letter-spacing:1px;margin-bottom:4px">설비 사진</div>
+  <div style="display:flex;gap:8px">
+    ${photoUrls.slice(0,4).map(u=>`<img src="${u}" style="max-height:110px;max-width:160px;object-fit:contain;border:1px solid #d1d5db;border-radius:4px">`).join('')}
+  </div>
+</div>` : '';
+
+    const items = e.items || [];
+    const tbodyHtml = items.map((item, i) => {
+      const dom = isCur ? (_curDomResults[i] || {}) : {};
+      const result = dom.result || '';
+      const remark = dom.remark || '';
+      const resBg = result === '✕' ? '#fff5f5' : result === '○' ? '#f0fdf4' : '#fff';
+      return `<tr>
+        <td style="padding:3px 5px;border:1px solid #d1d5db;text-align:center;font-size:9px;color:#6b7280">${i+1}</td>
+        <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px;font-weight:500">${item.name||''}</td>
+        <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px;color:#374151">${item.standard||''}</td>
+        <td style="padding:3px 5px;border:1px solid #d1d5db;font-size:9px;text-align:center">${item.method||''}</td>
+        <td style="padding:3px 5px;border:1px solid #d1d5db;font-size:9px;text-align:center">${item.cycle||''}</td>
+        <td style="padding:3px 5px;border:1px solid #d1d5db;font-size:10px;font-weight:700;text-align:center;background:${resBg}">${result}</td>
+        <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px">${remark}</td>
+      </tr>`;
+    }).join('');
+
+    const isLast = idx === allEquip.length - 1;
+    return `<div style="${isLast ? '' : 'page-break-after:always'}">
+${signHdr}
+<table style="border:1px solid #7a90b8;margin-bottom:6px;font-size:9px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">차종</td>
+    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${car}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">설비명</td>
+    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;font-weight:600;color:#1e3264">${e.sheet||''}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">공정번호</td>
+    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;color:#1e3264">${e.proc_no||''}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">공정명</td>
+    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;color:#1e3264">${e.proc_name||''}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">설치장소</td>
+    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;color:#1e3264">${e.location||''}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">관리책임자</td>
+    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;color:#1e3264">${e.manager||''}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">점검일</td>
+    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${selDate}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">점검자</td>
+    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;color:#1e3264">${worker}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">확인자</td>
+    <td style="padding:3px 7px;color:#1e3264">${verifier}</td>
+  </tr>
+</table>
+${photosHtml}
+<table style="border:1px solid #7a90b8;font-size:9px;width:100%;border-collapse:collapse">
+  <thead>${hdrRow}</thead>
+  <tbody>${tbodyHtml || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#9ca3af;border:1px solid #d1d5db">점검항목 없음</td></tr>'}</tbody>
+</table>
+<div style="margin-top:4px;display:flex;justify-content:space-between;font-size:8px;color:#9ca3af;border-top:1px solid #e2e8f0;padding-top:2px">
+  <span>AIT 공정문서 관리시스템</span><span>출력일: ${new Date().toLocaleDateString('ko-KR')}</span>
+</div>
+</div>`;
+  }).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<title>설비일상점검표 ${car} ${selDate}</title>
+<style>
+@page{size:A4 landscape;margin:7mm 9mm}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:10px;color:#111827}
+table{border-collapse:collapse;width:100%}
+</style></head>
+<body>
+${pagesHtml}
+<script>
+window.onload = function() {
+  var imgs = document.querySelectorAll('img');
+  if (!imgs.length) { window.print(); return; }
+  var done = 0, total = imgs.length;
+  var go = function() { if (++done >= total) window.print(); };
+  imgs.forEach(function(img) {
+    if (img.complete) go(); else { img.onload = go; img.onerror = go; }
+  });
+  setTimeout(function() { window.print(); }, 10000);
+};
+<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=1120,height=820');
+  if (!win) { alert('팝업 차단을 해제해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
+};
 </script>

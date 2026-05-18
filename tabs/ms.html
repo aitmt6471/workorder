@@ -13,6 +13,7 @@
     <span id="alarm-toggle-icon">🔔</span><span id="alarm-toggle-label">알람설정</span>
   </button>
   <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('ms')">저장</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_ms && window.print_ms()">🖨 인쇄</button>
   <button class="btn btn-ghost btn-sm" id="ms-edit-btn" onclick="toggleTabEditMode('ms',this)">&#x270F; 편집 모드</button>
 </div>
 
@@ -1046,4 +1047,155 @@ window.msSetEditable=function(on){
   if (typeof window._aitLoadAlarmState === 'function') window._aitLoadAlarmState();
 })();
 })();
+
+window.print_ms = async function() {
+  const car        = document.getElementById('car-sel')?.options[document.getElementById('car-sel')?.selectedIndex]?.text || '';
+  const sampleName = document.getElementById('ms-sample-name')?.textContent.trim() || '';
+  const sampleNum  = document.getElementById('ms-sample-num')?.textContent.trim() || '';
+  const sampleType = document.getElementById('ms-sample-type')?.querySelector('span')?.textContent.trim() || document.getElementById('ms-sample-type')?.textContent.trim() || '';
+  const expire     = document.getElementById('ms-sample-expire')?.textContent.trim() || '';
+  const manager    = document.getElementById('ms-manager')?.textContent.trim() || '';
+  const content    = document.getElementById('ms-sample-content')?.textContent.trim() || '';
+  const rev        = document.getElementById('ms-rev-badge')?.textContent.trim() || '';
+  const revDate    = document.getElementById('ms-rev-date')?.textContent.trim() || '';
+  const revNum     = parseInt((rev || '').replace(/[^0-9]/g, '')) || 0;
+
+  let authorSignUrl = '', authorName = '';
+  let reviewerSignUrl = '', reviewerName = '';
+  let approverSignUrl = '', approverName = '';
+  try {
+    const signs = await AIT_API.getRevisionSigns(window.currentCarId, 'ms');
+    const sigMap = {};
+    signs.filter(s => s.rev === revNum || s.rev === String(revNum)).forEach(s => { sigMap[s.role] = s; });
+    const driveUrl = fid => (fid && typeof AIT_API.driveUrl === 'function') ? AIT_API.driveUrl(fid) : '';
+    authorSignUrl   = driveUrl(sigMap.author?.sign_file_id);   authorName   = sigMap.author?.signer_name   || '';
+    reviewerSignUrl = driveUrl(sigMap.reviewer?.sign_file_id); reviewerName = sigMap.reviewer?.signer_name || '';
+    approverSignUrl = driveUrl(sigMap.approver?.sign_file_id); approverName = sigMap.approver?.signer_name || '';
+  } catch(e) { console.warn('서명 로드 실패', e); }
+
+  const _signCell = (imgUrl, name) => {
+    const img = imgUrl ? `<img src="${imgUrl}" style="max-height:30px;max-width:56px;object-fit:contain;display:block;margin:0 auto" onerror="this.style.display='none'">` : '';
+    return (img || name) ? `<div style="font-size:8px;color:#374151;margin-bottom:2px">${name}</div>${img}` : '';
+  };
+
+  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+
+  const photoUrls = [...document.querySelectorAll('#ms-photo-strip img')].map(img => img.src).filter(Boolean);
+
+  const checkRows = [...document.querySelectorAll('#ms-check-tbody tr')];
+  const car2 = typeof getCurrentCar === 'function' ? getCurrentCar() : '';
+  const tbodyHtml = checkRows.map((tr, i) => {
+    const cells = [...tr.querySelectorAll('td:not(.ms-edit-col)')];
+    if (!cells.length) return '';
+    const no     = cells[0]?.textContent.trim() || (i + 1);
+    const name   = cells[1]?.textContent.trim() || '';
+    const std    = cells[2]?.textContent.trim() || '';
+    const method = cells[3]?.textContent.trim() || '';
+    const cycle  = cells[4]?.textContent.trim() || '';
+    const sel    = cells[5]?.querySelector('select');
+    const result = sel ? sel.value : (cells[5]?.textContent.trim() || '');
+    const remark = cells[6]?.querySelector('input')?.value || cells[6]?.textContent.trim() || '';
+    const resBg  = result === '✕' ? '#fff5f5' : result === '○' ? '#f0fdf4' : '#fff';
+    return `<tr style="border-bottom:1px solid #e5e7eb">
+      <td style="padding:4px 6px;border:1px solid #d1d5db;text-align:center;font-size:10px;color:#6b7280">${no}</td>
+      <td style="padding:4px 8px;border:1px solid #d1d5db;font-size:10px;font-weight:500">${name}</td>
+      <td style="padding:4px 8px;border:1px solid #d1d5db;font-size:10px;color:#374151">${std}</td>
+      <td style="padding:4px 6px;border:1px solid #d1d5db;font-size:10px;text-align:center">${method}</td>
+      <td style="padding:4px 6px;border:1px solid #d1d5db;font-size:10px;text-align:center">${cycle}</td>
+      <td style="padding:4px 6px;border:1px solid #d1d5db;font-size:11px;font-weight:700;text-align:center;background:${resBg}">${result}</td>
+      <td style="padding:4px 8px;border:1px solid #d1d5db;font-size:10px">${remark}</td>
+    </tr>`;
+  }).join('');
+
+  const photosHtml = photoUrls.length ? `
+<div style="margin-bottom:8px">
+  <div style="background:#1e3264;color:#fff;font-size:9px;font-weight:700;padding:3px 8px;letter-spacing:1px;margin-bottom:4px">샘플 사진</div>
+  <div style="display:flex;gap:8px;flex-wrap:nowrap">
+    ${photoUrls.slice(0, 4).map(url => `<img src="${url}" style="max-height:120px;max-width:180px;object-fit:contain;border:1px solid #d1d5db;border-radius:4px">`).join('')}
+  </div>
+</div>` : '';
+
+  const html = `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<title>마스터샘플 체크시트 ${car}</title>
+<style>
+@page{size:A4 landscape;margin:7mm 9mm}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;color:#111827}
+table{border-collapse:collapse;width:100%}
+</style></head>
+<body>
+<table style="border:1.5px solid #1e3264;margin-bottom:4px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="width:70px;border-right:1px solid #7a90b8;padding:3px;text-align:center;vertical-align:middle">
+      <img src="${logoUrl}" style="height:28px;object-fit:contain" onerror="this.style.display='none'">
+    </td>
+    <td style="text-align:center;font-size:18px;font-weight:900;letter-spacing:6px;color:#1e3264;padding:5px 0">마스터샘플 체크시트</td>
+    <td style="width:190px;border-left:1px solid #7a90b8;padding:0">
+      <table style="width:100%;height:100%;border-collapse:collapse">
+        <tr>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">작성</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">검토</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;width:34%">승인</td>
+        </tr>
+        <tr>
+          <td style="height:40px;border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(authorSignUrl, authorName)}</td>
+          <td style="border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(reviewerSignUrl, reviewerName)}</td>
+          <td style="border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(approverSignUrl, approverName)}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<table style="border:1px solid #7a90b8;margin-bottom:6px;font-size:10px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">차종</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${car}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">설비명</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-weight:600">${sampleName}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">관리번호</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-family:monospace">${sampleNum}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">구분</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-weight:700">${sampleType}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">유효기간</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${expire}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">관리책임자</td>
+    <td style="padding:3px 8px;color:#1e3264">${manager}</td>
+  </tr>
+  ${content ? `<tr><td style="background:#1e3264;color:#fff;padding:3px 7px;font-weight:700">내용</td><td colspan="11" style="padding:3px 8px;font-size:9px;color:#374151">${content}</td></tr>` : ''}
+</table>
+${photosHtml}
+<table style="border:1px solid #7a90b8;font-size:10px;width:100%;border-collapse:collapse">
+  <thead>
+    <tr style="background:#1e3264">
+      <th style="padding:5px 6px;text-align:center;font-weight:600;color:#fff;border:1px solid rgba(255,255,255,.2);width:36px">No.</th>
+      <th style="padding:5px 8px;text-align:left;font-weight:600;color:#fff;border:1px solid rgba(255,255,255,.2)">점검항목</th>
+      <th style="padding:5px 8px;text-align:left;font-weight:600;color:#fff;border:1px solid rgba(255,255,255,.2)">판정기준</th>
+      <th style="padding:5px 6px;text-align:center;font-weight:600;color:#fff;border:1px solid rgba(255,255,255,.2);width:76px">확인방법</th>
+      <th style="padding:5px 6px;text-align:center;font-weight:600;color:#fff;border:1px solid rgba(255,255,255,.2);width:56px">주기</th>
+      <th style="padding:5px 6px;text-align:center;font-weight:600;color:#fff;border:1px solid rgba(255,255,255,.2);width:56px">결과</th>
+      <th style="padding:5px 8px;text-align:left;font-weight:600;color:#fff;border:1px solid rgba(255,255,255,.2)">비고</th>
+    </tr>
+  </thead>
+  <tbody>${tbodyHtml}</tbody>
+</table>
+<script>
+window.onload = function() {
+  var imgs = document.querySelectorAll('img');
+  if (!imgs.length) { window.print(); return; }
+  var done = 0, total = imgs.length;
+  var go = function() { if (++done >= total) window.print(); };
+  imgs.forEach(function(img) {
+    if (img.complete) go(); else { img.onload = go; img.onerror = go; }
+  });
+  setTimeout(function() { window.print(); }, 10000);
+};
+<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=1120,height=820');
+  if (!win) { alert('팝업 차단을 해제해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
+};
 </script>

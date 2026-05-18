@@ -67,10 +67,18 @@
     <div id="spec-reverse-panel" style="display:none;flex:1;min-width:0;flex-direction:column;background:#fff">
       <div style="padding:8px 12px;border-bottom:1px solid #e5e7eb;background:#f8fafc;flex-shrink:0">
         <div style="display:flex;align-items:center;gap:6px">
-          <input id="spec-reverse-search" type="text" placeholder="자재 품번 입력..."
-            onkeydown="if(event.key==='Enter')specReverseSearch()"
-            style="flex:1;padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:20px;outline:none">
-          <button onclick="specReverseSearch()" style="padding:5px 12px;background:#1e3264;color:#fff;border:none;border-radius:6px;font-size:20px;cursor:pointer;white-space:nowrap">조회</button>
+          <div style="flex:1;position:relative">
+            <input id="spec-reverse-search" type="text" placeholder="자재 품번 일부 입력 후 선택..."
+              autocomplete="off"
+              oninput="specReverseSuggest()"
+              onkeydown="if(event.key==='Enter'){specHideSuggest();specReverseSearch();}if(event.key==='Escape')specHideSuggest();if(event.key==='ArrowDown'){event.preventDefault();specSuggestFocus(1);}if(event.key==='ArrowUp'){event.preventDefault();specSuggestFocus(-1);}"
+              style="width:100%;box-sizing:border-box;padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;font-size:20px;outline:none">
+            <div id="spec-reverse-suggest"
+              style="display:none;position:absolute;top:calc(100% + 2px);left:0;right:0;z-index:200;
+                     background:#fff;border:1px solid #c9d4e8;border-radius:6px;
+                     box-shadow:0 6px 20px rgba(0,0,0,.15);max-height:300px;overflow-y:auto"></div>
+          </div>
+          <button onclick="specHideSuggest();specReverseSearch()" style="padding:5px 12px;background:#1e3264;color:#fff;border:none;border-radius:6px;font-size:20px;cursor:pointer;white-space:nowrap">조회</button>
           <span id="spec-reverse-badge" style="font-size:19px;color:#6b7280;white-space:nowrap"></span>
         </div>
         <div id="spec-reverse-partname" style="display:none;margin-top:5px;font-size:20px;color:#1e3264;font-weight:600;padding:0 2px"></div>
@@ -323,6 +331,70 @@ window.specFilterTable=function(){
   _specSearchQ=(document.getElementById('spec-search')?.value||'').toLowerCase().trim();
   specRenderTable();
 };
+
+/* ── 자재 품번 자동완성 ── */
+let _specSuggestTimer=null;
+let _specSuggestIdx=-1;
+
+window.specReverseSuggest=function(){
+  const q=(document.getElementById('spec-reverse-search')?.value||'').trim();
+  const drop=document.getElementById('spec-reverse-suggest');
+  if(!drop) return;
+  clearTimeout(_specSuggestTimer);
+  _specSuggestIdx=-1;
+  if(q.length<2){drop.style.display='none';return;}
+  drop.innerHTML='<div style="padding:10px 14px;color:#9ca3af;font-size:19px">검색 중...</div>';
+  drop.style.display='';
+  _specSuggestTimer=setTimeout(async()=>{
+    try{
+      const rows=await AIT_API.getSpecBomSuggest(q);
+      const list=Array.isArray(rows)?rows:[];
+      if(!list.length){drop.innerHTML='<div style="padding:10px 14px;color:#9ca3af;font-size:19px">일치하는 품번 없음</div>';return;}
+      drop.innerHTML=list.map((r,i)=>`
+        <div data-idx="${i}" data-pno="${r.sub_part_no}"
+          onmousedown="specPickSuggest('${r.sub_part_no.replace(/'/g,"\\'")}')"
+          onmouseover="specSuggestHover(${i})"
+          style="padding:8px 14px;cursor:pointer;border-bottom:1px solid #f0f4fa;display:flex;align-items:baseline;gap:8px">
+          <span style="font-family:monospace;font-size:20px;font-weight:700;color:#1e3264">${r.sub_part_no}</span>
+          ${r.sub_part_name?`<span style="font-size:18px;color:#6b7280">${r.sub_part_name}</span>`:''}
+        </div>`).join('');
+    }catch(e){drop.innerHTML='<div style="padding:10px 14px;color:#ef4444;font-size:19px">조회 오류</div>';}
+  },280);
+};
+
+window.specPickSuggest=function(partNo){
+  const input=document.getElementById('spec-reverse-search');
+  if(input) input.value=partNo;
+  specHideSuggest();
+  specReverseSearch();
+};
+
+window.specHideSuggest=function(){
+  const drop=document.getElementById('spec-reverse-suggest');
+  if(drop) drop.style.display='none';
+  _specSuggestIdx=-1;
+};
+
+window.specSuggestHover=function(idx){
+  _specSuggestIdx=idx;
+  document.querySelectorAll('#spec-reverse-suggest [data-idx]').forEach(el=>{
+    el.style.background=Number(el.dataset.idx)===idx?'#eff6ff':'';
+  });
+};
+
+window.specSuggestFocus=function(dir){
+  const items=[...document.querySelectorAll('#spec-reverse-suggest [data-idx]')];
+  if(!items.length) return;
+  _specSuggestIdx=Math.max(0,Math.min(items.length-1,_specSuggestIdx+dir));
+  items.forEach((el,i)=>el.style.background=i===_specSuggestIdx?'#eff6ff':'');
+  const pno=items[_specSuggestIdx]?.dataset?.pno;
+  if(pno){const inp=document.getElementById('spec-reverse-search');if(inp)inp.value=pno;}
+};
+
+document.addEventListener('mousedown',e=>{
+  if(!e.target.closest('#spec-reverse-search')&&!e.target.closest('#spec-reverse-suggest'))
+    specHideSuggest();
+});
 
 /* ── 자재 역추적 ── */
 window.specReverseSearch=async function(){

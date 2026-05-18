@@ -239,6 +239,7 @@ function submitCpAddModal() {
   const catStyle = cat==='제품'?'color:#1e3264;font-weight:600':'color:#6b7280;font-weight:600';
   const planStyle= plan.includes('작업표준서')||plan.includes('작표')?'color:#1e3264;font-weight:600':plan.includes('설비일상')?'color:#16a34a;font-weight:600':'color:#6b7280';
   const tbody = document.querySelector('#cp-tbody'); if (!tbody) { closeCpAddModal(); return; }
+  tbody.querySelectorAll('tr:not(.cp-group-hd):not(.cp-child)').forEach(tr => tr.remove());
   const groupSel = document.getElementById('cpa-group');
   let targetGid = groupSel.value;
   if (!targetGid) {
@@ -259,9 +260,10 @@ function submitCpAddModal() {
   tr.className = 'cp-child cp-open';
   tr.setAttribute('data-gid', targetGid);
   tr.style.background = '#fff';
+  const _isEditMode = document.getElementById('pane-cp')?.classList.contains('edit-mode') || false;
   tr.innerHTML = `
     <td class="td-center td-mono" contenteditable="false">${procNo}</td>
-    <td class="td-center" contenteditable="false"><span style="${msStyle}">${mainsub}</span></td>
+    <td class="cp-flow-cell" data-ms="${mainsub}" style="padding:0;vertical-align:middle;text-align:center">${_cpFlowHtml(mainsub, _isEditMode)}</td>
     <td contenteditable="false">${procName}</td>
     <td contenteditable="false">${equip}</td>
     <td class="td-center" contenteditable="false">${special||'—'}</td>
@@ -406,11 +408,11 @@ function _syncCarMetaToLocal(carObj) {
       linename: carObj.linename || ''
     });
   }
+  window._cftCache = window._cftCache || {};
   if (carObj.cft) {
-    try {
-      window._cftCache = window._cftCache || {};
-      window._cftCache[name] = typeof carObj.cft === 'string' ? JSON.parse(carObj.cft) : carObj.cft;
-    } catch {}
+    try { window._cftCache[name] = typeof carObj.cft === 'string' ? JSON.parse(carObj.cft) : carObj.cft; } catch {}
+  } else {
+    try { const s = localStorage.getItem(`ait_cft_${name}`); if (s) window._cftCache[name] = JSON.parse(s); } catch {}
   }
 }
 
@@ -423,8 +425,9 @@ function _updateCarCache(id, fields) {
 function _saveCftToDb(car, cft) {
   window._cftCache = window._cftCache || {};
   window._cftCache[car] = cft;
-  if (AIT_API.MOCK || !window.currentCarId) return;
   const cftJson = JSON.stringify(cft);
+  try { localStorage.setItem(`ait_cft_${car}`, cftJson); } catch {}
+  if (AIT_API.MOCK || !window.currentCarId) return;
   AIT_API.updateCar(window.currentCarId, { cft: cftJson })
     .then(() => _updateCarCache(window.currentCarId, { cft: cftJson }))
     .catch(e => console.warn('CFT DB 저장 실패', e));
@@ -606,8 +609,8 @@ function initCpFlowDiagram(paneEl) {
       tr.cells[1].innerHTML = _cpFlowHtml(tr.cells[1].dataset.ms || 'MAIN', inEdit);
       return;
     }
-    // 미변환 행 — cells[3]이 MAIN/SUB
-    const msCell = tr.cells[3];
+    // 미변환 행 — cells[1]이 MAIN/SUB
+    const msCell = tr.cells[1];
     if (!msCell) return;
     const raw = (msCell.querySelector('span')?.textContent.trim() || msCell.textContent.trim());
     const flowTd = document.createElement('td');
@@ -616,7 +619,7 @@ function initCpFlowDiagram(paneEl) {
     flowTd.dataset.ms = raw;
     flowTd.innerHTML = _cpFlowHtml(raw, inEdit);
     tr.insertBefore(flowTd, tr.cells[1]); // position 1에 삽입
-    tr.deleteCell(4);                      // 원래 MAIN/SUB (now idx 4) 제거
+    tr.deleteCell(2);                      // 원래 MAIN/SUB (now idx 2) 제거
   });
 }
 function refreshCpFlowEditMode(paneEl, on) {

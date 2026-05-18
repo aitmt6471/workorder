@@ -14,6 +14,7 @@
   <button class="btn btn-ghost btn-sm edit-only" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}deleteEmptyCpRows();})()" style="color:#ef4444;border-color:rgba(239,68,68,.4)">&#x1F5D1; 빈 행 삭제</button>
   <button class="btn btn-ghost btn-sm edit-only" onclick="addCpRow()">&#xFF0B; 항목 추가</button>
   <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('cp')">저장</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_cp && window.print_cp()">🖨 인쇄</button>
   <button class="btn btn-ghost btn-sm" id="cp-edit-btn" onclick="toggleTabEditMode('cp', this)">&#x270F; 편집 모드</button>
 </div>
 
@@ -104,4 +105,152 @@
   </table>
 </div>
 
+<script>
+window.print_cp = async function() {
+  const car      = document.getElementById('car-sel')?.options[document.getElementById('car-sel')?.selectedIndex]?.text || '';
+  const stage    = document.getElementById('cp-stage-view')?.textContent.trim() || '';
+  const line     = document.getElementById('cp-meta-linename')?.textContent.trim() || '';
+  const model    = document.getElementById('cp-meta-model')?.textContent.trim() || '';
+  const partno   = document.getElementById('cp-meta-partno')?.textContent.trim() || '';
+  const partname = document.getElementById('cp-meta-partname')?.textContent.trim() || '';
+  const cft      = document.getElementById('cp-cft-inline')?.textContent.trim() || '';
+  const rev      = document.getElementById('cp-rev-badge')?.textContent.trim() || '';
+  const revDate  = document.getElementById('cp-rev-date')?.textContent.trim() || '';
+  const revNum   = parseInt((rev || '').replace(/[^0-9]/g, '')) || 0;
+
+  let authorSignUrl = '', authorName = '';
+  let reviewerSignUrl = '', reviewerName = '';
+  let approverSignUrl = '', approverName = '';
+  try {
+    const signs = await AIT_API.getRevisionSigns(window.currentCarId, 'cp');
+    const sigMap = {};
+    signs.filter(s => s.rev === revNum || s.rev === String(revNum)).forEach(s => { sigMap[s.role] = s; });
+    const driveUrl = fid => (fid && typeof AIT_API.driveUrl === 'function') ? AIT_API.driveUrl(fid) : '';
+    authorSignUrl   = driveUrl(sigMap.author?.sign_file_id);   authorName   = sigMap.author?.signer_name   || '';
+    reviewerSignUrl = driveUrl(sigMap.reviewer?.sign_file_id); reviewerName = sigMap.reviewer?.signer_name || '';
+    approverSignUrl = driveUrl(sigMap.approver?.sign_file_id); approverName = sigMap.approver?.signer_name || '';
+  } catch(e) { console.warn('서명 로드 실패', e); }
+
+  const _signCell = (imgUrl, name) => {
+    const img = imgUrl ? `<img src="${imgUrl}" style="max-height:30px;max-width:56px;object-fit:contain;display:block;margin:0 auto" onerror="this.style.display='none'">` : '';
+    return (img || name) ? `<div style="font-size:8px;color:#374151;margin-bottom:2px">${name}</div>${img}` : '';
+  };
+
+  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+
+  const headerHtml = `
+<table style="border:1.5px solid #1e3264;margin-bottom:4px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="width:70px;border-right:1px solid #7a90b8;padding:3px;text-align:center;vertical-align:middle">
+      <img src="${logoUrl}" style="height:28px;object-fit:contain" onerror="this.style.display='none'">
+    </td>
+    <td style="text-align:center;font-size:18px;font-weight:900;letter-spacing:6px;color:#1e3264;padding:5px 0">관 리 계 획 서</td>
+    <td style="width:190px;border-left:1px solid #7a90b8;padding:0">
+      <table style="width:100%;height:100%;border-collapse:collapse">
+        <tr>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">작성</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">검토</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;width:34%">승인</td>
+        </tr>
+        <tr>
+          <td style="height:40px;border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(authorSignUrl, authorName)}</td>
+          <td style="border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(reviewerSignUrl, reviewerName)}</td>
+          <td style="border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(approverSignUrl, approverName)}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>`;
+
+  const metaHtml = `
+<table style="border:1px solid #7a90b8;margin-bottom:4px;font-size:10px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">차종</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${car}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">단계</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${stage}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">라인명</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${line}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">품번</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${partno}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">품명</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${partname}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">${rev}</td>
+    <td style="padding:3px 8px;color:#1e3264;font-size:9px">${revDate}</td>
+  </tr>
+  ${cft ? `<tr><td style="background:#1e3264;color:#fff;padding:3px 7px;font-weight:700">CFT</td><td colspan="11" style="padding:3px 8px;font-size:9px;color:#374151">${cft}</td></tr>` : ''}
+</table>`;
+
+  const theadHtml = `
+<tr style="background:#1e3264;color:#fff;text-align:center;vertical-align:middle">
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">공정번호</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px;border-bottom:1px solid rgba(255,255,255,.25)">공정흐름도</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">공정명</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">설비명</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">특별특성</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">F/PF</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">구분</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">관리항목</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">규격/관리기준</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">확인방법</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">주기</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">관리방안</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">관리주체</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">이상조치</th>
+  <th style="background:#1e3264;color:#fff;padding:4px 3px;border:1px solid rgba(255,255,255,.2);font-size:9px" rowspan="2">비고</th>
+</tr>
+<tr style="background:#1e3264;color:#fff;text-align:center">
+  <th style="background:#1e3264;color:#fff;padding:2px;border:1px solid rgba(255,255,255,.2);font-size:8px">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;justify-items:center"><span>SUB</span><span>MAIN</span><span>외주</span></div>
+  </th>
+</tr>`;
+
+  const cpRows = [...document.querySelectorAll('#cp-tbody tr')];
+  const tbodyHtml = cpRows.map(tr => {
+    const cells = [...tr.querySelectorAll('td:not(.edit-only)')];
+    const isParent = tr.classList.contains('cp-parent');
+    const rowStyle = isParent ? 'background:#edf3ff' : '';
+    return `<tr style="${rowStyle}">${cells.map(td => {
+      const colspan = td.getAttribute('colspan') || '';
+      const rowspan = td.getAttribute('rowspan') || '';
+      return `<td style="padding:2px 3px;border:1px solid #b8c4d8;font-size:8px;vertical-align:middle;${td.style.cssText}" ${colspan ? `colspan="${colspan}"` : ''} ${rowspan ? `rowspan="${rowspan}"` : ''}>${td.innerHTML}</td>`;
+    }).join('')}</tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<title>관리계획서 ${car}</title>
+<style>
+@page{size:A4 landscape;margin:7mm 9mm}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:10px;color:#111827}
+table{border-collapse:collapse;width:100%}
+.edit-only{display:none!important}
+</style></head>
+<body>
+${headerHtml}
+${metaHtml}
+<table style="border:1px solid #7a90b8;font-size:8px">
+  <thead>${theadHtml}</thead>
+  <tbody>${tbodyHtml}</tbody>
+</table>
+<script>
+window.onload = function() {
+  var imgs = document.querySelectorAll('img');
+  if (!imgs.length) { window.print(); return; }
+  var done = 0, total = imgs.length;
+  var go = function() { if (++done >= total) window.print(); };
+  imgs.forEach(function(img) {
+    if (img.complete) go(); else { img.onload = go; img.onerror = go; }
+  });
+  setTimeout(function() { window.print(); }, 10000);
+};
+<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=1120,height=820');
+  if (!win) { alert('팝업 차단을 해제해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
+};
 </script>

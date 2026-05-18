@@ -9,6 +9,7 @@
   </div>
   <div style="flex:1"></div>
   <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('insp')">저장</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_insp && window.print_insp()">🖨 인쇄</button>
   <button id="insp-edit-btn" class="btn btn-ghost btn-sm" onclick="toggleTabEditMode('insp',this)">&#x270F; 편집 모드</button>
 </div>
 
@@ -356,4 +357,136 @@ window.inspItemInput=function(procId,itemId,el,field){
 loadDoc();
 
 })();
+
+window.print_insp = async function() {
+  const carKey = document.getElementById('car-sel')?.value || '';
+  const car    = document.getElementById('car-sel')?.options[document.getElementById('car-sel')?.selectedIndex]?.text || '';
+  const rev    = document.getElementById('insp-rev-badge')?.textContent.trim() || '';
+  const revDate= document.getElementById('insp-rev-date')?.textContent.trim() || '';
+  const revNum = parseInt((rev || '').replace(/[^0-9]/g, '')) || 0;
+
+  let doc = null;
+  try { doc = JSON.parse(localStorage.getItem('insp_doc_' + carKey) || 'null'); } catch(e) {}
+  if (!doc || !doc.procs || !doc.procs.length) { alert('공정검사기준서 데이터가 없습니다.'); return; }
+
+  let authorSignUrl = '', authorName = '';
+  let reviewerSignUrl = '', reviewerName = '';
+  let approverSignUrl = '', approverName = '';
+  try {
+    const signs = await AIT_API.getRevisionSigns(window.currentCarId, 'insp');
+    const sigMap = {};
+    signs.filter(s => s.rev === revNum || s.rev === String(revNum)).forEach(s => { sigMap[s.role] = s; });
+    const driveUrl = fid => (fid && typeof AIT_API.driveUrl === 'function') ? AIT_API.driveUrl(fid) : '';
+    authorSignUrl   = driveUrl(sigMap.author?.sign_file_id);   authorName   = sigMap.author?.signer_name   || '';
+    reviewerSignUrl = driveUrl(sigMap.reviewer?.sign_file_id); reviewerName = sigMap.reviewer?.signer_name || '';
+    approverSignUrl = driveUrl(sigMap.approver?.sign_file_id); approverName = sigMap.approver?.signer_name || '';
+  } catch(e) { console.warn('서명 로드 실패', e); }
+
+  const _signCell = (imgUrl, name) => {
+    const img = imgUrl ? `<img src="${imgUrl}" style="max-height:30px;max-width:56px;object-fit:contain;display:block;margin:0 auto" onerror="this.style.display='none'">` : '';
+    return (img || name) ? `<div style="font-size:8px;color:#374151;margin-bottom:2px">${name}</div>${img}` : '';
+  };
+
+  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  const headerHtml = `
+<table style="border:1.5px solid #1e3264;margin-bottom:4px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="width:70px;border-right:1px solid #7a90b8;padding:3px;text-align:center;vertical-align:middle">
+      <img src="${logoUrl}" style="height:28px;object-fit:contain" onerror="this.style.display='none'">
+    </td>
+    <td style="text-align:center;font-size:18px;font-weight:900;letter-spacing:6px;color:#1e3264;padding:5px 0">공 정 검 사 기 준 서</td>
+    <td style="width:190px;border-left:1px solid #7a90b8;padding:0">
+      <table style="width:100%;height:100%;border-collapse:collapse">
+        <tr>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">작성</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">검토</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;width:34%">승인</td>
+        </tr>
+        <tr>
+          <td style="height:40px;border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(authorSignUrl, authorName)}</td>
+          <td style="border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(reviewerSignUrl, reviewerName)}</td>
+          <td style="border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(approverSignUrl, approverName)}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>`;
+
+  const pagesHtml = doc.procs.map((proc, pi) => {
+    const isLast = pi === doc.procs.length - 1;
+    const items = proc.items || [];
+
+    const procMetaHtml = `
+<table style="border:1px solid #7a90b8;margin-bottom:6px;font-size:10px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">차종</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${esc(proc.car_models || car)}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">품번</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-family:monospace">${esc(proc.part_no || doc.part_no || '')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">품명</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-weight:600">${esc(proc.part_name || doc.part_name || '')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">공정번호</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-weight:700">${esc(proc.proc_no || '')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">공정명</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${esc(proc.proc_name || '')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">구분</td>
+    <td style="padding:3px 8px;color:#1e3264">${esc(proc.proc_type || '일반공정')}</td>
+  </tr>
+</table>`;
+
+    const itemsGridHtml = items.length ? `
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:8px">
+  ${items.map(item => `
+  <div style="border:1px solid #c8d3e0;border-radius:6px;overflow:hidden">
+    <div style="background:#374151;color:#fff;padding:6px 8px;font-size:10px;font-weight:700;min-height:28px">${esc(item.name || '항목명')}</div>
+    ${item.photo ? `<img src="${item.photo}" style="width:100%;max-height:160px;object-fit:contain;background:#f3f4f6;display:block">` : `<div style="width:100%;height:120px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:10px">사진 없음</div>`}
+    ${item.description ? `<div style="padding:5px 8px;font-size:9px;color:#4b5563;border-top:1px solid #e5e7eb;line-height:1.5">${esc(item.description)}</div>` : ''}
+  </div>`).join('')}
+</div>` : `<div style="padding:20px;text-align:center;color:#9ca3af;font-size:11px;border:1px solid #e2e8f0;margin-bottom:8px">등록된 검사항목이 없습니다</div>`;
+
+    return `<div style="${isLast ? '' : 'page-break-after:always'}">
+${headerHtml}
+${procMetaHtml}
+<div style="background:#1e3264;color:#fff;padding:7px 12px;border-radius:4px 4px 0 0;font-weight:700;font-size:12px;margin-bottom:0">
+  ${esc(proc.proc_no)}${proc.proc_name ? ' (' + esc(proc.proc_name) + ')' : ''}  검사 포인트
+</div>
+<div style="border:1px solid #c8d3e0;border-top:none;padding:10px;border-radius:0 0 6px 6px;margin-bottom:4px">
+${itemsGridHtml}
+</div>
+</div>`;
+  }).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<title>공정검사기준서 ${car}</title>
+<style>
+@page{size:A4 landscape;margin:7mm 9mm}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;color:#111827}
+table{border-collapse:collapse;width:100%}
+</style></head>
+<body>
+${pagesHtml}
+<script>
+window.onload = function() {
+  var imgs = document.querySelectorAll('img');
+  if (!imgs.length) { window.print(); return; }
+  var done = 0, total = imgs.length;
+  var go = function() { if (++done >= total) window.print(); };
+  imgs.forEach(function(img) {
+    if (img.complete) go(); else { img.onload = go; img.onerror = go; }
+  });
+  setTimeout(function() { window.print(); }, 10000);
+};
+<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=1120,height=820');
+  if (!win) { alert('팝업 차단을 해제해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
+};
 </script>

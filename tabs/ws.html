@@ -10,6 +10,7 @@
   <div style="flex:1"></div>
   <button class="btn btn-ghost btn-sm" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}wsResetContent();})()" style="color:var(--red);border-color:var(--red)">🗑 초기화</button>
   <button class="btn btn-primary btn-sm edit-only" onclick="saveDocument('ws')" style="font-weight:700">💾 저장</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_ws && window.print_ws()">🖨 인쇄</button>
   <button class="btn btn-ghost btn-sm" id="ws-edit-btn" onclick="toggleTabEditMode('ws', this)">✏ 편집 모드</button>
 </div>
 
@@ -629,4 +630,212 @@ function _wsSlidePrev() {
   panel.addEventListener('touchstart', _wsSlideStop, { passive: true });
   panel.addEventListener('touchend',   _wsSlideRestart, { passive: true });
 })();
+
+/* ── 작업표준서 인쇄 (Excel 기존 양식 기준 / 전체공정) ── */
+window.print_ws = async function() {
+  const car     = typeof getCurrentCar === 'function' ? getCurrentCar() : '';
+  const pn      = document.getElementById('ws-pn')?.textContent.trim() || '';
+  const pname   = document.getElementById('ws-pname')?.textContent.trim() || '';
+  const rev     = document.getElementById('ws-rev-badge')?.textContent.trim() || '';
+  const revDate = document.getElementById('ws-rev-date')?.textContent.trim() || '';
+  const today   = new Date().toLocaleDateString('ko-KR');
+
+  // 모든 공정 번호 수집
+  const allProcNums = [...document.querySelectorAll('#ws-proc-nav .proc-btn')]
+    .map(b => { const m = b.textContent.match(/\d+/); return m ? parseInt(m[0]) : null; })
+    .filter(Boolean);
+  if (!allProcNums.length) { alert('공정 데이터가 없습니다.'); return; }
+
+  // 서명: /webhook/ait/sign-img는 JSON 반환이므로 AIT_API.driveUrl로 CDN URL 직접 사용
+  let authorSignUrl = '', authorName = '';
+  let reviewerSignUrl = '', reviewerName = '';
+  let approverSignUrl = '', approverName = '';
+  try {
+    const revNum = parseInt((rev || '').replace(/[^0-9]/g, '')) || 0;
+    const signs = await AIT_API.getRevisionSigns(window.currentCarId, 'cp');
+    const sigMap = {};
+    signs.filter(s => s.rev === revNum || s.rev === String(revNum)).forEach(s => { sigMap[s.role] = s; });
+    const driveUrl = fid => (fid && typeof AIT_API.driveUrl === 'function') ? AIT_API.driveUrl(fid) : '';
+    authorSignUrl   = driveUrl(sigMap.author?.sign_file_id);   authorName   = sigMap.author?.signer_name   || '';
+    reviewerSignUrl = driveUrl(sigMap.reviewer?.sign_file_id); reviewerName = sigMap.reviewer?.signer_name || '';
+    approverSignUrl = driveUrl(sigMap.approver?.sign_file_id); approverName = sigMap.approver?.signer_name || '';
+  } catch(e) { console.warn('서명 로드 실패', e); }
+
+  const _signCell = (imgUrl, name) => {
+    const img = imgUrl ? `<img src="${imgUrl}" style="max-height:30px;max-width:56px;object-fit:contain;display:block;margin:0 auto" onerror="this.style.display='none'">` : '';
+    return (img || name) ? `<div style="font-size:8px;color:#374151;margin-bottom:2px">${name}</div>${img}` : '';
+  };
+
+  const logoUrl  = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+  const pinchUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/pinch-warning.png');
+
+  // CP DOM(또는 캐시)에서 공정별 이름·설비 추출 (js/ws.js showProcess와 동일 로직)
+  function getProcInfo(num) {
+    const cpDomRows = [...document.querySelectorAll('#cp-tbody tr.cp-child')]
+      .filter(tr => parseInt(tr.cells[0]?.textContent.trim()) === num);
+    if (cpDomRows.length) {
+      const isT = cpDomRows[0]?.cells[1]?.classList.contains('cp-flow-cell');
+      const ni = isT ? 2 : 1, ei = isT ? 3 : 2;
+      const equips = [...new Set(cpDomRows.map(tr => tr.cells[ei]?.textContent.trim()).filter(v => v && v !== 'MAIN' && v !== 'SUB' && !v.includes('외주')))];
+      return { name: cpDomRows[0]?.cells[ni]?.textContent.trim() || '', equip: equips.join(', ') };
+    }
+    if (window._cpRowsForWs) {
+      const db = window._cpRowsForWs.filter(r => parseInt(r.proc_no) === num);
+      const equips = [...new Set(db.map(r => r.equip_name).filter(v => v && v !== 'MAIN' && v !== 'SUB' && !(v||'').includes('외주')))];
+      return { name: db[0]?.proc_name || '', equip: equips.join(', ') };
+    }
+    return { name: '', equip: '' };
+  }
+
+  // 공정 1개 페이지 HTML 생성
+  function buildProcPage(procNum, isLast) {
+    const stepList = document.getElementById('ws-step-list-' + procNum);
+    const allSteps = stepList ? [...stepList.querySelectorAll('.ws-step-item')] : [];
+    const steps = allSteps
+      .map((step, i) => ({ step, origIdx: i }))
+      .filter(({ step }) => !step.querySelector('.ws-drive-video') && !step.querySelector('video'));
+
+    const info     = getProcInfo(procNum);
+    const mgmtRows = [...document.querySelectorAll(`#ws-mgmt-tbody tr[data-proc="${procNum}"]`)];
+    const n        = steps.length || 1;
+    const photoH   = n <= 3 ? '165px' : n <= 5 ? '140px' : n <= 7 ? '115px' : '90px';
+
+    const stepNumRow = steps.map(({ origIdx }) =>
+      `<td style="background:#2a4080;color:#fff;font-size:9px;font-weight:800;text-align:center;padding:3px 4px;border:1px solid #7a90b8;white-space:nowrap">STEP ${origIdx+1}</td>`
+    ).join('');
+
+    const stepPhotoRow = steps.map(({ step }) => {
+      const img = step.querySelector('.ws-photo-inner img');
+      const photoHtml = img
+        ? `<img src="${img.src}" style="width:100%;height:100%;object-fit:contain;display:block">`
+        : `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:#9ca3af;font-size:9px;flex-direction:column;gap:3px"><span style="font-size:18px">📷</span>사진 없음</div>`;
+      return `<td style="border:1px solid #7a90b8;padding:2px;background:#f8f9fa;height:${photoH};width:${Math.floor(100/n)}%"><div style="height:${photoH};overflow:hidden">${photoHtml}</div></td>`;
+    }).join('');
+
+    const stepNameRow = steps.map(({ step }) => {
+      const name = step.querySelector('.ws-step-name')?.textContent.trim() || '';
+      const spec = (step.querySelector('.ws-step-spec')?.textContent.trim() || '').split('\n').slice(0,2).join(' / ');
+      return `<td style="border:1px solid #7a90b8;padding:4px 5px;vertical-align:middle;text-align:center;background:#fff">
+        <div style="font-size:9.5px;font-weight:700;color:#1e3264;line-height:1.4">${name}</div>
+        ${spec ? `<div style="font-size:8px;color:#6b7280;line-height:1.4;margin-top:2px">${spec}</div>` : ''}
+      </td>`;
+    }).join('');
+
+    const mgmtHtml = mgmtRows.map(tr => {
+      const cells = [...tr.querySelectorAll('td:not(.edit-only)')];
+      return `<tr>${cells.map((td, ci) => {
+        const align = (ci === 0 || ci === 4 || ci === 5) ? 'center' : 'left';
+        const color = ci === 1 ? 'color:#1d4ed8;font-weight:700' : '';
+        return `<td style="padding:2px 4px;border:1px solid #b8c4d8;font-size:8.5px;vertical-align:middle;text-align:${align};${color}">${td.textContent.trim()}</td>`;
+      }).join('')}</tr>`;
+    }).join('');
+
+    return `<div style="${isLast ? '' : 'page-break-after:always'}">
+<!-- ① 헤더 -->
+<table style="border:1.5px solid #1e3264;margin-bottom:4px">
+  <tr>
+    <td style="width:70px;border-right:1px solid #7a90b8;padding:3px;text-align:center;vertical-align:middle">
+      <img src="${logoUrl}" style="height:28px;object-fit:contain" onerror="this.style.display='none'">
+    </td>
+    <td style="text-align:center;font-size:18px;font-weight:900;letter-spacing:6px;color:#1e3264;padding:5px 0">작 업 표 준 서</td>
+    <td style="width:190px;border-left:1px solid #7a90b8;padding:0">
+      <table style="width:100%;height:100%;border-collapse:collapse">
+        <tr>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">작성</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">검토</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;width:34%">승인</td>
+        </tr>
+        <tr>
+          <td style="height:40px;border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(authorSignUrl, authorName)}</td>
+          <td style="border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(reviewerSignUrl, reviewerName)}</td>
+          <td style="border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(approverSignUrl, approverName)}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<!-- ② 메타 -->
+<table style="border:1px solid #7a90b8;margin-bottom:4px">
+  <tr>
+    <td style="background:#1e3264;color:#fff;font-size:9px;font-weight:700;text-align:center;padding:4px 7px;border-right:1px solid rgba(255,255,255,.25);white-space:nowrap">차종</td>
+    <td style="padding:4px 8px;border-right:1px solid #b8c4d8;font-size:10px;font-weight:700;color:#1e3264;background:#f8faff">${car}</td>
+    <td style="background:#1e3264;color:#fff;font-size:9px;font-weight:700;text-align:center;padding:4px 7px;border-right:1px solid rgba(255,255,255,.25);white-space:nowrap">품번</td>
+    <td style="padding:4px 8px;border-right:1px solid #b8c4d8;font-size:10px;font-weight:700;color:#1e3264;background:#f8faff;min-width:80px">${pn}</td>
+    <td style="background:#1e3264;color:#fff;font-size:9px;font-weight:700;text-align:center;padding:4px 7px;border-right:1px solid rgba(255,255,255,.25);white-space:nowrap">품명</td>
+    <td style="padding:4px 8px;border-right:1px solid #b8c4d8;font-size:10px;font-weight:700;color:#1e3264;background:#f8faff">${pname}</td>
+    <td style="background:#1e3264;color:#fff;font-size:9px;font-weight:700;text-align:center;padding:4px 7px;border-right:1px solid rgba(255,255,255,.25);white-space:nowrap">공정번호</td>
+    <td style="padding:4px 8px;border-right:1px solid #b8c4d8;font-size:10px;font-weight:700;color:#1e3264;background:#f8faff;text-align:center">${procNum}</td>
+    <td style="background:#1e3264;color:#fff;font-size:9px;font-weight:700;text-align:center;padding:4px 7px;border-right:1px solid rgba(255,255,255,.25);white-space:nowrap">공정명</td>
+    <td style="padding:4px 8px;border-right:1px solid #b8c4d8;font-size:10px;font-weight:700;color:#1e3264;background:#f8faff">${info.name}</td>
+    <td style="background:#1e3264;color:#fff;font-size:9px;font-weight:700;text-align:center;padding:4px 7px;border-right:1px solid rgba(255,255,255,.25);white-space:nowrap">설비명</td>
+    <td style="padding:4px 8px;border-right:1px solid #b8c4d8;font-size:10px;font-weight:700;color:#1e3264;background:#f8faff">${info.equip}</td>
+    <td style="background:#1e3264;color:#fff;font-size:9px;font-weight:700;text-align:center;padding:4px 7px;border-right:1px solid rgba(255,255,255,.25);white-space:nowrap">${rev}</td>
+    <td style="padding:4px 8px;border-right:1px solid #b8c4d8;font-size:9px;color:#1e3264;background:#f8faff">${revDate}</td>
+    <td style="padding:2px;text-align:center;width:48px"><img src="${pinchUrl}" style="height:32px;object-fit:contain" onerror="this.style.display='none'"></td>
+  </tr>
+</table>
+<!-- ③ 작업 순서 -->
+${steps.length ? `
+<div class="section-title" style="margin-bottom:2px">작 업 순 서</div>
+<table style="border:1px solid #7a90b8;margin-bottom:4px;table-layout:fixed">
+  <tr>${stepNumRow}</tr>
+  <tr>${stepPhotoRow}</tr>
+  <tr>${stepNameRow}</tr>
+</table>` : `<div style="padding:10px;color:#9ca3af;font-size:11px;border:1px solid #e2e8f0;margin-bottom:4px;text-align:center">STEP이 없습니다</div>`}
+<!-- ④ 관리 항목 -->
+${mgmtRows.length ? `
+<div class="section-title" style="margin-bottom:2px">관 리 항 목</div>
+<table style="border:1px solid #7a90b8">
+  <thead><tr>
+    <th style="background:#1e3264;color:#fff;padding:3px 5px;border:1px solid rgba(255,255,255,.2);font-size:9px;font-weight:700;text-align:center;width:30px">No.</th>
+    <th style="background:#1e3264;color:#fff;padding:3px 5px;border:1px solid rgba(255,255,255,.2);font-size:9px;font-weight:700;text-align:center;width:36px">구분</th>
+    <th style="background:#1e3264;color:#fff;padding:3px 5px;border:1px solid rgba(255,255,255,.2);font-size:9px;font-weight:700;text-align:left">관리항목</th>
+    <th style="background:#1e3264;color:#fff;padding:3px 5px;border:1px solid rgba(255,255,255,.2);font-size:9px;font-weight:700;text-align:left">규격·기준</th>
+    <th style="background:#1e3264;color:#fff;padding:3px 5px;border:1px solid rgba(255,255,255,.2);font-size:9px;font-weight:700;text-align:center;width:60px">확인방법</th>
+    <th style="background:#1e3264;color:#fff;padding:3px 5px;border:1px solid rgba(255,255,255,.2);font-size:9px;font-weight:700;text-align:center;width:44px">주기</th>
+    <th style="background:#1e3264;color:#fff;padding:3px 5px;border:1px solid rgba(255,255,255,.2);font-size:9px;font-weight:700;text-align:left">이상조치</th>
+    <th style="background:#1e3264;color:#fff;padding:3px 5px;border:1px solid rgba(255,255,255,.2);font-size:9px;font-weight:700;text-align:left">비고</th>
+  </tr></thead>
+  <tbody>${mgmtHtml}</tbody>
+</table>` : ''}
+<!-- ⑤ 푸터 -->
+<div style="margin-top:4px;display:flex;justify-content:space-between;font-size:8px;color:#9ca3af;border-top:1px solid #e2e8f0;padding-top:2px">
+  <span>AIT 공정문서 관리시스템</span><span>출력일: ${today}</span>
+</div>
+</div>`;
+  }
+
+  const pagesHtml = allProcNums.map((num, i) => buildProcPage(num, i === allProcNums.length - 1)).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<title>작업표준서 ${car} 전체공정</title>
+<style>
+@page{size:A4 landscape;margin:7mm 9mm}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;color:#111827}
+table{border-collapse:collapse;width:100%}
+.section-title{background:#1e3264;color:#fff;font-size:9px;font-weight:700;padding:3px 8px;letter-spacing:1px}
+</style></head>
+<body>
+${pagesHtml}
+<script>
+window.onload = function() {
+  var imgs = document.querySelectorAll('img');
+  if (!imgs.length) { window.print(); return; }
+  var done = 0, total = imgs.length;
+  var go = function() { if (++done >= total) window.print(); };
+  imgs.forEach(function(img) {
+    if (img.complete) go(); else { img.onload = go; img.onerror = go; }
+  });
+  setTimeout(function() { window.print(); }, 10000);
+};
+<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=1120,height=820');
+  if (!win) { alert('팝업 차단을 해제해주세요. (주소창 오른쪽 팝업 허용)'); return; }
+  win.document.write(html);
+  win.document.close();
+};
 </script>

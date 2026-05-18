@@ -72,7 +72,7 @@
 
     <div class="sidebar-footer">
       <button class="btn btn-sm sidebar-btn" onclick="openCarModal()">⚙ 아이템관리</button>
-      <button class="btn btn-sm sidebar-btn">🖨 인쇄</button>
+      <button class="btn btn-sm sidebar-btn" onclick="(function(){var t=document.querySelector('.nav-item.active')?.dataset.tab;var fn=window['print_'+t];if(typeof fn==='function')fn();else alert('이 탭은 아직 인쇄 기능이 준비 중입니다.');})()">🖨 인쇄</button>
     </div>
     <div id="sidebar-reset-btn" style="display:none;padding:8px 12px;border-top:1px solid var(--border)">
       <button class="btn btn-sm sidebar-btn" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}resetAllData();})()" style="width:100%;color:#f87171;border-color:rgba(248,113,113,.4)">🗑 전체 초기화</button>
@@ -329,13 +329,9 @@ async function loadTab(id) {
     const html = await res.text();
     const pane = document.getElementById('pane-' + id);
     pane.innerHTML = '';
-    if (id === 'cp') {
-      pane.innerHTML = html; // <script> 없음 → innerHTML이 createContextualFragment보다 수배 빠름
-      initCpEventListeners();
-    } else {
-      const frag = document.createRange().createContextualFragment(html);
-      pane.appendChild(frag);
-    }
+    const frag = document.createRange().createContextualFragment(html);
+    pane.appendChild(frag);
+    if (id === 'cp') initCpEventListeners();
     loaded[id] = true;
     if (typeof loadCarContent === 'function') loadCarContent(id);
     updateMonthLabel(id);

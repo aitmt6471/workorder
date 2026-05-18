@@ -15,6 +15,7 @@
     <option value="completed">완료</option>
   </select>
   <button id="qp-new-btn" class="btn btn-sm" style="background:#c9302d;color:#fff;display:none" onclick="qpNewForm()">＋ 새 Q-Point</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_qpoint && window.print_qpoint()">🖨 인쇄</button>
   <button id="qp-edit-btn" class="btn btn-ghost btn-sm" onclick="qpToggleEditMode(this)">&#x270F; 편집 모드</button>
 </div>
 
@@ -1014,4 +1015,160 @@ window.qpRevise=function(){
 load();
 
 })();
+
+window.print_qpoint = async function() {
+  const car = document.getElementById('car-sel')?.options[document.getElementById('car-sel')?.selectedIndex]?.text || '';
+
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem('qpoints_v1') || '[]'); } catch(e) {}
+
+  const filterStatus = document.getElementById('qp-filter-status')?.value || '';
+  const STATUS_LABEL = {active:'진행중', v1done:'1차 완료', v2done:'2차 완료', completed:'완료'};
+  const STATUS_COLOR = {active:'#f97316', v1done:'#3b82f6', v2done:'#8b5cf6', completed:'#16a34a'};
+
+  function calcStatus(q) {
+    var v = q.validity || [];
+    if (v[2] && v[2].done) return 'completed';
+    if (v[1] && v[1].done) return 'v2done';
+    if (v[0] && v[0].done) return 'v1done';
+    return 'active';
+  }
+
+  if (filterStatus) list = list.filter(q => calcStatus(q) === filterStatus);
+  if (!list.length) { alert('출력할 Q-Point가 없습니다.'); return; }
+
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+
+  const pagesHtml = list.map((q, qi) => {
+    const isLast = qi === list.length - 1;
+    const s = calcStatus(q);
+    const sc = STATUS_COLOR[s] || '#374151';
+    const sl = STATUS_LABEL[s] || '';
+    const validity = q.validity || [];
+    const actions = q.actions || [];
+
+    const validityRows = validity.map((v, i) => `
+<tr>
+  <td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${sc};width:48px">${i+1}차</td>
+  <td style="padding:5px 8px;border:1px solid #e5e7eb;width:100px">${esc(v.date || '-')}</td>
+  <td style="padding:5px 8px;border:1px solid #e5e7eb;width:80px">${esc(v.checker || '-')}</td>
+  <td style="padding:5px 8px;border:1px solid #e5e7eb">${esc(v.result || '-')}</td>
+  <td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;width:56px">
+    <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${v.done?'#dcfce7':'#f3f4f6'};color:${v.done?'#16a34a':'#9ca3af'}">${v.done?'완료':'미완'}</span>
+  </td>
+</tr>`).join('');
+
+    const photosHtml = (q.photos || []).length ? `
+<div style="margin-top:8px">
+  <div style="font-size:9px;font-weight:700;color:#6b7280;margin-bottom:4px">문제 사진</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    ${(q.photos||[]).slice(0,3).map(p => `<img src="${p}" style="max-height:100px;max-width:150px;object-fit:contain;border:1px solid #d1d5db;border-radius:4px">`).join('')}
+  </div>
+</div>` : (q.problem_photo ? `
+<div style="margin-top:8px">
+  <div style="font-size:9px;font-weight:700;color:#6b7280;margin-bottom:4px">문제 사진</div>
+  <img src="${q.problem_photo}" style="max-height:120px;max-width:200px;object-fit:contain;border:1px solid #d1d5db;border-radius:4px">
+</div>` : '');
+
+    return `<div style="${isLast ? '' : 'page-break-after:always'}">
+<table style="border:1.5px solid #1e3264;margin-bottom:4px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="width:70px;border-right:1px solid #7a90b8;padding:3px;text-align:center;vertical-align:middle">
+      <img src="${logoUrl}" style="height:28px;object-fit:contain" onerror="this.style.display='none'">
+    </td>
+    <td style="text-align:center;font-size:18px;font-weight:900;letter-spacing:6px;color:#c9302d;padding:5px 0">Q - P o i n t</td>
+    <td style="width:160px;border-left:1px solid #7a90b8;padding:6px 10px;text-align:center;vertical-align:middle">
+      <span style="background:${sc};color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px">${sl}</span>
+    </td>
+  </tr>
+</table>
+<table style="border:1px solid #7a90b8;margin-bottom:6px;font-size:10px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">문서번호</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;font-weight:700;color:#c9302d;font-family:monospace">${esc(q.doc_no||'')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">발행일</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${esc(q.issue_date||'')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">차종</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-weight:700">${esc(q.car_model||car)}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">조치부서</td>
+    <td style="padding:3px 8px;color:#1e3264">${esc(q.dept||'')}</td>
+  </tr>
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">내용</td>
+    <td colspan="7" style="padding:3px 8px;font-weight:600;color:#111827">${esc(q.title||'')}</td>
+  </tr>
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">품명</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${esc(q.part_name||'')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">도번</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-family:monospace">${esc(q.part_no||'')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">발생장소</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${esc(q.plant||'')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">발생수량</td>
+    <td style="padding:3px 8px;color:#1e3264">${esc(q.qty||'')}</td>
+  </tr>
+</table>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+  <div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+    <div style="background:#374151;color:#fff;padding:6px 10px;font-size:10px;font-weight:700">품질문제 발생 내용</div>
+    <div style="padding:8px 10px;font-size:10px;color:#374151;line-height:1.6;min-height:60px">${esc(q.detail||'내용 없음')}</div>
+    ${photosHtml}
+  </div>
+  <div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+    <div style="background:#c9302d;color:#fff;padding:6px 10px;font-size:10px;font-weight:700">준수사항 (재발방지 대책)</div>
+    <div style="padding:8px 10px;min-height:60px">
+      ${actions.length ? actions.map((a, ai) => `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid #f0f4f8"><span style="background:#c9302d;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;flex-shrink:0;margin-top:2px">${ai+1}</span><span style="font-size:10px;color:#374151;line-height:1.5">${esc(a)}</span></div>`).join('') : '<div style="font-size:10px;color:#9ca3af;padding:8px 0">등록된 준수사항 없음</div>'}
+    </div>
+  </div>
+</div>
+<div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+  <div style="background:#374151;color:#fff;padding:6px 10px;font-size:10px;font-weight:700">유효성 점검</div>
+  <table style="width:100%;border-collapse:collapse;font-size:10px">
+    <thead>
+      <tr style="background:#f8fafc">
+        <th style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;width:48px;font-size:10px;color:#6b7280">차수</th>
+        <th style="padding:5px 8px;border:1px solid #e5e7eb;text-align:left;width:100px;font-size:10px;color:#6b7280">점검일</th>
+        <th style="padding:5px 8px;border:1px solid #e5e7eb;text-align:left;width:80px;font-size:10px;color:#6b7280">점검자</th>
+        <th style="padding:5px 8px;border:1px solid #e5e7eb;text-align:left;font-size:10px;color:#6b7280">점검 결과</th>
+        <th style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;width:56px;font-size:10px;color:#6b7280">완료</th>
+      </tr>
+    </thead>
+    <tbody>${validityRows}</tbody>
+  </table>
+</div>
+</div>`;
+  }).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<title>Q-Point ${car}</title>
+<style>
+@page{size:A4 landscape;margin:7mm 9mm}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;color:#111827}
+table{border-collapse:collapse;width:100%}
+</style></head>
+<body>
+${pagesHtml}
+<script>
+window.onload = function() {
+  var imgs = document.querySelectorAll('img');
+  if (!imgs.length) { window.print(); return; }
+  var done = 0, total = imgs.length;
+  var go = function() { if (++done >= total) window.print(); };
+  imgs.forEach(function(img) {
+    if (img.complete) go(); else { img.onload = go; img.onerror = go; }
+  });
+  setTimeout(function() { window.print(); }, 10000);
+};
+<\/script>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=1120,height=820');
+  if (!win) { alert('팝업 차단을 해제해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
+};
 </script>
