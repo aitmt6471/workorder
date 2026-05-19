@@ -1,4 +1,9 @@
 <!-- 설비일상점검표 -->
+<style>
+@media print {
+  #d-sel-date, #d-worker-bar, #d-verifier-bar { display: none !important; }
+}
+</style>
 <div class="tab-toolbar">
   <div style="display:flex;align-items:center;gap:8px">
     <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">설비일상점검표</span>
@@ -86,13 +91,13 @@
         <span style="color:rgba(255,255,255,.35);margin:0 4px">|</span>
         <span id="d-sel-date" style="font-size:13px;font-weight:700;color:#fff;background:rgba(255,255,255,.15);padding:3px 12px;border-radius:6px;letter-spacing:.5px">날짜 선택</span>
         <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
-          <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px">
+          <div id="d-worker-bar" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px">
             <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.8)">점검자</span>
             <input id="d-worker-input" type="text" placeholder="이름 입력"
               style="border:none;background:transparent;font-size:11px;font-family:inherit;width:70px;outline:none;color:#fff;caret-color:#fff"
               onchange="window._dSaveWorker(this.value)">
           </div>
-          <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px">
+          <div id="d-verifier-bar" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px">
             <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.8)">확인자</span>
             <input id="d-verifier-input" type="text" placeholder="이름 입력"
               style="border:none;background:transparent;font-size:11px;font-family:inherit;width:70px;outline:none;color:#fff;caret-color:#fff"
@@ -117,27 +122,9 @@
       <!-- 점검 항목 -->
       <div style="padding:14px 16px;overflow-x:auto;background:#fff">
         <div style="font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">점검 항목</div>
-        <table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">
-          <colgroup>
-            <col style="width:36px">
-            <col style="width:18%">
-            <col style="width:22%">
-            <col style="width:74px">
-            <col style="width:58px">
-            <col style="width:64px">
-            <col style="width:72px">
-          </colgroup>
-          <thead>
-            <tr style="background:#1e3264">
-              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">No.</th>
-              <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">점검항목</th>
-              <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">관리기준</th>
-              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">확인방법</th>
-              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">주기</th>
-              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">결과</th>
-              <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff">비고</th>
-            </tr>
-          </thead>
+        <table id="d-check-table" style="border-collapse:collapse;font-size:12px;table-layout:fixed">
+          <colgroup id="d-check-colgroup"></colgroup>
+          <thead><tr id="d-check-thead-row" style="background:#1e3264"></tr></thead>
           <tbody id="d-check-tbody"></tbody>
         </table>
       </div>
@@ -354,7 +341,7 @@ function renderPhotoStrip() {
     const safeUrl = _normUrl ? _normUrl.replace(/'/g,'%27') : '';
     if (_normUrl && !firstUrl) firstUrl = _normUrl;
     const imgHtml = _normUrl
-      ? `<img src="${_normUrl.replace('sz=w1200','sz=w200')}" loading="lazy" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="window._dShowMainPhoto('${safeUrl}')">`
+      ? `<img src="${_normUrl.replace(/=w\d+/,'=w200')}" loading="lazy" style="width:100%;height:100%;object-fit:contain;background:#fff;cursor:pointer" onclick="window._dShowMainPhoto('${safeUrl}')">`
       : `<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#9ca3af"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span style="font-size:9px">없음</span></div>`;
     const uploadBtn = dailyEditMode ? `<label style="position:absolute;bottom:5px;right:5px;background:rgba(30,50,100,.75);color:#fff;font-size:9px;padding:3px 7px;border-radius:4px;cursor:pointer;z-index:2">&#x1F4F7;<input type="file" accept="image/*" style="display:none" onchange="window._dUploadEquipPhoto(${i},this)"></label>` : '';
     const delBtn = (dailyEditMode && hasPhoto) ? `<button onclick="window._dDelEquipPhoto(${i})" style="position:absolute;top:4px;right:4px;width:20px;height:20px;background:rgba(220,38,38,.8);color:#fff;border:none;border-radius:50%;font-size:10px;line-height:1;cursor:pointer;z-index:2">✕</button>` : '';
@@ -626,12 +613,14 @@ window._dSelDay=function(day){
   if (!_dHasLocalResults(curEquip, day)) _dLoadResultsFromDB(curEquip, day);
 };
 
-/* ── Inspection table ── */
+/* ── Inspection table (single-day view) ── */
 function renderCheckTable(){
-  const e=DAILY_EQUIP[curEquip], m=getTabMonth('daily'), car=getCar();
+  const e=DAILY_EQUIP[curEquip];
+  if(!e||!e.items){document.getElementById('d-check-tbody').innerHTML='';return;}
+  const m=getTabMonth('daily'), car=getCar();
+  const equipDbId=e.id||curEquip;
   const ce=dailyEditMode?'true':'false';
   const es=dailyEditMode?'background:#edf3ff;cursor:text;':'';
-  // Load worker name for this day/equip
   const wk=_dWorkerCache[`${m.year}_${m.month}_${curDay}_${curEquip}`]||'';
   const wi=document.getElementById('d-worker-input');
   if(wi){wi.value=wk;wi.disabled=_dReadOnly;wi.style.color=_dReadOnly?'rgba(255,255,255,.4)':'#fff';}
@@ -642,47 +631,93 @@ function renderCheckTable(){
   const editBtn=document.getElementById('d-edit-result-btn');
   if(saveBtn) saveBtn.style.display=_dReadOnly?'none':'';
   if(editBtn) editBtn.style.display=_dReadOnly?'':'none';
-  const _rKey=`${m.year}_${m.month}_${curDay}_${curEquip}`;
-  const _dayData=_dResults[_rKey]||{};
+  const cg=document.getElementById('d-check-colgroup');
+  if(cg) cg.innerHTML=`<col style="width:24px"><col style="width:120px"><col style="width:100px"><col style="width:64px"><col style="width:44px"><col style="width:70px"><col style="width:80px">`;
+  const TH=(v,s='')=>`<th style="padding:6px 4px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);font-size:12px;white-space:nowrap;${s}">${v}</th>`;
+  const thr=document.getElementById('d-check-thead-row');
+  if(thr) thr.innerHTML=TH('No.')+TH('점검항목','text-align:left;padding:6px 8px')+TH('관리기준','text-align:left;padding:6px 8px')+TH('확인방법')+TH('주기')+TH('결과')+TH('비고','text-align:left;padding:6px 8px');
+  const rKey=`${m.year}_${m.month}_${curDay}_${curEquip}`;
+  const dayData=_dResults[rKey]||{};
   document.getElementById('d-check-tbody').innerHTML=e.items.map((item,i)=>{
+    const _dItemKey=`${equipDbId}_${item.no}`;
+    const _dItem=DAILY_ITEMS[_dItemKey]||{};
+    const n=item.name||_dItem.item_name||'';
+    const s=item.std||_dItem.standard||'';
+    const mt=item.method||_dItem.method||'';
+    const cy=item.cycle||_dItem.cycle||'';
+    const rd=dayData[item.no]||{};
+    const val=rd.result||'';
+    const rmk=(rd.remark||'').replace(/"/g,'&quot;');
+    const isNg=val==='✕';
+    const rowBg=isNg?'#fff5f5':val==='○'?'#f7fef9':'#fff';
+    const resBg=isNg?'#fee2e2':val==='○'?'#dcfce7':'#fff';
+    const resBdr=isNg?'#fca5a5':val==='○'?'#86efac':'var(--border)';
+    const rmkStyle=isNg?'border-color:#fca5a5;background:#fff0f0;':'border-color:var(--border);background:#fff;';
+    const _isNum=_dIsNumericStd(s);
     const k=`daily_${car}_${m.year}_${m.month}_${curDay}_${curEquip}_${item.no}`;
     const kr=`daily_rmk_${car}_${m.year}_${m.month}_${curDay}_${curEquip}_${item.no}`;
-    const _rd=_dayData[item.no]||{};
-    const val=_rd.result||'', rmk=(_rd.remark||'').replace(/"/g,'&quot;');
-    const equipDbId = DAILY_EQUIP[curEquip]?.id || curEquip;
-    const _dItemKey = `${equipDbId}_${item.no}`;
-    const _dItem = DAILY_ITEMS[_dItemKey] || {};
-    const n=item.name   || _dItem.item_name || '';
-    const s=item.std    || _dItem.standard  || '';
-    const mt=item.method|| _dItem.method   || '';
-    const cy=item.cycle || _dItem.cycle    || '';
-    const _isNum = _dIsNumericStd(s);
-    const _inR = _isNum && val!=='' ? _dCheckInRange(parseFloat(val), s) : null;
-    const bg = _isNum && val!==''
-      ? (_inR===null?'#fff':_inR?'#f7fef9':'#fff5f5')
-      : (val==='✕'?'#fff5f5':val==='○'?'#f7fef9':'#fff');
-    const isNg=val==='✕';
-    const rmkStyle=isNg?'border-color:#fca5a5;background:#fff0f0;':'border-color:var(--border);background:#fff;';
-    const rmkPh=isNg?'이상조치 입력':'비고';
-    return `<tr data-row="${i}" data-itemno="${item.no}" style="background:${bg};border-bottom:1px solid var(--border)">
-      <td style="padding:7px 8px;text-align:center;border-right:1px solid var(--border);color:var(--text3);font-size:11px">${i+1}</td>
-      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_name" style="padding:7px 10px;border-right:1px solid var(--border);font-weight:500;${es}" onblur="window._dSaveItemDef(this)">${n}</td>
-      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_std" style="padding:7px 10px;border-right:1px solid var(--border);color:var(--text2);${es}" onblur="window._dSaveItemDef(this)">${s}</td>
-      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_method" style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._dSaveItemDef(this)">${mt}</td>
-      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_cycle" style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._dSaveItemDef(this)">${cy}</td>
-      <td style="padding:5px 6px;border-right:1px solid var(--border);text-align:center">
-        ${_isNum
-          ? `<input type="text" inputmode="decimal" value="${val}" placeholder="" onchange="window._dSaveRes('${k}',this.value.replace(',','.'),${i})" oninput="this.value=this.value.replace(/[^0-9.\-]/g,'');window._dSaveRes('${k}',this.value,${i},false)"${_dReadOnly?' disabled':''} style="width:58px;border:1px solid var(--border);border-radius:5px;padding:3px 4px;font-size:12px;font-family:inherit;text-align:center;background:${_dReadOnly?'#f3f4f6':'#fff'}">`
-          : `<select onchange="window._dSaveRes('${k}',this.value,${i})"${_dReadOnly?' disabled':''} style="width:52px;border:1px solid var(--border);border-radius:5px;padding:3px;font-size:12px;background:${_dReadOnly?'#f3f4f6':'#fff'};font-family:inherit;cursor:${_dReadOnly?'default':'pointer'}"><option value=""${val===''?' selected':''}></option><option value="○"${val==='○'?' selected':''}>○</option><option value="✕"${val==='✕'?' selected':''}>✕</option><option value="N"${val==='N'?' selected':''}>N</option></select>`}
-        <div class="d-ts-badge" style="font-size:9px;text-align:center;margin-top:2px;min-height:11px;line-height:1.3">${_dTsBadgeHtml(_rd.savedAt,_rd.modifiedAt)}</div>
-      </td>
+    const savedAt=rd.savedAt||null, modifiedAt=rd.modifiedAt||null;
+    let resultCell;
+    if(_isNum){
+      const inR=val===''?null:_dCheckInRange(parseFloat(val),s);
+      const numBg=inR===null?'#fff':(inR?'#dcfce7':'#fee2e2');
+      const numBdr=inR===null?'var(--border)':(inR?'#86efac':'#fca5a5');
+      resultCell=`<td style="padding:4px 5px;border-right:1px solid var(--border);text-align:center;vertical-align:middle">
+        <input type="text" inputmode="decimal" value="${val.replace(/"/g,'&quot;')}"
+          onchange="window._dSaveRes('${k}',this.value.replace(',','.'),${i})"
+          oninput="this.value=this.value.replace(/[^0-9.\\-]/g,'')"
+          ${_dReadOnly?'disabled':''}
+          style="width:52px;border:1px solid ${numBdr};border-radius:5px;padding:3px;font-size:12px;font-family:inherit;text-align:center;background:${_dReadOnly?'#f3f4f6':numBg}">
+        <div style="font-size:9px;text-align:center;margin-top:2px;min-height:11px;line-height:1.3">${_dTsBadgeHtml(savedAt,modifiedAt)}</div>
+      </td>`;
+    } else {
+      resultCell=`<td style="padding:4px 5px;border-right:1px solid var(--border);text-align:center;vertical-align:middle">
+        <select onchange="window._dSaveRes('${k}',this.value,${i})"${_dReadOnly?' disabled':''}
+          style="width:52px;border:1px solid ${resBdr};border-radius:5px;padding:3px;font-size:12px;background:${_dReadOnly?'#f3f4f6':resBg};font-family:inherit;cursor:${_dReadOnly?'default':'pointer'}">
+          <option value=""${val===''?' selected':''}></option>
+          <option value="○"${val==='○'?' selected':''}>○</option>
+          <option value="✕"${val==='✕'?' selected':''}>✕</option>
+          <option value="N"${val==='N'?' selected':''}>N</option>
+        </select>
+        <div style="font-size:9px;text-align:center;margin-top:2px;min-height:11px;line-height:1.3">${_dTsBadgeHtml(savedAt,modifiedAt)}</div>
+      </td>`;
+    }
+    return `<tr data-row="${i}" data-itemno="${item.no}" style="background:${rowBg};border-bottom:1px solid var(--border)">
+      <td style="padding:7px 3px;text-align:center;border-right:1px solid var(--border);color:var(--text3);font-size:11px">${i+1}</td>
+      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_name" style="padding:7px 10px;border-right:1px solid var(--border);font-weight:500;${es}overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onblur="window._dSaveItemDef(this)">${n}</td>
+      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_std" style="padding:7px 10px;border-right:1px solid var(--border);color:var(--text2);${es}word-break:keep-all;overflow-wrap:break-word" onblur="window._dSaveItemDef(this)">${s}</td>
+      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_method" style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}overflow:hidden;white-space:nowrap" onblur="window._dSaveItemDef(this)">${mt}</td>
+      <td contenteditable="${ce}" data-dk="daily_item_${car}_equip${equipDbId}_item${item.no}_cycle" style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}overflow:hidden;white-space:nowrap" onblur="window._dSaveItemDef(this)">${cy}</td>
+      ${resultCell}
       <td style="padding:5px 6px">
-        <input type="text" value="${rmk}" placeholder="${rmkPh}" onchange="window._dSaveRmk('${kr}',this.value)"${_dReadOnly?' disabled':''}
-          style="width:100%;border:1px solid;${rmkStyle}border-radius:5px;padding:3px 6px;font-size:11px;font-family:inherit;color:var(--text)">
+        <input type="text" value="${rmk}" placeholder="${isNg?'이상조치 입력':'비고'}"
+          onchange="window._dSaveRmk('${kr}',this.value)"${_dReadOnly?' disabled':''}
+          style="width:100%;border:1px solid;${_dReadOnly?'border-color:var(--border);background:#f3f4f6;':rmkStyle}border-radius:5px;padding:3px 6px;font-size:11px;font-family:inherit;color:var(--text)">
       </td>
     </tr>`;
   }).join('');
 }
+window._dGridCycle=function(k,rowIdx){
+  const km=k.match(/daily_[^_]+(?:_[^_]+){2}_(\d+)_(\d+)_(\d+)$/);
+  if(!km) return;
+  const m=getTabMonth('daily');
+  const rKey=`${m.year}_${m.month}_${km[1]}_${km[2]}`;
+  if(!_dResults[rKey]) _dResults[rKey]={};
+  if(!_dResults[rKey][km[3]]) _dResults[rKey][km[3]]={result:'',remark:'',savedAt:null,modifiedAt:null};
+  const cur=_dResults[rKey][km[3]].result||'';
+  const opts=['','○','✕','N'];
+  const next=opts[(opts.indexOf(cur)+1)%opts.length];
+  _dResults[rKey][km[3]].result=next;
+  const date=`${m.year}-${String(m.month).padStart(2,'0')}-${String(km[1]).padStart(2,'0')}`;
+  _dStageResult(parseInt(km[2]),parseInt(km[3]),date,next,_dResults[rKey][km[3]].remark||'');
+  const td=document.querySelector(`#d-check-tbody td[data-day="${km[1]}"][data-itemno="${km[3]}"]`);
+  if(td){
+    td.textContent=next;
+    td.style.background=next==='✕'?'#fff5f5':next==='○'?'#f0fdf4':'';
+    td.style.color=next==='✕'?'#dc2626':next==='○'?'#16a34a':next==='N'?'#6b7280':'#111';
+    updateDayBtn(parseInt(km[1]));
+  }
+};
 
 /* ── 관리기준이 숫자 형식인지 판정 → 숫자가 하나라도 있으면 true ── */
 function _dIsNumericStd(std) {
@@ -797,8 +832,7 @@ async function _dFlushResults() {
 }
 
 /* ── Save handlers — NO full re-render, targeted DOM update only ── */
-window._dSaveRes=function(k,v,rowIdx,autoFocus=true){
-  // DB에 debounce 저장 (k: daily_${car}_${year}_${month}_${day}_${equipIdx}_${itemNo})
+window._dSaveRes=function(k,v,rowIdx){
   const km=k.match(/daily_[^_]+(?:_[^_]+){2}_(\d+)_(\d+)_(\d+)$/);
   if(km){
     const m=getTabMonth('daily');
@@ -811,27 +845,31 @@ window._dSaveRes=function(k,v,rowIdx,autoFocus=true){
   }
   const tr=document.querySelector(`#d-check-tbody tr[data-row="${rowIdx}"]`);
   if(tr){
-    const _rstd=tr.cells[2]?.textContent?.trim()||'';
-    let _rbg,_isNg;
-    if(_dIsNumericStd(_rstd)){
-      const _rinR=v===''?null:_dCheckInRange(parseFloat(v),_rstd);
-      _rbg=_rinR===null?'#fff':(_rinR?'#f7fef9':'#fff5f5');
-      _isNg=_rinR===false;
+    const isNg=v==='✕';
+    tr.style.background=isNg?'#fff5f5':v==='○'?'#f7fef9':'#fff';
+    const std=tr.cells[2]?.textContent?.trim()||'';
+    if(_dIsNumericStd(std)){
+      const numInput=tr.querySelector('input[type="text"]');
+      if(numInput){
+        const inR=v===''?null:_dCheckInRange(parseFloat(v),std);
+        numInput.style.borderColor=inR===null?'var(--border)':(inR?'#86efac':'#fca5a5');
+        numInput.style.background=inR===null?'#fff':(inR?'#dcfce7':'#fee2e2');
+      }
     } else {
-      _rbg=v==='✕'?'#fff5f5':v==='○'?'#f7fef9':'#fff';
-      _isNg=v==='✕';
-    }
-    tr.style.background=_rbg;
-    // NG 시 비고칸 강조
-    const rmkInput=tr.querySelector('td:last-child input');
-    if(rmkInput){
-      rmkInput.style.borderColor=_isNg?'#fca5a5':'var(--border)';
-      rmkInput.style.background=_isNg?'#fff0f0':'#fff';
-      rmkInput.placeholder=_isNg?'이상조치 입력':'비고';
-      if(_isNg && autoFocus) rmkInput.focus();
+      const sel=tr.querySelector('select');
+      if(sel){
+        sel.style.background=isNg?'#fee2e2':v==='○'?'#dcfce7':'#fff';
+        sel.style.borderColor=isNg?'#fca5a5':v==='○'?'#86efac':'var(--border)';
+      }
+      const rmkInput=tr.querySelector('td:last-child input');
+      if(rmkInput){
+        rmkInput.placeholder=isNg?'이상조치 입력':'비고';
+        rmkInput.style.borderColor=isNg?'#fca5a5':'var(--border)';
+        rmkInput.style.background=isNg?'#fff0f0':'#fff';
+      }
     }
   }
-  updateDayBtn(curDay);
+  updateDayBtn(parseInt(km?km[1]:curDay));
 };
 window._dSaveRmk=function(k,v){
   // DB에 debounce 저장 (k: daily_rmk_${car}_${year}_${month}_${day}_${equipIdx}_${itemNo})
@@ -953,183 +991,150 @@ if(DAILY_EQUIP.length>0){ renderEquipInfo(); dailyRenderDayPicker(); renderCheck
 if(typeof window._aitLoadAlarmState==='function') window._aitLoadAlarmState();
 
 window.addEventListener('beforeunload', () => { clearTimeout(_dSaveTimer); _dFlushResults(); });
-  window._dailyPhotosObj = _dailyPhotos;
-  window._dailyPhotoKey = e => _photoKey(e);
+  window._dailyPhotosObj      = _dailyPhotos;
+  window._dailyPhotoKey       = e => _photoKey(e);
   window._dailyLoadEquipPhotos = loadEquipPhotos;
+  window._dResultsObj         = _dResults;
+  window._dWorkerCacheObj     = _dWorkerCache;
+  window._dVerifierCacheObj   = _dVerifierCache;
+  window._dailyLoadDay          = (equipIdx, day) => _dLoadResultsFromDB(equipIdx, day);
+  window._dailyLoadMonthStatus  = (equipIdx) => _dLoadMonthStatus(equipIdx);
+  window._dHasDBData            = _dHasDBData;
+  window._dDBLoadedDays         = _dDBLoadedDays;
+  window._dailyGetDay           = () => curDay;
+  window._dailyGetMth           = () => getTabMonth('daily');
 })();
 
 window.print_daily = async function() {
-  const car      = document.getElementById('car-sel')?.options[document.getElementById('car-sel')?.selectedIndex]?.text || '';
-  const selDate  = document.getElementById('d-sel-date')?.textContent.trim() || '';
-  const worker   = document.getElementById('d-worker-input')?.value.trim() || '';
-  const verifier = document.getElementById('d-verifier-input')?.value.trim() || '';
-  const rev      = document.getElementById('daily-rev-badge')?.textContent.trim() || '';
-  const revDate  = document.getElementById('daily-rev-date')?.textContent.trim() || '';
-  const revNum   = parseInt((rev || '').replace(/[^0-9]/g, '')) || 0;
-
-  // 모든 설비 탭 가져오기
   const allEquip = typeof window._dailyGetEquip === 'function' ? window._dailyGetEquip() : [];
   if (!allEquip.length) { alert('설비 데이터가 없습니다.'); return; }
 
-  let authorSignUrl = '', authorName = '';
-  let reviewerSignUrl = '', reviewerName = '';
-  let approverSignUrl = '', approverName = '';
+  const win = window.open('', '_blank', 'width=1200,height=820');
+  if (!win) { alert('팝업 차단을 해제해주세요.'); return; }
+  win.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>로딩 중...</title></head><body style="font-family:\'Malgun Gothic\',sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;color:#1e3264;font-size:18px;font-weight:700">설비일상점검표 데이터를 불러오는 중입니다...</body></html>');
+  win.document.close();
+
+  const carSel = document.getElementById('car-sel');
+  const car    = carSel?.options[carSel?.selectedIndex]?.text || '';
+  const rev    = document.getElementById('daily-rev-badge')?.textContent.trim() || '';
+  const revNum = parseInt((rev||'').replace(/[^0-9]/g,''))||0;
+  const dMth   = typeof window._dailyGetMth === 'function' ? window._dailyGetMth() : {year:new Date().getFullYear(),month:new Date().getMonth()+1};
+  const dResultsAll   = window._dResultsObj       || {};
+  const dWorkerAll    = window._dWorkerCacheObj   || {};
+  const dVerifierAll  = window._dVerifierCacheObj || {};
+  const daysInMonth   = new Date(dMth.year, dMth.month, 0).getDate();
+  const days          = Array.from({length:daysInMonth},(_,i)=>i+1);
+
+  let authorSignUrl='',authorName='',reviewerSignUrl='',reviewerName='',approverSignUrl='',approverName='',revDate='';
   try {
-    const signs = await AIT_API.getRevisionSigns(window.currentCarId, 'cp');
-    const sigMap = {};
-    signs.filter(s => s.rev === revNum || s.rev === String(revNum)).forEach(s => { sigMap[s.role] = s; });
-    const driveUrl = fid => (fid && typeof AIT_API.driveUrl === 'function') ? AIT_API.driveUrl(fid) : '';
-    authorSignUrl   = driveUrl(sigMap.author?.sign_file_id);   authorName   = sigMap.author?.signer_name   || '';
-    reviewerSignUrl = driveUrl(sigMap.reviewer?.sign_file_id); reviewerName = sigMap.reviewer?.signer_name || '';
-    approverSignUrl = driveUrl(sigMap.approver?.sign_file_id); approverName = sigMap.approver?.signer_name || '';
-  } catch(e) { console.warn('서명 로드 실패', e); }
+    const signs = await AIT_API.getRevisionSigns(window.currentCarId,'cp');
+    const sigMap={};
+    signs.filter(s=>s.rev===revNum||s.rev===String(revNum)).forEach(s=>{sigMap[s.role]=s;});
+    const driveUrl=fid=>(fid&&typeof AIT_API.driveUrl==='function')?AIT_API.driveUrl(fid):'';
+    authorSignUrl=driveUrl(sigMap.author?.sign_file_id);authorName=sigMap.author?.signer_name||'';
+    reviewerSignUrl=driveUrl(sigMap.reviewer?.sign_file_id);reviewerName=sigMap.reviewer?.signer_name||'';
+    approverSignUrl=driveUrl(sigMap.approver?.sign_file_id);approverName=sigMap.approver?.signer_name||'';
+    const _rd=sigMap.approver?.sign_date||sigMap.approver?.signed_at||sigMap.approver?.created_at||sigMap.author?.sign_date||sigMap.author?.signed_at||sigMap.author?.created_at||'';
+    if(_rd){try{revDate=new Date(_rd).toLocaleDateString('ko-KR');}catch(_){revDate=String(_rd).slice(0,10);}}
+  } catch(e){}
+  const _signCell=(imgUrl,name)=>{const img=imgUrl?`<img src="${imgUrl}" style="max-height:24px;max-width:44px;object-fit:contain;display:block;margin:0 auto" onerror="this.style.display='none'">`:'';return(img||name)?`<div style="font-size:7px;color:#374151">${name}</div>${img}`:'';};
+  const logoUrl=window.location.origin+window.location.pathname.replace(/\/[^/]*$/,'/ait-logo.png');
 
-  const _signCell = (imgUrl, name) => {
-    const img = imgUrl ? `<img src="${imgUrl}" style="max-height:30px;max-width:56px;object-fit:contain;display:block;margin:0 auto" onerror="this.style.display='none'">` : '';
-    return (img || name) ? `<div style="font-size:8px;color:#374151;margin-bottom:2px">${name}</div>${img}` : '';
-  };
+  const TD  = (v,style='')=>`<td style="border:1px solid #b8c4d8;padding:2px 3px;font-size:8px;vertical-align:middle;text-align:center;${style}">${v}</td>`;
+  const TDL = (v,style='')=>`<td style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;vertical-align:middle;${style}">${v}</td>`;
+  const TH  = (v,extra='')=>`<th style="background:#1e3264;color:#fff;border:1px solid rgba(255,255,255,.25);padding:3px 2px;font-size:8px;font-weight:700;text-align:center;${extra}">${v}</th>`;
+  // 사진: 기존 캐시 복사 후 미로드된 설비만 DB에서 추가 로드
+  const printPhotosObj = {};
+  const _cachedPhotos = window._dailyPhotosObj || {};
+  const _photoKeyFn = e => (typeof window._dailyPhotoKey==='function') ? window._dailyPhotoKey(e) : (e.id?`id_${e.id}`:`sheet_${e.sheet||''}`);
+  allEquip.forEach(e=>{ const k=_photoKeyFn(e); if(_cachedPhotos[k]!==undefined) printPhotosObj[k]=_cachedPhotos[k]; });
+  if(!AIT_API.MOCK && window.currentCarId) {
+    const unloaded=allEquip.filter(e=>printPhotosObj[_photoKeyFn(e)]===undefined && e.id);
+    if(unloaded.length) {
+      await Promise.all(unloaded.map(e=>
+        AIT_API.getDailyEquipPhotos(window.currentCarId,e.id)
+          .then(rows=>{printPhotosObj[_photoKeyFn(e)]=rows||[];})
+          .catch(()=>{printPhotosObj[_photoKeyFn(e)]=[];})
+      ));
+    }
+  }
 
-  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+  // DB에서 이번 달 전체 결과 로드 (미로드된 설비+날짜만)
+  if (!AIT_API.MOCK && window.currentCarId) {
+    const _loadMS = window._dailyLoadMonthStatus;
+    const _hasDB  = window._dHasDBData;
+    const _loaded = window._dDBLoadedDays;
+    if (_loadMS) {
+      await Promise.all(allEquip.map((_, idx) => _loadMS(idx)));
+    }
+    if (_hasDB && _loaded && window._dailyLoadDay) {
+      const toLoad = [];
+      allEquip.forEach((_, idx) => {
+        days.forEach(day => {
+          const ck = `${idx}_${day}_${dMth.year}_${dMth.month}`;
+          if (_hasDB.has(ck) && !_loaded.has(ck)) toLoad.push([idx, day]);
+        });
+      });
+      if (toLoad.length) await Promise.all(toLoad.map(([idx, day]) => window._dailyLoadDay(idx, day)));
+    }
+  }
 
-  // 현재 탭의 결과 DOM에서 수집 (결과는 현재 선택된 설비만 DOM에 존재)
-  const _curDomResults = {};
-  [...document.querySelectorAll('#d-check-tbody tr')].forEach((tr, i) => {
-    const cells = [...tr.querySelectorAll('td')];
-    if (!cells.length) return;
-    const resultEl = cells[5]?.querySelector('select, input');
-    _curDomResults[i] = {
-      result: resultEl ? (resultEl.value || '') : (cells[5]?.textContent.trim() || ''),
-      remark: cells[6]?.querySelector('input')?.value || cells[6]?.textContent.trim() || ''
-    };
-  });
-
-  // 현재 탭 인덱스 파악
-  const activeTabBtn = document.querySelector('#d-equip-tabs .proc-btn.active');
-  const curEquipIdx = activeTabBtn ? [...document.querySelectorAll('#d-equip-tabs .proc-btn')].indexOf(activeTabBtn) : 0;
-
-  // 모든 설비 사진 미리 로드 (방문하지 않은 탭 포함)
-  try {
-    await Promise.all(allEquip.map(async e => {
-      const key = window._dailyPhotoKey(e);
-      if (!window._dailyPhotosObj[key]) {
-        try { await window._dailyLoadEquipPhotos(e); } catch(err) {}
-      }
+  const pagesHtml = allEquip.map((e,idx)=>{
+    const items = e.items||[];
+    const dayResults = days.map(day=>({
+      data: dResultsAll[`${dMth.year}_${dMth.month}_${day}_${idx}`]||{},
+      worker: dWorkerAll[`${dMth.year}_${dMth.month}_${day}_${idx}`]||'',
+      verifier: dVerifierAll[`${dMth.year}_${dMth.month}_${day}_${idx}`]||''
     }));
-  } catch(err) { console.warn('사진 pre-load 실패', err); }
-
-  // 설비별 페이지 빌드
-  const TH = s => `<th style="background:#1e3264;color:#fff;padding:5px 6px;text-align:center;font-weight:600;border:1px solid rgba(255,255,255,.2)">${s}</th>`;
-  const hdrRow = `<tr>${TH('No.')}${TH('점검항목')}${TH('관리기준')}${TH('확인방법')}${TH('주기')}${TH('결과')}${TH('비고')}</tr>`;
-  const signHdr = `
-<table style="border:1.5px solid #1e3264;margin-bottom:4px;width:100%;border-collapse:collapse">
-  <tr>
-    <td style="width:70px;border-right:1px solid #7a90b8;padding:3px;text-align:center;vertical-align:middle">
-      <img src="${logoUrl}" style="height:28px;object-fit:contain" onerror="this.style.display='none'">
-    </td>
-    <td style="text-align:center;font-size:18px;font-weight:900;letter-spacing:6px;color:#1e3264;padding:5px 0">설 비 일 상 점 검 표</td>
-    <td style="width:190px;border-left:1px solid #7a90b8;padding:0">
-      <table style="width:100%;height:100%;border-collapse:collapse">
-        <tr>
-          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">작성</td>
-          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">검토</td>
-          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;width:34%">승인</td>
-        </tr>
-        <tr>
-          <td style="height:40px;border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(authorSignUrl, authorName)}</td>
-          <td style="border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(reviewerSignUrl, reviewerName)}</td>
-          <td style="border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(approverSignUrl, approverName)}</td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-</table>`;
-
-  const pagesHtml = allEquip.map((e, idx) => {
-    const isCur = idx === curEquipIdx;
-    const photoKey = window._dailyPhotoKey(e);
-    const equipPhotos = (window._dailyPhotosObj[photoKey] || [])
-      .sort((a, b) => (a.photo_order||0) - (b.photo_order||0));
-    const photoUrls = equipPhotos.map(p => {
-      const url = p.photo_url || '';
-      return typeof AIT_API?.normalizePhotoUrl === 'function' ? AIT_API.normalizePhotoUrl(url) : url;
-    }).filter(Boolean);
-    const photosHtml = photoUrls.length ? `
-<div style="margin-bottom:6px">
-  <div style="background:#1e3264;color:#fff;font-size:9px;font-weight:700;padding:3px 8px;letter-spacing:1px;margin-bottom:4px">설비 사진</div>
-  <div style="display:flex;gap:8px">
-    ${photoUrls.slice(0,4).map(u=>`<img src="${u}" style="max-height:110px;max-width:160px;object-fit:contain;border:1px solid #d1d5db;border-radius:4px">`).join('')}
-  </div>
-</div>` : '';
-
-    const items = e.items || [];
-    const tbodyHtml = items.map((item, i) => {
-      const dom = isCur ? (_curDomResults[i] || {}) : {};
-      const result = dom.result || '';
-      const remark = dom.remark || '';
-      const resBg = result === '✕' ? '#fff5f5' : result === '○' ? '#f0fdf4' : '#fff';
-      return `<tr>
-        <td style="padding:3px 5px;border:1px solid #d1d5db;text-align:center;font-size:9px;color:#6b7280">${i+1}</td>
-        <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px;font-weight:500">${item.name||''}</td>
-        <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px;color:#374151">${item.standard||''}</td>
-        <td style="padding:3px 5px;border:1px solid #d1d5db;font-size:9px;text-align:center">${item.method||''}</td>
-        <td style="padding:3px 5px;border:1px solid #d1d5db;font-size:9px;text-align:center">${item.cycle||''}</td>
-        <td style="padding:3px 5px;border:1px solid #d1d5db;font-size:10px;font-weight:700;text-align:center;background:${resBg}">${result}</td>
-        <td style="padding:3px 6px;border:1px solid #d1d5db;font-size:9px">${remark}</td>
-      </tr>`;
+    const dayHeaders = days.map(d=>TH(d,'font-size:7px')).join('');
+    const tbodyHtml = items.map(item=>{
+      const iname = item.name||item.item_name||'';
+      const istd  = item.std||item.standard||'';
+      const imt   = item.method||'';
+      const icy   = item.cycle||'';
+      const dayCells = days.map((_,di)=>{
+        const r = (dayResults[di].data[item.no]||{}).result||'';
+        const bg = r==='✕'?'#fff5f5':r==='○'?'#f0fdf4':'';
+        return TD(`<span style="font-size:9px;font-weight:700">${r}</span>`,`background:${bg};width:16px`);
+      }).join('');
+      return `<tr>${TDL(item.no,'text-align:center')}${TDL(iname)}${TDL(istd,'color:#374151')}${TD(imt)}${TD(icy)}${dayCells}</tr>`;
     }).join('');
-
-    const isLast = idx === allEquip.length - 1;
-    return `<div style="${isLast ? '' : 'page-break-after:always'}">
-${signHdr}
-<table style="border:1px solid #7a90b8;margin-bottom:6px;font-size:9px;width:100%;border-collapse:collapse">
-  <tr>
-    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">차종</td>
-    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${car}</td>
-    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">설비명</td>
-    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;font-weight:600;color:#1e3264">${e.sheet||''}</td>
-    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">공정번호</td>
-    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;color:#1e3264">${e.proc_no||''}</td>
-    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">공정명</td>
-    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;color:#1e3264">${e.proc_name||''}</td>
-    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">설치장소</td>
-    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;color:#1e3264">${e.location||''}</td>
-    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">관리책임자</td>
-    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;color:#1e3264">${e.manager||''}</td>
-    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">점검일</td>
-    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${selDate}</td>
-    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">점검자</td>
-    <td style="padding:3px 7px;border-right:1px solid #b8c4d8;color:#1e3264">${worker}</td>
-    <td style="background:#1e3264;color:#fff;padding:3px 6px;white-space:nowrap;font-weight:700">확인자</td>
-    <td style="padding:3px 7px;color:#1e3264">${verifier}</td>
-  </tr>
-</table>
+    const workerRow = `<tr><td colspan="5" style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;text-align:center;background:#f0f4ff"><b>점검자</b></td>${days.map((_,di)=>TD(`<span style="font-size:6px">${dayResults[di].worker}</span>`)).join('')}</tr>`;
+    const verifierRow = `<tr><td colspan="5" style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;text-align:center;background:#f0f4ff"><b>확인자</b></td>${days.map((_,di)=>TD(`<span style="font-size:6px">${dayResults[di].verifier}</span>`)).join('')}</tr>`;
+    const revDateRow = `<tr><td colspan="5" style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;text-align:center;background:#f0f4ff"><b>개정이력일</b></td><td colspan="${daysInMonth}" style="border:1px solid #b8c4d8;padding:2px 6px;font-size:8px;text-align:center;color:#1e3264;font-weight:700">${revDate}</td></tr>`;
+    const photos = (printPhotosObj[_photoKeyFn(e)]||[]).filter(p=>p.photo_url);
+    const photosHtml = photos.length ? `<div style="margin-bottom:3px;padding:3px 0"><span style="font-size:8px;font-weight:700;color:#1e3264;display:block;margin-bottom:3px">사 진</span><div style="display:flex;flex-wrap:wrap;gap:6px">${photos.map(p=>`<img src="${(typeof AIT_API!=='undefined'&&AIT_API.normalizePhotoUrl)?AIT_API.normalizePhotoUrl(p.photo_url):p.photo_url}" style="width:200px;height:156px;object-fit:cover;border:1px solid #b8c4d8;border-radius:4px" onerror="this.style.display='none'">`).join('')}</div></div>` : '';
+    const isLast = idx===allEquip.length-1;
+    return `<div style="${isLast?'':'page-break-after:always'}">
+<table style="border:1.5px solid #1e3264;margin-bottom:3px;width:100%;border-collapse:collapse"><tr>
+  <td style="width:60px;border-right:1px solid #7a90b8;padding:2px;text-align:center"><img src="${logoUrl}" style="height:24px" onerror="this.style.display='none'"></td>
+  <td style="text-align:center;font-size:15px;font-weight:900;letter-spacing:4px;color:#1e3264">설 비 일 상 점 검 표</td>
+  <td style="width:160px;border-left:1px solid #7a90b8;padding:0"><table style="width:100%;height:100%;border-collapse:collapse">
+    <tr><td style="background:#1e3264;color:#fff;font-size:7px;font-weight:700;text-align:center;padding:1px;border-right:1px solid rgba(255,255,255,.3);width:33%">작성</td><td style="background:#1e3264;color:#fff;font-size:7px;font-weight:700;text-align:center;padding:1px;border-right:1px solid rgba(255,255,255,.3);width:33%">검토</td><td style="background:#1e3264;color:#fff;font-size:7px;font-weight:700;text-align:center;padding:1px;width:34%">승인</td></tr>
+    <tr><td style="height:32px;border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:1px">${_signCell(authorSignUrl,authorName)}</td><td style="border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:1px">${_signCell(reviewerSignUrl,reviewerName)}</td><td style="border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:1px">${_signCell(approverSignUrl,approverName)}</td></tr>
+  </table></td>
+</tr></table>
+<table style="border:1px solid #7a90b8;margin-bottom:3px;font-size:8px;width:100%;border-collapse:collapse"><tr>
+  <td style="background:#1e3264;color:#fff;padding:2px 5px;font-weight:700;white-space:nowrap">차종</td><td style="padding:2px 6px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${car}</td>
+  <td style="background:#1e3264;color:#fff;padding:2px 5px;font-weight:700;white-space:nowrap">설비명</td><td style="padding:2px 6px;border-right:1px solid #b8c4d8;color:#1e3264;font-weight:600">${e.sheet||''}</td>
+  <td style="background:#1e3264;color:#fff;padding:2px 5px;font-weight:700;white-space:nowrap">공정번호</td><td style="padding:2px 6px;border-right:1px solid #b8c4d8;color:#1e3264">${e.proc_no||''}</td>
+  <td style="background:#1e3264;color:#fff;padding:2px 5px;font-weight:700;white-space:nowrap">공정명</td><td style="padding:2px 6px;border-right:1px solid #b8c4d8;color:#1e3264">${e.proc_name||''}</td>
+  <td style="background:#1e3264;color:#fff;padding:2px 5px;font-weight:700;white-space:nowrap">설치장소</td><td style="padding:2px 6px;border-right:1px solid #b8c4d8;color:#1e3264">${e.location||''}</td>
+  <td style="background:#1e3264;color:#fff;padding:2px 5px;font-weight:700;white-space:nowrap">관리책임자</td><td style="padding:2px 6px;color:#1e3264">${e.manager||''}</td>
+</tr></table>
 ${photosHtml}
-<table style="border:1px solid #7a90b8;font-size:9px;width:100%;border-collapse:collapse">
-  <thead>${hdrRow}</thead>
-  <tbody>${tbodyHtml || '<tr><td colspan="7" style="padding:12px;text-align:center;color:#9ca3af;border:1px solid #d1d5db">점검항목 없음</td></tr>'}</tbody>
+<table style="border:1px solid #7a90b8;font-size:8px;width:100%;border-collapse:collapse;table-layout:fixed">
+<colgroup><col style="width:2%"><col style="width:8.5%"><col style="width:7.5%"><col style="width:4.5%"><col style="width:2.5%">${days.map(()=>`<col style="width:${(75/daysInMonth).toFixed(2)}%">`).join('')}</colgroup>
+<thead><tr>${TH('No.')}${TH('점검항목')}${TH('관리기준')}${TH('확인방법')}${TH('주기')}${dayHeaders}</tr></thead>
+<tbody>${tbodyHtml||'<tr><td colspan="'+(5+daysInMonth)+'" style="padding:8px;text-align:center;color:#9ca3af">점검항목 없음</td></tr>'}</tbody>
+<tfoot>${workerRow}${verifierRow}${revDateRow}</tfoot>
 </table>
-<div style="margin-top:4px;display:flex;justify-content:space-between;font-size:8px;color:#9ca3af;border-top:1px solid #e2e8f0;padding-top:2px">
-  <span>AIT 공정문서 관리시스템</span><span>출력일: ${new Date().toLocaleDateString('ko-KR')}</span>
-</div>
+<div style="margin-top:3px;font-size:7px;color:#9ca3af;border-top:1px solid #e2e8f0;padding-top:1px;display:flex;justify-content:space-between"><span>AIT 공정문서 관리시스템</span><span>출력일: ${new Date().toLocaleDateString('ko-KR')}</span></div>
 </div>`;
   }).join('\n');
 
-  const html = `<!DOCTYPE html>
-<html lang="ko"><head><meta charset="UTF-8">
-<title>설비일상점검표 ${car} ${selDate}</title>
-<style>
-@page{size:A4 landscape;margin:7mm 9mm}
-*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:10px;color:#111827}
-table{border-collapse:collapse;width:100%}
-</style></head>
-<body>
-<div id="pset" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e3264;color:#fff;padding:6px 14px;display:flex;align-items:center;gap:10px;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.4)"><b style="margin-right:4px">🖨 인쇄 설정</b><label>여백 <select id="pm" style="font-size:11px;padding:2px 5px;border-radius:4px;color:#111"><option value="3mm">3mm 최소</option><option value="6mm">6mm 좁게</option><option value="10mm" selected>10mm 보통</option><option value="14mm">14mm 넓게</option><option value="18mm">18mm</option></select></label><label style="margin-left:6px">배율 <select id="ps" style="font-size:11px;padding:2px 5px;border-radius:4px;color:#111"><option value="100">100%</option><option value="95" selected>95%</option><option value="90">90%</option><option value="85">85%</option><option value="80">80%</option><option value="75">75%</option></select></label><button onclick="(function(){var m=document.getElementById('pm').value,s=parseInt(document.getElementById('ps').value,10),st=document.createElement('style');st.textContent='@page{size:A4 landscape;margin:'+m+'}body{zoom:'+(s/100)+'}';document.head.appendChild(st);document.getElementById('pset').style.display='none';document.getElementById('pss').style.display='none';setTimeout(function(){window.print();},200);})()" style="margin-left:8px;padding:4px 14px;background:#fff;color:#1e3264;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">인쇄</button><span style="margin-left:8px;font-size:10px;opacity:.65">※ 설정 바는 인쇄에서 제외됩니다</span></div><div id="pss" style="height:42px"></div>
-${pagesHtml}
-</body></html>`;
-
-  const win = window.open('', '_blank', 'width=1120,height=820');
-  if (!win) { alert('팝업 차단을 해제해주세요.'); return; }
+  const html=`<!DOCTYPE html>\n<html lang="ko"><head><meta charset="UTF-8"><title>설비일상점검표 ${car} ${dMth.year}년 ${dMth.month}월</title>\n<style>\n@page{size:A4 landscape;margin:7mm 9mm}\n*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}\nbody{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:8px;color:#111827}\ntable{border-collapse:collapse;width:100%}\n</style></head>\n<body>\n<div id="pset" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e3264;color:#fff;padding:6px 14px;display:flex;align-items:center;gap:10px;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.4)"><b style="margin-right:4px">🖨 인쇄 설정</b><label>여백 <select id="pm" style="font-size:11px;padding:2px 5px;border-radius:4px;color:#111"><option value="3mm">3mm 최소</option><option value="6mm">6mm 좁게</option><option value="10mm" selected>10mm 보통</option><option value="14mm">14mm 넓게</option><option value="18mm">18mm</option></select></label><label style="margin-left:6px">배율 <select id="ps" style="font-size:11px;padding:2px 5px;border-radius:4px;color:#111"><option value="100">100%</option><option value="95" selected>95%</option><option value="90">90%</option><option value="85">85%</option><option value="80">80%</option><option value="75">75%</option></select></label><button onclick="(function(){var m=document.getElementById('pm').value,s=parseInt(document.getElementById('ps').value,10),st=document.createElement('style');st.textContent='@page{size:A4 landscape;margin:'+m+'}body{zoom:'+(s/100)+'}';document.head.appendChild(st);document.getElementById('pset').style.display='none';document.getElementById('pss').style.display='none';setTimeout(function(){window.print();},200);})()" style="margin-left:8px;padding:4px 14px;background:#fff;color:#1e3264;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">인쇄</button><span style="margin-left:8px;font-size:10px;opacity:.65">※ 설정 바는 인쇄에서 제외됩니다</span></div><div id="pss" style="height:42px"></div>\n${pagesHtml}\n</body></html>`;
+  win.document.open();
   win.document.write(html);
   win.document.close();
 };
