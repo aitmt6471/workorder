@@ -102,7 +102,7 @@
     <!-- 오른쪽: 관리항목 — 맨 위부터 시작 (45%) -->
     <div style="flex:1;background:#fff;display:flex;flex-direction:column;overflow:hidden;min-width:0">
       <div style="flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-gutter:stable">
-        <table class="ws-mgmt-tbl" style="table-layout:fixed;font-size:11px">
+        <table class="ws-mgmt-tbl" style="table-layout:fixed;font-size:12px">
           <colgroup>
             <col style="width:32px"><col style="width:42px"><col style="width:100px">
             <col><col style="width:86px"><col style="width:58px">
@@ -111,14 +111,14 @@
           </colgroup>
           <thead>
             <tr>
-              <th style="font-size:11px">No.</th>
-              <th style="font-size:11px">구분</th>
-              <th style="font-size:11px;text-align:left">관리항목</th>
-              <th style="font-size:11px;text-align:left">규격·기준</th>
-              <th style="font-size:11px">확인방법</th>
-              <th style="font-size:11px">주기</th>
-              <th style="font-size:11px;text-align:left">이상조치</th>
-              <th style="font-size:11px;text-align:left">비고</th>
+              <th>No.</th>
+              <th>구분</th>
+              <th style="text-align:left">관리항목</th>
+              <th style="text-align:left">규격·기준</th>
+              <th>확인방법</th>
+              <th>주기</th>
+              <th style="text-align:left">이상조치</th>
+              <th style="text-align:left">비고</th>
               <th class="edit-only" style="padding:2px 4px">
                 <button onclick="addWsMgmtRow()" title="항목 추가"
                   style="width:22px;height:22px;border:none;background:#1e3264;color:#fff;border-radius:4px;cursor:pointer;font-size:14px;line-height:1;font-weight:700">＋</button>
@@ -170,7 +170,7 @@ function addWsMgmtRow() {
   tr.dataset.proc = proc;
   tr.innerHTML = `
     <td contenteditable="false" style="font-family:monospace;font-weight:700">${cnt}</td>
-    <td contenteditable="false" style="color:#1d4ed8;font-weight:600;font-size:11px">제품</td>
+    <td contenteditable="false" style="color:#1d4ed8;font-weight:600">제품</td>
     <td contenteditable="false"></td>
     <td contenteditable="false"></td>
     <td contenteditable="false">육안</td>
