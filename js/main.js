@@ -1289,64 +1289,32 @@ function loadCarContent(pane) {
     if (typeof msRenderAll === 'function') msRenderAll();
   } else if (pane === 'daily') {
     if (!AIT_API.MOCK && window.currentCarId) {
-      AIT_API.getDailyEquipments(window.currentCarId).then(async dbRows => {
-        if (dbRows && dbRows.length) {
-          // items는 별도 API로 조회 (GROUP_CONCAT 한계 회피)
-          let itemRows = [];
-          try { itemRows = await AIT_API.getDailyItems(window.currentCarId); } catch(e) {}
-
-          // items가 전부 비어있으면 CP rows에서 항목 복원
-          const hasContent = itemRows.some(r => r.item_name || r.standard || r.method);
-          let cpItemMap = {};
-          if (!hasContent) {
-            try {
-              const linename = _cpMetaGet(car).linename || '';
-              const cpRows = await AIT_API.getCpRows(window.currentCarId);
-              if (cpRows && cpRows.length) {
-                const cpList = _buildDailyFromCpRows(cpRows, linename);
-                cpList.forEach(e => {
-                  const equip = dbRows.find(r => r.equip_name === e.sheet);
-                  if (equip) cpItemMap[equip.id] = e.items;
-                });
-              }
-            } catch(e) {}
+      const linename = _cpMetaGet(car).linename || '';
+      // CP = 단일 진실 소스: 설비목록·항목은 항상 CP 기준, DB에서 id·photo_count만 매핑
+      Promise.all([
+        AIT_API.getDailyEquipments(window.currentCarId).catch(() => []),
+        AIT_API.getCpRows(window.currentCarId).catch(() => [])
+      ]).then(([dbRows, cpRows]) => {
+        if (cpRows && cpRows.length) {
+          const list = _buildDailyFromCpRows(cpRows, linename);
+          if (dbRows && dbRows.length) {
+            const idMap = {};
+            dbRows.forEach(r => { idMap[r.equip_name] = { id: r.id, photo_count: r.photo_count || 0 }; });
+            list.forEach(e => { Object.assign(e, idMap[e.sheet] || {}); });
           }
-
-          const itemsByEquip = {};
-          itemRows.forEach(r => {
-            if (!itemsByEquip[r.equip_id]) itemsByEquip[r.equip_id] = [];
-            itemsByEquip[r.equip_id].push(r);
-          });
-
-          const list = dbRows.map(r => ({
-            id: r.id,
-            sheet: r.equip_name,
-            proc_no: String(r.proc_no || ''),
-            proc_name: r.proc_name || '',
-            location: r.location || '',
-            manager: r.manager || '',
-            sort_order: r.sort_order || 0,
-            photo_count: r.photo_count || 0,
-            items: cpItemMap[r.id] || (itemsByEquip[r.id] || []).map(item => ({
-              no: String(item.item_no || ''),
-              name: item.item_name || '',
-              std: item.standard || '',
-              method: item.method || '',
-              cycle: item.cycle || ''
-            }))
-          }));
           if (list.length && typeof window._dInitEquip === 'function') window._dInitEquip(list);
           else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
+        } else if (dbRows && dbRows.length) {
+          // CP 없을 때만 DB fallback
+          if (typeof window._dInitEquip === 'function') window._dInitEquip(dbRows.map(r => ({
+            id: r.id, sheet: r.equip_name,
+            proc_no: String(r.proc_no || ''), proc_name: r.proc_name || '',
+            location: r.location || '', manager: r.manager || '',
+            sort_order: r.sort_order || 0, photo_count: r.photo_count || 0, items: []
+          })));
+          else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
         } else {
-          // DB에 데이터 없으면 CP rows에서 빌드 (fallback)
-          const linename = _cpMetaGet(car).linename || '';
-          AIT_API.getCpRows(window.currentCarId).then(rows => {
-            if (rows && rows.length) {
-              const list = _buildDailyFromCpRows(rows, linename);
-              if (list.length && typeof window._dInitEquip === 'function') window._dInitEquip(list);
-              else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
-            } else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
-          }).catch(() => { if (typeof window._dFlushInfo === 'function') window._dFlushInfo(); });
+          if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
         }
       }).catch(() => { if (typeof window._dFlushInfo === 'function') window._dFlushInfo(); });
     } else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();

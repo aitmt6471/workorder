@@ -195,7 +195,7 @@ function addWsMgmtRow() {
 // ══════════════════════════════════
 //   STEP 뷰 렌더링
 // ══════════════════════════════════
-let _wsIdx = 0;
+var _wsIdx = 0;
 
 function _wsGetList() {
   return [...document.querySelectorAll('[id^="ws-step-list-"]')].find(d => d.style.display !== 'none') || null;
@@ -554,8 +554,8 @@ window.addStep = function() {
 };
 
 // ── STEP 자동 슬라이드쇼 ──
-let _wsSlideTimer = null;
-let _wsSlidePaused = true;
+var _wsSlideTimer = null;
+var _wsSlidePaused = true;
 const WS_SLIDE_MS = 4000;
 
 function _wsSlideStop() {

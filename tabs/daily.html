@@ -222,8 +222,21 @@ window._dailyGetEquip = () => DAILY_EQUIP;
 // DB에서 로드한 설비 목록으로 탭 재초기화
 window._dInitEquip = async function(list) {
   // id 없는 CP 데이터 → DB 동기화 후 ID만 병합 (이름·항목은 CP 데이터 유지)
-  if (list.length > 0 && !list[0].id && window.currentCarId && !AIT_API.MOCK) {
-    try { await AIT_API.syncDailyEquip(window.currentCarId, list); } catch(e) { console.warn('설비 DB 동기화 실패', e); }
+  if (list.length > 0 && list.some(e => !e.id) && window.currentCarId && !AIT_API.MOCK) {
+    try {
+      const noIdItems = list.filter(e => !e.id);
+      for (let i = 0; i < noIdItems.length; i++) {
+        const e = noIdItems[i];
+        await AIT_API.createDailyEquip(window.currentCarId, {
+          equip_name: e.sheet,
+          proc_no: e.proc_no || '',
+          proc_name: e.proc_name || '',
+          location: e.location || '',
+          manager: e.manager || '',
+          sort_order: i
+        });
+      }
+    } catch(e) { console.warn('설비 DB 등록 실패', e); }
     try {
       const dbRows = await AIT_API.getDailyEquipments(window.currentCarId);
       if (dbRows && dbRows.length) {
