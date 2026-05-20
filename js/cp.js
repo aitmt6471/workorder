@@ -400,14 +400,12 @@ function _cpMetaSet(car, meta) {
 
 function _syncCarMetaToLocal(carObj) {
   const name = carObj.name;
-  if (carObj.stage || carObj.partno || carObj.partname || carObj.linename) {
-    _cpMetaSet(name, {
-      stage:    carObj.stage    || '시작',
-      partno:   carObj.partno   || '',
-      partname: carObj.partname || '',
-      linename: carObj.linename || ''
-    });
-  }
+  _cpMetaSet(name, {
+    stage:    carObj.stage    || '시작',
+    partno:   carObj.partno   || '',
+    partname: carObj.partname || '',
+    linename: carObj.linename || ''
+  });
   window._cftCache = window._cftCache || {};
   if (carObj.cft) {
     try { window._cftCache[name] = typeof carObj.cft === 'string' ? JSON.parse(carObj.cft) : carObj.cft; } catch {}

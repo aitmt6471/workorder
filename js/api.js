@@ -166,6 +166,14 @@ const AIT_API = (() => {
     getMsItems:       (carId)        => _get('ait/ms/items', { carId }),
     syncMsItems:      (carId, items) => _post('ait/ms/items/sync', { carId, items }),
 
+    /* ── 공정검사기준서 (JSON blob) ───────────── */
+    getInspDoc:       (carId)        => _get('ait/insp/doc', { carId }),
+    saveInspDoc:      (carId, doc)   => _post('ait/insp/doc', { carId, doc }),
+
+    /* ── Q-Point (JSON blob) ──────────────────── */
+    getQpointList:    (carId)        => _get('ait/qpoint/list', { carId }),
+    saveQpointList:   (carId, list)  => _post('ait/qpoint/save', { carId, list }),
+
     /* ── 하위 호환: 기존 api.js 메서드명 유지 ──── */
     async getImfMeta(car) {
       const sheets = await this.getImfSheets(car);
@@ -314,6 +322,11 @@ const AIT_API = (() => {
     syncImfItems:       (carId, items)  => _real.syncImfItems(carId, items),
     getMsItems:         (carId)         => _real.getMsItems(carId),
     syncMsItems:        (carId, items)  => _real.syncMsItems(carId, items),
+    /* 공정검사기준서 / Q-Point */
+    getInspDoc:         (carId)         => _real.getInspDoc(carId),
+    saveInspDoc:        (carId, doc)    => _real.saveInspDoc(carId, doc),
+    getQpointList:      (carId)         => _real.getQpointList(carId),
+    saveQpointList:     (carId, list)   => _real.saveQpointList(carId, list),
     /* 사양표 */
     getSpecCatalog:     ()                         => _real.getSpecCatalog(),
     getSpecMes:         (date, carModel, lineName) => _real.getSpecMes(date, carModel, lineName),

@@ -1089,10 +1089,9 @@ window.print_ms = async function() {
   if(!msData.length){alert('마스터샘플 데이터가 없습니다.');return;}
 
   const _msPhotoCacheRef = window._msPhotoCache || {};
-  const _msSampleIdsRef  = window._msSampleIds  || [];
   if (!AIT_API.MOCK && window.currentCarId) {
-    await Promise.all(msData.map((_,si) => {
-      const sId = _msSampleIdsRef[si];
+    await Promise.all(msData.map((samp) => {
+      const sId = samp.id;
       if (!sId || _msPhotoCacheRef[sId] !== undefined) return Promise.resolve();
       return typeof window._msLoadPhotosFromDb === 'function'
         ? window._msLoadPhotosFromDb(sId) : Promise.resolve();
@@ -1153,7 +1152,7 @@ window.print_ms = async function() {
     const workerRow=`<tr><td colspan="5" style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;text-align:center;background:#f0f4ff"><b>점검자</b></td>${days.map((_,di)=>TD(`<span style="font-size:6px">${dayResults[di].worker}</span>`,'width:16px')).join('')}</tr>`;
     const verifierRow=`<tr><td colspan="5" style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;text-align:center;background:#f0f4ff"><b>확인자</b></td>${days.map((_,di)=>TD(`<span style="font-size:6px">${dayResults[di].verifier}</span>`,'width:16px')).join('')}</tr>`;
     const revDateRow=`<tr><td colspan="5" style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;text-align:center;background:#f0f4ff"><b>개정이력일</b></td><td colspan="${daysInMonth}" style="border:1px solid #b8c4d8;padding:2px 6px;font-size:8px;text-align:center;color:#1e3264;font-weight:700">${revDate}</td></tr>`;
-    const sId = samp.id || _msSampleIdsRef[si];
+    const sId = samp.id;
     const _slotPhotos = sId ? (_msPhotoCacheRef[sId]||{}) : {};
     const msPhotoImgs = ['앞','뒤'].map(slot=>{
       const fid = _slotPhotos[slot];

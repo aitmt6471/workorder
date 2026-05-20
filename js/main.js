@@ -105,6 +105,7 @@ function toggleTabEditMode(pane, btn) {
     if (pane === 'imf' && typeof window.imfSetEditable === 'function') window.imfSetEditable(true);
     if (pane === 'ms' && typeof window.msSetEditable === 'function') window.msSetEditable(true);
     if (pane === 'insp' && typeof window.inspSetEditable === 'function') window.inspSetEditable(true);
+    if (pane === 'spec' && typeof window.specSetEditable === 'function') window.specSetEditable(true);
   }
 }
 
@@ -421,7 +422,7 @@ function saveDocument(pane) {
     const current = snapshotPane(pane);
     const prev = snapshots[pane] ?? null;
 
-    const paneLabels = { cp:'CP', ws:'작업표준서', daily:'설비일상점검표', imf:'초중종물', ms:'마스터샘플', insp:'공정검사기준서', spec:'사양표' };
+    const paneLabels = { cp:'CP', ws:'작업표준서', daily:'설비일상점검표', imf:'초중종물', ms:'마스터샘플', insp:'공정검사기준서', spec:'사양표', qpoint:'Q-Point' };
     let doRevise = confirm(`개정하시겠습니까?\n\n[확인] 예 — 개정번호 자동 부여\n[취소] 아니오 — 저장만 (개정번호 유지)`);
 
     if (doRevise) {
@@ -455,9 +456,11 @@ function saveDocument(pane) {
     if (!AIT_API.MOCK) {
       if (pane === 'cp') {
         const paneEl = document.getElementById('pane-cp');
+        window.showSaving && window.showSaving();
         _saveCpToDb(carName, paneEl)
           .then(msg => {
-            console.log('CP DB 저장:', msg);
+            window.hideSaving && window.hideSaving();
+            window.showToast && window.showToast('CP 저장 완료 (' + msg + ')', 'success');
             // CP 변경 → 작표·설비일상 탭 즉시 갱신 (관리기준 반영)
             loadCarContent('daily');
             loadCarContent('ws');
@@ -470,21 +473,63 @@ function saveDocument(pane) {
                 .catch(e => console.warn('설비일상 초기화 실패 (n8n 미설정?):', e));
             }
           })
-          .catch(e => alert('⚠ CP DB 저장 실패: ' + e.message));
+          .catch(e => {
+            window.hideSaving && window.hideSaving();
+            window.showToast && window.showToast('CP 저장 실패: ' + (e?.message || String(e)), 'error');
+          });
       }
       if (pane === 'daily') {
         // localStorage 저장은 _saveCarContent에서 처리됨
         const dailyList = typeof window._dailyGetEquip === 'function' ? window._dailyGetEquip() : null;
         if (dailyList && dailyList.length && window.currentCarId) {
+          window.showSaving && window.showSaving();
           AIT_API.syncDailyEquip(window.currentCarId, dailyList)
-            .then(() => console.log('설비일상 DB 저장 완료'))
-            .catch(e => alert('⚠ 설비일상 DB 저장 실패: ' + e.message));
+            .then(() => {
+              window.hideSaving && window.hideSaving();
+              window.showToast && window.showToast('설비일상점검표 저장 완료', 'success');
+            })
+            .catch(e => {
+              window.hideSaving && window.hideSaving();
+              window.showToast && window.showToast('설비일상점검표 저장 실패: ' + (e?.message || String(e)), 'error');
+            });
+        } else {
+          window.showToast && window.showToast('설비일상점검표 저장 완료', 'success');
         }
       }
       if (pane === 'ms' && typeof window._msSyncToDb === 'function' && window.currentCarId) {
+        window.showSaving && window.showSaving();
         window._msSyncToDb()
-          .then(() => console.log('마스터샘플 DB 저장 완료'))
-          .catch(e => alert('⚠ 마스터샘플 DB 저장 실패: ' + e.message));
+          .then(() => {
+            window.hideSaving && window.hideSaving();
+            window.showToast && window.showToast('마스터샘플 저장 완료', 'success');
+          })
+          .catch(e => {
+            window.hideSaving && window.hideSaving();
+            window.showToast && window.showToast('마스터샘플 저장 실패: ' + (e?.message || String(e)), 'error');
+          });
+      }
+      if (pane === 'spec') {
+        window.showToast && window.showToast('사양표 저장 완료', 'success');
+      }
+      if (pane === 'insp' && window.currentCarId) {
+        if (typeof window._inspSyncToDb === 'function') {
+          window.showSaving && window.showSaving();
+          window._inspSyncToDb()
+            .then(() => { window.hideSaving && window.hideSaving(); window.showToast && window.showToast('공정검사기준서 저장 완료', 'success'); })
+            .catch(e => { window.hideSaving && window.hideSaving(); window.showToast && window.showToast('공정검사기준서 저장 실패: ' + (e?.message || String(e)), 'error'); });
+        } else {
+          window.showToast && window.showToast('공정검사기준서 저장 완료', 'success');
+        }
+      }
+      if (pane === 'qpoint' && window.currentCarId) {
+        if (typeof window._qpSyncToDb === 'function') {
+          window.showSaving && window.showSaving();
+          window._qpSyncToDb()
+            .then(() => { window.hideSaving && window.hideSaving(); window.showToast && window.showToast('Q-Point 저장 완료', 'success'); })
+            .catch(e => { window.hideSaving && window.hideSaving(); window.showToast && window.showToast('Q-Point 저장 실패: ' + (e?.message || String(e)), 'error'); });
+        } else {
+          window.showToast && window.showToast('Q-Point 저장 완료', 'success');
+        }
       }
     }
   } catch(e) {
@@ -507,6 +552,8 @@ function saveDocument(pane) {
       if (pane === 'imf' && typeof window.imfSetEditable === 'function') window.imfSetEditable(false);
       if (pane === 'ms' && typeof window.msSetEditable === 'function') window.msSetEditable(false);
       if (pane === 'insp' && typeof window.inspSetEditable === 'function') window.inspSetEditable(false);
+      if (pane === 'spec' && typeof window.specSetEditable === 'function') window.specSetEditable(false);
+      if (editBtn) { editBtn.style.background = ''; editBtn.style.color = ''; }
     }
   }
 }
@@ -607,6 +654,7 @@ async function initCars() {
     console.error('차종 로드 실패', e);
     cars = loadCars();
   }
+  window._aitCars = cars;
   renderCarSelect(cars);
   window.currentCar = localStorage.getItem('ait_cur_car') || cars[0]?.name || 'GN7 FL OHCL';
   const cur = cars.find(c => c.name === window.currentCar) || cars[0];
@@ -797,7 +845,7 @@ function _toDirectDriveUrl(url) {
   if (!url) return url;
   const m = url.match(/[?&]fileId=([^&]+)/);
   if (m) return `https://drive.google.com/thumbnail?id=${m[1]}&sz=w1200`;
-  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^?&\s]+)/);
+  const lh3 = url.match(/lh3\.googleusercontent\.com\/d\/([^?&\s=]+)/);
   if (lh3) return `https://drive.google.com/thumbnail?id=${lh3[1]}&sz=w1200`;
   const uc = url.match(/drive\.google\.com\/(?:uc\?.*[?&]id=|thumbnail\?.*[?&]id=)([^&\s]+)/);
   if (uc) return `https://drive.google.com/thumbnail?id=${uc[1]}&sz=w1200`;
@@ -827,14 +875,9 @@ function _renderWsMgmtFromItems(items, paneEl, car) {
       ${delBtn}</tr>`;
   }).join('');
   refreshMgmtRowColors(paneEl);
-  // localStorage mgmt도 갱신
-  try {
-    const wsRaw = localStorage.getItem(`ait_ws_content_${car}`);
-    if (wsRaw) { const d = JSON.parse(wsRaw); d.mgmt = tb.innerHTML; localStorage.setItem(`ait_ws_content_${car}`, JSON.stringify(d)); }
-  } catch(e) {}
 }
 
-function _wsRenderStepsFromDb(rows, paneEl, car) {
+function _wsRenderStepsFromDb(rows, paneEl, car, extraProcs) {
   const byProc = {};
   window._wsProcIdMap = window._wsProcIdMap || {};
   window._wsProcIdMap[car] = {};
@@ -843,14 +886,17 @@ function _wsRenderStepsFromDb(rows, paneEl, car) {
     if (r.process_id) window._wsProcIdMap[car][p] = r.process_id;
     (byProc[p]||(byProc[p]=[])).push(r);
   });
-  const procs = Object.keys(byProc).map(Number).filter(Boolean).sort((a,b)=>a-b);
+  const stepProcs = Object.keys(byProc).map(Number).filter(Boolean).sort((a,b)=>a-b);
+  const procs = (extraProcs && extraProcs.length)
+    ? [...new Set([...stepProcs, ...extraProcs])].sort((a,b)=>a-b)
+    : stepProcs;
   if (!procs.length) return false;
   buildWsProcs(procs, paneEl);
   const delBtn = `<button class="edit-only" onclick="wsRemovePhoto(this)" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border:none;background:rgba(0,0,0,.55);color:#fff;border-radius:4px;cursor:pointer;font-size:12px;line-height:1">✕</button>`;
   procs.forEach(proc => {
     const list = paneEl.querySelector(`#ws-step-list-${proc}`);
     if (!list) return;
-    byProc[proc].sort((a,b)=>a.step_num-b.step_num).forEach((row, idx) => {
+    (byProc[proc] || []).sort((a,b)=>a.step_num-b.step_num).forEach((row, idx) => {
       const item = document.createElement('div');
       item.className = 'ws-step-item';
       let mediaHtml = typeof _wsMediaLabel === 'function' ? _wsMediaLabel() : '';
@@ -885,45 +931,11 @@ function _wsRenderStepsFromDb(rows, paneEl, car) {
       list.appendChild(item);
     });
   });
-  const raw = localStorage.getItem(`ait_ws_content_${car}`);
-  if (raw) {
-    try {
-      const d = JSON.parse(raw);
-      const safety = paneEl.querySelector('#ws-safety');
-      if (safety && d.safety !== undefined) safety.innerHTML = d.safety;
-      // 관리항목(mgmt)은 아래 DB 우선 로드로 처리 (localStorage 우선 제거)
-      // DB에 media_url 없는 step → localStorage 이미지로 보완
-      Object.entries(d.steps || {}).forEach(([proc, stepData]) => {
-        if (!stepData?.list) return;
-        const tmp = document.createElement('div');
-        tmp.innerHTML = stepData.list;
-        tmp.querySelectorAll('.ws-step-item').forEach((idbItem, i) => {
-          const dbItems = paneEl.querySelectorAll(`#ws-step-list-${proc} .ws-step-item`);
-          const dbItem = dbItems[i];
-          if (!dbItem) return;
-          const inner = dbItem.querySelector('.ws-photo-inner');
-          if (!inner || inner.querySelector('img[src], video[src], .ws-drive-video[data-file-id]')) return; // DB에 이미 미디어 있음
-          const idbInner = idbItem.querySelector('.ws-photo-inner');
-          if (!idbInner?.querySelector('img[src], video[src], .ws-drive-video[data-file-id]')) return;
-          inner.innerHTML = idbInner.innerHTML;
-          inner.style.position = 'relative';
-          // data-file-id 있는 base64 → CDN URL 변환
-          inner.querySelectorAll('img[data-file-id], video[data-file-id]').forEach(el => {
-            if (el.src?.startsWith('data:') && el.dataset.fileId)
-              el.src = AIT_API.driveUrl(el.dataset.fileId);
-          });
-        });
-      });
-      setTimeout(() => {
-        if (typeof _wsRenderThumb === 'function') _wsRenderThumb();
-        if (typeof _wsShowStep === 'function') _wsShowStep(typeof _wsIdx !== 'undefined' ? _wsIdx : 0);
-      }, 50);
-    } catch(e) {}
-  }
   const cpMeta = _cpMetaGet(car);
+  const _wsCarE = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
   const wsPn = paneEl.querySelector('#ws-pn'); const wsPnm = paneEl.querySelector('#ws-pname');
-  if (wsPn)  wsPn.textContent  = cpMeta.partno   || '';
-  if (wsPnm) wsPnm.textContent = cpMeta.partname || '';
+  if (wsPn)  wsPn.textContent  = cpMeta.partno   || _wsCarE?.partno   || '';
+  if (wsPnm) wsPnm.textContent = cpMeta.partname || _wsCarE?.partname || '';
   setWsEditable(paneEl, false);
   refreshMgmtRowColors(paneEl);
   if (procs.length && typeof showProcess === 'function') {
@@ -986,8 +998,17 @@ function _saveCarContent(pane, car) {
     data.procs = [...paneEl.querySelectorAll('[id^="ws-step-list-"]')]
       .map(d => parseInt(d.id.replace('ws-step-list-', ''))).filter(Boolean).sort((a,b)=>a-b);
     if (!AIT_API.MOCK && window.currentCarId) {
-      AIT_API.syncWsSteps(window.currentCarId, _wsExtractSteps(paneEl)).catch(e => console.warn('WS DB 동기화 실패', e));
-      AIT_API.saveWsMeta(window.currentCarId, data.safety || '').catch(e => console.warn('WS 안전주의사항 DB 저장 실패', e));
+      window.showSaving && window.showSaving();
+      Promise.all([
+        AIT_API.syncWsSteps(window.currentCarId, _wsExtractSteps(paneEl)),
+        AIT_API.saveWsMeta(window.currentCarId, data.safety || '')
+      ]).then(() => {
+        window.hideSaving && window.hideSaving();
+        window.showToast && window.showToast('작업표준서 저장 완료', 'success');
+      }).catch(e => {
+        window.hideSaving && window.hideSaving();
+        window.showToast && window.showToast('작업표준서 저장 실패: ' + (e?.message || String(e)), 'error');
+      });
     }
   }
   if (pane === 'insp' && typeof window.inspSaveDocData === 'function') window.inspSaveDocData();
@@ -1185,9 +1206,10 @@ function loadCarContent(pane) {
           });
         }
         const cpMeta = _cpMetaGet(car);
+        const _wsCarDb = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
         const wsPn = paneEl.querySelector('#ws-pn'); const wsPnm = paneEl.querySelector('#ws-pname');
-        if (wsPn)  wsPn.textContent  = cpMeta.partno   || '';
-        if (wsPnm) wsPnm.textContent = cpMeta.partname || '';
+        if (wsPn)  wsPn.textContent  = cpMeta.partno   || _wsCarDb?.partno   || '';
+        if (wsPnm) wsPnm.textContent = cpMeta.partname || _wsCarDb?.partname || '';
         setWsEditable(paneEl, false);
         refreshMgmtRowColors(paneEl);
         if (procs.length > 0 && typeof showProcess === 'function') {
@@ -1208,9 +1230,10 @@ function loadCarContent(pane) {
         const fallbackProcs = cpProcs.length > 0 ? cpProcs : [20,30,40,50,60];
         buildWsProcs(fallbackProcs, paneEl);
         const _fm = _cpMetaGet(car);
+        const _wsCarLs = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
         const _fpn = paneEl.querySelector('#ws-pn'); const _fpnm = paneEl.querySelector('#ws-pname');
-        if (_fpn)  _fpn.textContent  = _fm.partno   || '';
-        if (_fpnm) _fpnm.textContent = _fm.partname || '';
+        if (_fpn)  _fpn.textContent  = _fm.partno   || _wsCarLs?.partno   || '';
+        if (_fpnm) _fpnm.textContent = _fm.partname || _wsCarLs?.partname || '';
         if (!isBase) {
           const tb2 = paneEl.querySelector('#ws-mgmt-tbody');
           if (tb2) tb2.innerHTML = '';
@@ -1229,16 +1252,11 @@ function loadCarContent(pane) {
           const safetyEl = paneEl.querySelector('#ws-safety');
           if (safetyEl) safetyEl.innerHTML = meta.safety_html || '';
         }
-        // 2. STEP: DB에서 로드
-        if (stepsRows && stepsRows.length) {
-          _wsRenderStepsFromDb(stepsRows, paneEl, car);
-        }
-        // 2. 관리항목: CP rows에서 직접 빌드 (단일 진실 소스, STEP 렌더 후 mgmt-tbody 덮어씀)
+        // 2. 관리항목: CP rows에서 cpProcs 먼저 추출 (STEP nav 빌드에 사용)
         let cpProcs = [];
         if (cpRows && cpRows.length) {
           window._cpRowsForWs = cpRows; // showProcess 폴백용 캐시
           cpProcs = _buildWsMgmtFromCpRows(cpRows, paneEl);
-          // _buildWsMgmtFromCpRows가 전체 행을 재빌드하므로, 현재 공정 필터를 재적용
           const activeProcNum = parseInt(paneEl.querySelector('#ws-proc-num')?.textContent.trim()) || 0;
           if (activeProcNum) {
             paneEl.querySelectorAll('#ws-mgmt-tbody tr').forEach(r => {
@@ -1246,10 +1264,20 @@ function loadCarContent(pane) {
             });
           }
         }
-        // 3. STEP이 없어 공정 nav가 비어있으면 CP rows의 공정으로 빌드
-        if (cpProcs.length && !paneEl.querySelector('#ws-proc-nav .proc-btn')) {
+        // 3. STEP: DB에서 로드 (cpProcs 전달 → CP 전체 공정 탭 포함)
+        if (stepsRows && stepsRows.length) {
+          _wsRenderStepsFromDb(stepsRows, paneEl, car, cpProcs);
+        } else if (cpProcs.length && !paneEl.querySelector('#ws-proc-nav .proc-btn')) {
           buildWsProcs(cpProcs, paneEl);
         }
+        // 4. 품번/품명 헤더 — _cpMetaCache 우선, window._aitCars 폴백
+        const _hm = _cpMetaGet(car);
+        const _carEntry = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
+        console.log('[WS품번]', 'car=', car, 'carId=', window.currentCarId, 'cpMeta=', _hm, 'aitCarsEntry=', _carEntry);
+        const _wsPn = paneEl.querySelector('#ws-pn');
+        const _wsPnm = paneEl.querySelector('#ws-pname');
+        if (_wsPn)  _wsPn.textContent  = _hm.partno   || _carEntry?.partno   || '';
+        if (_wsPnm) _wsPnm.textContent = _hm.partname || _carEntry?.partname || '';
         refreshMgmtRowColors(paneEl);
       });
     }
@@ -1322,6 +1350,10 @@ function loadCarContent(pane) {
         }
       }).catch(() => { if (typeof window._dFlushInfo === 'function') window._dFlushInfo(); });
     } else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
+  } else if (pane === 'insp') {
+    if (typeof window.inspLoadDoc === 'function') window.inspLoadDoc();
+  } else if (pane === 'qpoint') {
+    if (typeof window.qpLoad === 'function') window.qpLoad();
   }
 }
 

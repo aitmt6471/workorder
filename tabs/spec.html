@@ -18,6 +18,7 @@
     <button class="btn btn-ghost btn-sm" onclick="openRevModal('spec')">이력</button>
   </div>
   <div style="flex:1"></div>
+  <button class="btn btn-primary btn-sm edit-only" id="spec-save-btn" onclick="saveDocument('spec')">&#x1F4BE; 저장</button>
   <button class="btn btn-ghost btn-sm" id="spec-edit-btn" onclick="specToggleEdit(this)">&#x270F; 편집 모드</button>
 </div>
 
@@ -817,14 +818,37 @@ window.specViewPartPhotos=function(rowIdx){
 
 /* ── 편집 모드 (툴바 버튼) ── */
 window.specToggleEdit=function(btn){
-  if(!_specEditMode){
+  const paneEl=document.getElementById('pane-spec');
+  if(_specEditMode){
+    const save=confirm('데이터를 저장하겠습니까?\n\n[확인] 예 — 저장\n[취소] 아니오 — 저장하지 않고 나가기');
+    if(save){
+      if(typeof saveDocument==='function') saveDocument('spec');
+    }else{
+      _specEditMode=false;
+      if(paneEl) paneEl.classList.remove('edit-mode');
+      if(typeof _syncSidebarReset==='function') _syncSidebarReset();
+      btn.textContent='✏ 편집 모드';
+      btn.classList.remove('btn-primary');
+      btn.classList.add('btn-ghost');
+      btn.style.background='';
+      btn.style.color='';
+    }
+  }else{
     const pw=prompt('비밀번호를 입력하세요');
     if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}
+    _specEditMode=true;
+    if(paneEl) paneEl.classList.add('edit-mode');
+    if(typeof _syncSidebarReset==='function') _syncSidebarReset();
+    btn.textContent='✓ 편집 완료';
+    btn.classList.remove('btn-ghost');
+    btn.classList.add('btn-primary');
+    btn.style.background='';
+    btn.style.color='';
   }
-  _specEditMode=!_specEditMode;
-  btn.textContent=_specEditMode?'✓ 편집 완료':'✏ 편집 모드';
-  btn.style.background=_specEditMode?'#1e3264':'';
-  btn.style.color=_specEditMode?'#fff':'';
+};
+
+window.specSetEditable=function(on){
+  _specEditMode=!!on;
 };
 
 /* ── 초기화 ── */

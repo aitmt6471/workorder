@@ -365,10 +365,16 @@ window._dUploadEquipPhoto = async function(order, input) {
   const r = new FileReader();
   r.onload = async ev => {
     try {
+      // 기존 슬롯 사진이 있으면 Drive에서 먼저 삭제
+      const existing = (_dailyPhotos[photoKey]||[]).find(p => parseInt(p.photo_order) === order);
+      if (existing) {
+        const oldFileId = existing.media_file_id || existing.file_id;
+        if (oldFileId) { try { await AIT_API.deleteDailyPhoto(oldFileId); } catch(_) {} }
+      }
       const base64 = ev.target.result.split(',')[1];
       const ext = (file.name.split('.').pop()||'jpg');
       const res = await AIT_API.uploadDailyPhoto({ car, proc: e.proc_no, filename: `daily_${car}_equip${equipId}_slot${order}_${Date.now()}.${ext}`, base64 });
-      const entry = { photo_order: order, photo_url: AIT_API.driveUrl(res.fileId), media_file_id: res.fileId };
+      const entry = { photo_order: order, photo_url: AIT_API.driveUrl(res.fileId), media_file_id: res.fileId, file_id: res.fileId };
       if (!_dailyPhotos[photoKey]) _dailyPhotos[photoKey] = [];
       const idx = _dailyPhotos[photoKey].findIndex(p => parseInt(p.photo_order) === order);
       if (idx >= 0) _dailyPhotos[photoKey][idx] = entry; else _dailyPhotos[photoKey].push(entry);
@@ -382,9 +388,10 @@ window._dUploadEquipPhoto = async function(order, input) {
 window._dDelEquipPhoto = async function(order) {
   const e = DAILY_EQUIP[curEquip], equipId = e.id, photoKey = _photoKey(e);
   const photo = (_dailyPhotos[photoKey]||[]).find(p => parseInt(p.photo_order) === order);
-  if (photo?.media_file_id) { try { await AIT_API.deleteDailyPhoto(photo.media_file_id); } catch(e){} }
+  const fileId = photo?.media_file_id || photo?.file_id;
+  if (fileId) { try { await AIT_API.deleteDailyPhoto(fileId); } catch(_){} }
   _dailyPhotos[photoKey] = (_dailyPhotos[photoKey]||[]).filter(p => parseInt(p.photo_order) !== order);
-  if (equipId) { try { await AIT_API.syncDailyEquipPhotos(window.currentCarId, equipId, _dailyPhotos[photoKey]); } catch(e){} }
+  if (equipId) { try { await AIT_API.syncDailyEquipPhotos(window.currentCarId, equipId, _dailyPhotos[photoKey]); } catch(_){} }
   renderPhotoStrip();
 };
 

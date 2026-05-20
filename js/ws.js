@@ -28,7 +28,7 @@ function showProcess(num, el) {
   } else if (window._cpRowsForWs) {
     // CP 탭 DOM이 아직 로드되지 않은 경우 → WS 로드 시 캐시한 DB 행으로 폴백
     const dbMatched = window._cpRowsForWs.filter(r => parseInt(r.proc_no) === num);
-    const equips = [...new Set(dbMatched.map(r => r.equip_name).filter(v => v && v !== 'MAIN' && v !== 'SUB' && !(v||'').includes('외주')))];
+    const equips = [...new Set(dbMatched.map(r => r.equip_name).filter(v => v && v !== 'null' && v !== 'MAIN' && v !== 'SUB' && !(v||'').includes('외주')))];
     info = { name: dbMatched[0]?.proc_name || '', equip: equips.join(', ') };
   } else {
     info = { name: '', equip: '' };

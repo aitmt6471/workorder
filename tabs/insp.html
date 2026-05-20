@@ -88,13 +88,23 @@ function compressImg(file,cb){
 function loadDoc(){
   _carKey=carKey();
   if(!_carKey){ _doc=null; render(); return; }
-  try{
-    var raw=localStorage.getItem(lsKey());
-    _doc=raw?JSON.parse(raw):{part_no:'',part_name:'',procs:[]};
-  }catch(e){
-    _doc={part_no:'',part_name:'',procs:[]};
+  if(typeof AIT_API!=='undefined' && !AIT_API.MOCK && window.currentCarId){
+    AIT_API.getInspDoc(window.currentCarId).then(function(doc){
+      _doc=doc||{part_no:'',part_name:'',procs:[]};
+      try{localStorage.setItem(lsKey(),JSON.stringify(_doc));}catch(e){}
+      if(_procId===null && _doc.procs&&_doc.procs.length) _procId=_doc.procs[0].id;
+      render();
+    }).catch(function(){
+      try{var raw=localStorage.getItem(lsKey());_doc=raw?JSON.parse(raw):{part_no:'',part_name:'',procs:[]};}
+      catch(e){_doc={part_no:'',part_name:'',procs:[]};}
+      if(_procId===null && _doc.procs&&_doc.procs.length) _procId=_doc.procs[0].id;
+      render();
+    });
+    return;
   }
-  if(_procId===null && _doc.procs.length) _procId=_doc.procs[0].id;
+  try{var raw=localStorage.getItem(lsKey());_doc=raw?JSON.parse(raw):{part_no:'',part_name:'',procs:[]};}
+  catch(e){_doc={part_no:'',part_name:'',procs:[]};}
+  if(_procId===null && _doc.procs&&_doc.procs.length) _procId=_doc.procs[0].id;
   render();
 }
 
@@ -242,6 +252,13 @@ window.inspSetEditable=function(on){
 window.inspSaveDocData=function(){
   saveDoc(true);
 };
+
+window._inspSyncToDb=function(){
+  if(!_doc||!window.currentCarId) return Promise.reject(new Error('데이터 없음'));
+  return AIT_API.saveInspDoc(window.currentCarId,_doc);
+};
+
+window.inspLoadDoc=loadDoc;
 
 /* ── 공정 관리 ── */
 window.inspSelProc=function(id){ _procId=id; renderNav(); renderContent(); };

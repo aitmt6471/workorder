@@ -246,7 +246,20 @@ function compressImage(file,cb){
 
 /* ── 데이터 ── */
 function load(){
-  try{ _list=JSON.parse(localStorage.getItem(LS_KEY)||'[]'); }catch(e){ _list=[]; }
+  if(typeof AIT_API!=='undefined' && !AIT_API.MOCK && window.currentCarId){
+    AIT_API.getQpointList(window.currentCarId).then(function(list){
+      _list=Array.isArray(list)?list:[];
+      try{localStorage.setItem(LS_KEY,JSON.stringify(_list));}catch(e){}
+      renderList();
+      if(_selId) renderDetail(_selId);
+    }).catch(function(){
+      try{_list=JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){_list=[];}
+      renderList();
+      if(_selId) renderDetail(_selId);
+    });
+    return;
+  }
+  try{_list=JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){_list=[];}
   renderList();
   if(_selId) renderDetail(_selId);
 }
@@ -255,6 +268,13 @@ function save(){
   try{ localStorage.setItem(LS_KEY,JSON.stringify(_list)); }
   catch(e){ if(typeof showToast==='function') showToast('저장 실패 (용량 초과)','error'); }
 }
+
+window._qpSyncToDb=function(){
+  if(!window.currentCarId) return Promise.reject(new Error('차종 미선택'));
+  return AIT_API.saveQpointList(window.currentCarId,_list);
+};
+
+window.qpLoad=load;
 
 function findQ(id){
   for(var i=0;i<_list.length;i++){ if(_list[i].id===id) return _list[i]; }
