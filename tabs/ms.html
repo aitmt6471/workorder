@@ -921,7 +921,7 @@ async function renderMsPhotoStrip(){
     if(url&&!firstUrl) firstUrl=url;
     const safe=url.replace(/'/g,'%27');
     const imgHtml=url
-      ?`<img src="${url}" style="width:100%;height:100%;object-fit:contain;background:#fff;cursor:pointer" onclick="window._msShowMainPhoto('${safe}')">`
+      ?`<div class="ms-img-ph" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#9ca3af;pointer-events:none">이미지 로딩중</div><img src="${url}" style="width:100%;height:100%;object-fit:contain;background:#fff;cursor:pointer;display:none" onload="this.previousElementSibling.style.display='none';this.style.display='block'" onerror="this.previousElementSibling.textContent='로드 실패';this.style.display='none'" onclick="window._msShowMainPhoto('${safe}')">`
       :`<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;color:#9ca3af"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg><span style="font-size:9px">없음</span></div>`;
     const uploadBtn=msEditMode?`<label style="position:absolute;bottom:5px;right:5px;background:rgba(30,50,100,.75);color:#fff;font-size:9px;padding:3px 7px;border-radius:4px;cursor:pointer;z-index:2">📷<input type="file" accept="image/*" style="display:none" onchange="window._msUploadPhoto('${slot}',this)"></label>`:'';
     const delBtn=(url&&msEditMode)?`<button onclick="window._msDelPhoto('${slot}')" style="position:absolute;top:4px;right:4px;width:20px;height:20px;background:rgba(220,38,38,.8);color:#fff;border:none;border-radius:50%;font-size:10px;line-height:1;cursor:pointer;z-index:2">✕</button>`:'';
@@ -978,9 +978,13 @@ window._msSyncToDb = async function() {
     const sId = _msSampleIds[sIdx];
     if (!sId) return;
     s.items.forEach((it, iIdx) => {
+      const _cached = MS_ITEMS[`${sIdx}_${it.no}`] || {};
       allItems.push({ sample_id: sId, item_no: parseInt(it.no) || (iIdx + 1),
-        item_name: it.name, standard: it.std, method: it.method,
-        cycle: it.cycle, sort_order: iIdx + 1 });
+        item_name: _cached.item_name !== undefined ? _cached.item_name : it.name,
+        standard:  _cached.standard  !== undefined ? _cached.standard  : it.std,
+        method:    _cached.method    !== undefined ? _cached.method    : it.method,
+        cycle:     _cached.cycle     !== undefined ? _cached.cycle     : it.cycle,
+        sort_order: iIdx + 1 });
     });
   });
   if (allItems.length)
@@ -999,6 +1003,9 @@ window._msSaveItemDef=function(td){
     const fieldMap = { name: 'item_name', std: 'standard', method: 'method', cycle: 'cycle' };
     const dbField = fieldMap[field] || field;
     MS_ITEMS[_msKey2][dbField] = td.textContent.trim();
+    // MS_DATA도 동기화 — _msSyncToDb가 MS_DATA 기준으로 읽기 때문에 반드시 필요
+    const _msDSamp = MS_DATA[sampleIdx];
+    if (_msDSamp) { const _msDItem = _msDSamp.items.find(it => String(it.no) === String(itemNo)); if (_msDItem) _msDItem[field] = td.textContent.trim(); }
 
     if (window.currentCarId) {
       clearTimeout(window._msItemSyncTimer);
