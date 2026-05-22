@@ -42,6 +42,17 @@ function applyEnabledDocs(docs) {
 
 /* ── 차종 변경 → 전체 탭 재로드 ── */
 function onCarChange(sel) {
+  const editPane = document.querySelector('.pane.active.edit-mode');
+  if (editPane) {
+    const curPaneId = editPane.id.replace('pane-', '');
+    const ans = confirm('편집 중인 내용이 있습니다.\n\n[확인] 저장하고 차종 변경\n[취소] 차종 변경 취소');
+    if (!ans) {
+      const prevCar = window.currentCar;
+      Array.from(sel.options).forEach((o, i) => { if (o.text === prevCar) sel.selectedIndex = i; });
+      return;
+    }
+    if (typeof saveDocument === 'function') saveDocument(curPaneId);
+  }
   const opt = sel.options[sel.selectedIndex];
   window.currentCar   = opt.text;
   window.currentCarId = opt.value;
@@ -1286,7 +1297,7 @@ function loadCarContent(pane) {
     if (typeof imfRenderAll === 'function') imfRenderAll();
 
   } else if (pane === 'ms') {
-    if (typeof msRenderAll === 'function') msRenderAll();
+    if (typeof window._msReInit === 'function') window._msReInit();
   } else if (pane === 'daily') {
     if (!AIT_API.MOCK && window.currentCarId) {
       const linename = _cpMetaGet(car).linename || '';

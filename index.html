@@ -346,6 +346,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 const _origShowTab = window.showTab;
 window.showTab = function(id, el) {
+  const editPane = document.querySelector('.pane.active.edit-mode');
+  if (editPane) {
+    const curId = editPane.id.replace('pane-', '');
+    if (curId === id) { _origShowTab(id, el); loadTab(id); return; }
+    const ans = confirm('편집 중인 내용이 있습니다.\n\n[확인] 저장하고 이동\n[취소] 이동 취소');
+    if (!ans) return;
+    if (typeof saveDocument === 'function') saveDocument(curId);
+  }
   _origShowTab(id, el);
   loadTab(id);
 };

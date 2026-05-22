@@ -369,8 +369,9 @@ function msUpdateVisibility(){
   }
 }
 
-/* ── 탭 단축 레이블 파생 (설비명+타입+NG순번) ── */
+/* ── 탭 단축 레이블 파생 (사용자 지정 → 설비명+타입+NG순번) ── */
 function _msDeriveTabLabel(s, idx){
+  if (s.sheet && s.sheet !== '(샘플명)') return s.sheet;
   const nm = s.name || '';
   const isVision = nm.includes('비전') || nm.includes('비젼');
   const eqType = isVision ? '비전' : '기능';
@@ -400,12 +401,21 @@ function msRenderSampleTabs(){
            width:14px;height:14px;border-radius:50%;background:rgba(239,68,68,.15);color:#ef4444;
            font-size:9px;font-weight:900;cursor:pointer;line-height:1" title="탭 삭제">✕</span>`
       : '';
+    const label = _msDeriveTabLabel(s, i);
+    const labelEl = msEditMode
+      ? `<input value="${label.replace(/"/g,'&quot;')}"
+           onclick="event.stopPropagation()"
+           onkeydown="if(event.key==='Enter'){this.blur();event.stopPropagation();}"
+           onblur="window._msSaveTabLabel(${i},this.value)"
+           title="탭 이름 수정"
+           style="border:none;background:transparent;color:${active?'#fff':'var(--text)'};font-size:11px;font-weight:600;width:${Math.max(70,label.length*8)}px;outline:1px solid rgba(${active?'255,255,255':'30,50,100'},.4);border-radius:2px;padding:0 2px;font-family:inherit;cursor:text">`
+      : label;
     return `<button onclick="window._msSelSample(${i})"
       style="padding:6px 10px;font-size:11px;font-weight:600;border:1px solid ${active?'#1e3264':'#c4cedf'};border-bottom:none;
       border-radius:6px 6px 0 0;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;
       background:${active?'#1e3264':'#fff'};color:${active?'#fff':'var(--text)'}">
       <span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;
-        background:${active?'rgba(255,255,255,.2)':typeBg};color:${active?'#fff':typeColor};margin-right:4px">${s.type}</span>${_msDeriveTabLabel(s,i)}${delBtn}
+        background:${active?'rgba(255,255,255,.2)':typeBg};color:${active?'#fff':typeColor};margin-right:4px">${s.type}</span>${labelEl}${delBtn}
     </button>`;
   }).join('');
 }
@@ -554,6 +564,17 @@ window._msToggleType = function(){
     AIT_API.updateMsSample(sId, { sample_type: s.type }).catch(e => console.warn('샘플타입 저장 실패', e));
   }
   renderMsSampleInfo();
+  msRenderSampleTabs();
+};
+window._msSaveTabLabel = function(idx, val) {
+  val = (val || '').trim();
+  if (!val) return;
+  MS_DATA[idx].sheet = val;
+  msSaveData();
+  const sId = _msSampleIds[idx];
+  if (sId && !AIT_API.MOCK) {
+    AIT_API.updateMsSample(sId, { sheet_name: val }).catch(e => console.warn('탭 이름 저장 실패', e));
+  }
   msRenderSampleTabs();
 };
 
@@ -1051,6 +1072,18 @@ window._msGetMonth         = () => getTabMonth('ms');
 window._msGetData          = () => MS_DATA;
 window._msGetCar           = () => typeof getCar === 'function' ? getCar() : '';
 window._msGetCurSample     = () => curSample;
+window._msReInit = async function() {
+  MS_DATA = []; _msSampleIds = []; MS_ITEMS = {};
+  curSample = 0; curDay = new Date().getDate(); msEditMode = false;
+  _msMonthStatusLoaded.clear();
+  for (const k in _msMonthStatusData) delete _msMonthStatusData[k];
+  _msDBLoadedDays.clear();
+  for (const k in _msTsCache) delete _msTsCache[k];
+  _msHasDBData.clear();
+  for (const k in _msPhotoCache) delete _msPhotoCache[k];
+  if (window.currentCarId && !AIT_API.MOCK) await _msInitFromDb();
+  msRenderAll();
+};
 window._msPhotoCache          = _msPhotoCache;
 window._msSampleIds           = _msSampleIds;
 window._msLoadPhotosFromDb    = (sId) => _msLoadPhotosFromDb(sId);
