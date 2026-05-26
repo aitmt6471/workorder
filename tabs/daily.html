@@ -223,20 +223,17 @@ window._dailyGetEquip = () => DAILY_EQUIP;
 window._dInitEquip = async function(list) {
   // id 없는 CP 데이터 → DB 동기화 후 ID만 병합 (이름·항목은 CP 데이터 유지)
   if (list.length > 0 && list.some(e => !e.id) && window.currentCarId && !AIT_API.MOCK) {
+    const noIdItems = list.filter(e => !e.id);
     try {
-      const noIdItems = list.filter(e => !e.id);
-      for (let i = 0; i < noIdItems.length; i++) {
-        const e = noIdItems[i];
-        await AIT_API.createDailyEquip(window.currentCarId, {
-          equip_name: e.sheet,
-          proc_no: e.proc_no || '',
-          proc_name: e.proc_name || '',
-          location: e.location || '',
-          manager: e.manager || '',
-          sort_order: i
-        });
-      }
-    } catch(e) { console.warn('설비 DB 등록 실패', e); }
+      await AIT_API.syncDailyEquip(window.currentCarId, noIdItems.map(e => ({
+        sheet: e.sheet,
+        proc_no: e.proc_no || '',
+        proc_name: e.proc_name || '',
+        location: e.location || '',
+        manager: e.manager || '',
+        sort_order: list.indexOf(e)
+      })));
+    } catch(err) { console.warn('설비 DB 등록 실패', err); }
     try {
       const dbRows = await AIT_API.getDailyEquipments(window.currentCarId);
       if (dbRows && dbRows.length) {
@@ -372,7 +369,20 @@ window._dShowMainPhoto = _dShowMainPhoto;
 window._dUploadEquipPhoto = async function(order, input) {
   const file = input.files[0]; input.value = ''; if (!file) return;
   if (file.size > 10*1024*1024) { alert('10MB 이하 이미지만 가능합니다.'); return; }
-  const car = getCar(), e = DAILY_EQUIP[curEquip], equipId = e.id, photoKey = _photoKey(e);
+  const car = getCar();
+  let e = DAILY_EQUIP[curEquip], equipId = e?.id;
+  if (!equipId && window.currentCarId && !AIT_API.MOCK) {
+    try {
+      await AIT_API.syncDailyEquip(window.currentCarId, [{
+        sheet: e.sheet, proc_no: e.proc_no||'', proc_name: e.proc_name||'',
+        location: e.location||'', manager: e.manager||'', sort_order: DAILY_EQUIP.indexOf(e)
+      }]);
+      const dbRows = await AIT_API.getDailyEquipments(window.currentCarId);
+      const found = dbRows && dbRows.find(r => r.equip_name === e.sheet);
+      if (found) { e.id = found.id; equipId = found.id; }
+    } catch(err) { console.warn('설비 등록 재시도 실패', err); }
+  }
+  const photoKey = _photoKey(e);
   if (!equipId) { alert('설비 DB 동기화가 완료되지 않았습니다. 잠시 후 다시 시도해주세요.'); return; }
   const st = document.getElementById('d-photo-status'); if (st) st.textContent = '업로드 중…';
   const r = new FileReader();
@@ -800,8 +810,6 @@ function _dStageResult(equipIdx, itemNo, date, result, remark) {
     result:  result  !== undefined ? result  : prev.result,
     remark:  remark  !== undefined ? remark  : prev.remark
   });
-  clearTimeout(_dSaveTimer);
-  _dSaveTimer = setTimeout(_dFlushResults, 1000);
 }
 
 async function _dFlushResults() {
@@ -814,13 +822,39 @@ async function _dFlushResults() {
     const [yr, mo, dy] = v.date.split('-');
     const rKey = `${yr}_${parseInt(mo)}_${parseInt(dy)}_${v.equipIdx}`;
     const existing = (_dResults[rKey] || {})[v.itemNo] || {};
-    // daily_items.id (FK) 조회 — item_no는 설비 내 순번, item_id는 DB PK
     const equipDbId = (DAILY_EQUIP[v.equipIdx] || {}).id || v.equipIdx;
     const dItem = DAILY_ITEMS[`${equipDbId}_${v.itemNo}`] || {};
-    if (!dItem.id) return; // item_id 없으면 저장 불가 (items 아직 미로드)
+    if (!dItem.id) return;
     grouped.get(gKey).results.push({ item_id: dItem.id, result: v.result || '', remark: v.remark || '', saved_at: now });
     grouped.get(gKey).meta.push({ itemNo: v.itemNo, rKey, isFirst: !existing.savedAt });
   });
+
+  // ── 저장 전 alarm_rules 검증 ──────────────────────────────
+  if (!AIT_API.MOCK) {
+    const allViolations = [];
+    for (const [, g] of grouped) {
+      const equip = DAILY_EQUIP[g.equipIdx] || {};
+      const equip_id = equip.id || g.equipIdx;
+      if (!equip_id) continue;
+      const alarmRes = g.results.map(r => {
+        const dItem = Object.values(DAILY_ITEMS).find(it => it.id === r.item_id) || {};
+        return { item_no: String(dItem.item_no || r.item_id), result: r.result, item_name: dItem.item_name || '' };
+      });
+      try {
+        const vRes = await AIT_API.validateDailyResults(equip_id, g.date, alarmRes);
+        const viols = (vRes && vRes.violations) || [];
+        viols.forEach(vio => allViolations.push({ ...vio, equip_name: equip.sheet || '' }));
+      } catch(e) {
+        console.warn('검증 API 실패, 저장 진행', e);
+      }
+    }
+    if (allViolations.length) {
+      _dShowAlarmBlockModal(allViolations);
+      return false; // pending 유지 — 저장 안 함
+    }
+  }
+  // ─────────────────────────────────────────────────────────
+
   _dPendingResults.clear();
   for (const [, g] of grouped) {
     const equip = DAILY_EQUIP[g.equipIdx] || {};
@@ -837,13 +871,6 @@ async function _dFlushResults() {
         else _dResults[rKey][itemNo].modifiedAt = now;
         if (g.equipIdx === curEquip) _dUpdateRowTs(itemNo, _dResults[rKey][itemNo].savedAt, _dResults[rKey][itemNo].modifiedAt);
       });
-      if (typeof window._aitAlarmValidate === 'function') {
-        const alarmRes = g.results.map(r => {
-          const dItem = Object.values(DAILY_ITEMS).find(it => it.id === r.item_id) || {};
-          return { item_no: String(dItem.item_no || r.item_id), result: r.result, item_name: dItem.item_name || '' };
-        });
-        window._aitAlarmValidate('daily', equip_id, g.date, alarmRes, { equip_name: equip.sheet || '' }).catch(() => {});
-      }
     } catch(e) {
       console.warn('결과 저장 실패', e);
       if (typeof showToast === 'function') showToast('저장 실패: 서버 연결을 확인하세요', 'error');
@@ -908,15 +935,44 @@ window._dSaveNow=async function(){
   const _w=document.getElementById('d-worker-input')?.value.trim()||'';
   const _v=document.getElementById('d-verifier-input')?.value.trim()||'';
   if(!_w||!_v){alert('점검자와 확인자를 모두 입력해주세요.');return;}
-  clearTimeout(_dSaveTimer);
-  const btn=document.getElementById('d-save-btn');
-  if(btn){btn.disabled=true;btn.textContent='저장 중…';}
-  await _dFlushResults();
-  if(btn){btn.disabled=false;btn.textContent='저장';}
-  const _sm=getTabMonth('daily');
-  _dHasDBData.add(`${curEquip}_${curDay}_${_sm.year}_${_sm.month}`);
-  _dSetReadOnly(true);
-  renderCheckTable();
+  // ── 미입력/스펙이탈 검증 ──────────────────────────────────
+  const _dIssues=[];
+  const _dE=DAILY_EQUIP[curEquip];
+  if(_dE&&_dE.items){
+    const _dM=getTabMonth('daily');
+    const _dRK=`${_dM.year}_${_dM.month}_${curDay}_${curEquip}`;
+    const _dDd=_dResults[_dRK]||{};
+    _dE.items.forEach(item=>{
+      const _rd=_dDd[item.no]||{};
+      const _val=_rd.result||'';
+      const _std=item.std||'';
+      if(!_val){
+        _dIssues.push({type:'empty',name:item.name||`항목 ${item.no}`,std:_std});
+      } else if(_dIsNumericStd(_std)){
+        if(_dCheckInRange(parseFloat(_val),_std)===false)
+          _dIssues.push({type:'outofspec',name:item.name||`항목 ${item.no}`,val:_val,std:_std});
+      } else if(_val==='✕'){
+        _dIssues.push({type:'outofspec',name:item.name||`항목 ${item.no}`,val:'✕',std:_std});
+      }
+    });
+  }
+  // ────────────────────────────────────────────────────────
+  const _doSave=async()=>{
+    clearTimeout(_dSaveTimer);
+    const btn=document.getElementById('d-save-btn');
+    if(btn){btn.disabled=true;btn.textContent='저장 중…';}
+    const _saved=await _dFlushResults();
+    if(btn){btn.disabled=false;btn.textContent='저장';}
+    if(_saved===false) return;
+    const _sm=getTabMonth('daily');
+    _dHasDBData.add(`${curEquip}_${curDay}_${_sm.year}_${_sm.month}`);
+    _dSetReadOnly(true);
+    renderCheckTable();
+  };
+  if(_dIssues.length>0&&typeof window._showSpecWarnModal==='function'){
+    window._showSpecWarnModal(_dIssues,_doSave); return;
+  }
+  await _doSave();
 };
 function _dSetReadOnly(flag) {
   _dReadOnly = flag;
@@ -1010,7 +1066,7 @@ window.dailySetEditable=function(on){
 if(DAILY_EQUIP.length>0){ renderEquipInfo(); dailyRenderDayPicker(); renderCheckTable(); loadAndRenderPhotos(); }
 if(typeof window._aitLoadAlarmState==='function') window._aitLoadAlarmState();
 
-window.addEventListener('beforeunload', () => { clearTimeout(_dSaveTimer); _dFlushResults(); });
+window.addEventListener('beforeunload', () => { clearTimeout(_dSaveTimer); });
   window._dailyPhotosObj      = _dailyPhotos;
   window._dailyPhotoKey       = e => _photoKey(e);
   window._dailyLoadEquipPhotos = loadEquipPhotos;
@@ -1122,7 +1178,9 @@ window.print_daily = async function() {
     const workerRow = `<tr><td colspan="5" style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;text-align:center;background:#f0f4ff"><b>점검자</b></td>${days.map((_,di)=>TD(`<span style="font-size:6px">${dayResults[di].worker}</span>`)).join('')}</tr>`;
     const verifierRow = `<tr><td colspan="5" style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;text-align:center;background:#f0f4ff"><b>확인자</b></td>${days.map((_,di)=>TD(`<span style="font-size:6px">${dayResults[di].verifier}</span>`)).join('')}</tr>`;
     const revDateRow = `<tr><td colspan="5" style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;text-align:center;background:#f0f4ff"><b>개정이력일</b></td><td colspan="${daysInMonth}" style="border:1px solid #b8c4d8;padding:2px 6px;font-size:8px;text-align:center;color:#1e3264;font-weight:700">${revDate}</td></tr>`;
-    const photos = (printPhotosObj[_photoKeyFn(e)]||[]).filter(p=>p.photo_url);
+    const photoCount = e.photo_count || e.items.length || 0;
+    const totalSlots = 1 + photoCount;
+    const photos = (printPhotosObj[_photoKeyFn(e)]||[]).filter(p=>p.photo_url && parseInt(p.photo_order) < totalSlots);
     const photosHtml = photos.length ? `<div style="margin-bottom:3px;padding:3px 0"><span style="font-size:8px;font-weight:700;color:#1e3264;display:block;margin-bottom:3px">사 진</span><div style="display:flex;flex-wrap:wrap;gap:6px">${photos.map(p=>`<img src="${(typeof AIT_API!=='undefined'&&AIT_API.normalizePhotoUrl)?AIT_API.normalizePhotoUrl(p.photo_url):p.photo_url}" style="width:200px;height:156px;object-fit:cover;border:1px solid #b8c4d8;border-radius:4px" onerror="this.style.display='none'">`).join('')}</div></div>` : '';
     const isLast = idx===allEquip.length-1;
     return `<div style="${isLast?'':'page-break-after:always'}">
@@ -1158,4 +1216,56 @@ ${photosHtml}
   win.document.write(html);
   win.document.close();
 };
+
+/* ── 저장 전 알람 검증 차단 모달 ────────────────────────── */
+(function() {
+  const OVERLAY_ID = 'd-alarm-modal-overlay';
+
+  function _ensureModal() {
+    if (document.getElementById(OVERLAY_ID)) return;
+    const el = document.createElement('div');
+    el.id = OVERLAY_ID;
+    el.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:none;align-items:center;justify-content:center';
+    el.innerHTML = `
+      <div style="background:#fff;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.3);width:min(660px,94vw);max-height:80vh;display:flex;flex-direction:column;overflow:hidden">
+        <div style="display:flex;align-items:center;padding:14px 20px;border-bottom:1px solid #e2e8f0;background:#fff5f5">
+          <span style="font-size:22px;margin-right:10px">🚫</span>
+          <h4 style="font-size:15px;font-weight:700;flex:1;color:#c53030">저장 불가 — 입력값 이상 감지</h4>
+          <button onclick="document.getElementById('${OVERLAY_ID}').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#718096;line-height:1">✕</button>
+        </div>
+        <div style="overflow-y:auto;padding:16px 20px">
+          <p style="font-size:14px;font-weight:600;color:#c53030;margin-bottom:12px">측정값 다시 확인 후, 지속적 발생 시 관리자 호출해주세요.</p>
+          <div id="d-alarm-modal-body"></div>
+        </div>
+        <div style="padding:12px 20px;border-top:1px solid #e2e8f0;text-align:right">
+          <button onclick="document.getElementById('${OVERLAY_ID}').style.display='none'" style="padding:8px 22px;background:#e53e3e;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">확인</button>
+        </div>
+      </div>`;
+    document.body.appendChild(el);
+  }
+
+  window._dShowAlarmBlockModal = function(violations) {
+    _ensureModal();
+    const rows = violations.map(v => `
+      <tr>
+        <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:13px">${v.equip_name||''}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:13px">${v.item_name||''}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:13px">${v.result||''}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#718096">${v.standard||''}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-size:13px;color:#c53030;font-weight:600;white-space:nowrap">${v.issue||''}</td>
+      </tr>`).join('');
+    document.getElementById('d-alarm-modal-body').innerHTML = `
+      <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0">
+        <thead><tr style="background:#edf2f7">
+          <th style="padding:7px 10px;text-align:left;font-size:12px;font-weight:600">설비</th>
+          <th style="padding:7px 10px;text-align:left;font-size:12px;font-weight:600">항목</th>
+          <th style="padding:7px 10px;text-align:left;font-size:12px;font-weight:600">입력값</th>
+          <th style="padding:7px 10px;text-align:left;font-size:12px;font-weight:600">기준</th>
+          <th style="padding:7px 10px;text-align:left;font-size:12px;font-weight:600">판정</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+    document.getElementById(OVERLAY_ID).style.display = 'flex';
+  };
+})();
 </script>

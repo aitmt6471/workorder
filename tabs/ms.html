@@ -234,15 +234,6 @@ async function _msFlushResults() {
           _msUpdateRowTs(r.item_no, ts.savedAt, ts.modifiedAt);
         }
       });
-      if (typeof window._aitAlarmValidate === 'function') {
-        const alarmRes = g.results.map(r => {
-          const msItem = MS_ITEMS[`${g.sampleIdx}_${r.item_no}`] || {};
-          return { item_no: String(r.item_no), result: r.result, item_name: msItem.item_name || '' };
-        });
-        const _msTabData = MS_DATA[g.sampleIdx] || {};
-        const _msTabLabel = _msDeriveTabLabel(_msTabData, g.sampleIdx);
-        window._aitAlarmValidate('ms', sample_id, g.date, alarmRes, { tab_label: _msTabLabel, equip_name: _msTabData.name || '' }).catch(() => {});
-      }
     } catch(e) { console.warn('MS 결과 저장 실패', e); window.showToast&&window.showToast('결과 저장 실패','error'); }
   }
 }
@@ -264,15 +255,37 @@ window._msSaveNow = async function() {
   const _w=document.getElementById('ms-worker-input')?.value.trim()||'';
   const _v=document.getElementById('ms-verifier-input')?.value.trim()||'';
   if(!_w||!_v){alert('점검자와 확인자를 모두 입력해주세요.');return;}
-  clearTimeout(_msSaveTimer);
-  const btn = document.getElementById('ms-save-btn');
-  if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
-  await _msFlushResults();
-  if (btn) { btn.disabled = false; btn.textContent = '저장'; }
-  const m = getTabMonth('ms');
-  _msHasDBData.add(`${curSample}_${curDay}_${m.year}_${m.month}`);
-  _msSetReadOnly(true);
-  renderMsCheckTable();
+  // ── 미입력 검증 ──────────────────────────────────────────
+  const _msIssues=[];
+  const _msSd=MS_DATA[curSample];
+  if(_msSd&&_msSd.items){
+    const _msM=getTabMonth('ms'),_msCar=getCar();
+    _msSd.items.forEach(item=>{
+      const _k=`ms_${_msCar}_${_msM.year}_${_msM.month}_${curDay}_${curSample}_${item.no}`;
+      const _val=localStorage.getItem(_k)||'';
+      const _msItm=MS_ITEMS[`${curSample}_${item.no}`]||{};
+      const _nm=_msItm.item_name||item.name||`항목 ${item.no}`;
+      const _std=_msItm.standard||item.std||'';
+      if(!_val) _msIssues.push({type:'empty',name:_nm,std:_std});
+      else if(_val==='✕') _msIssues.push({type:'outofspec',name:_nm,val:'✕',std:_std});
+    });
+  }
+  // ────────────────────────────────────────────────────────
+  const _doMsSave=async()=>{
+    clearTimeout(_msSaveTimer);
+    const btn=document.getElementById('ms-save-btn');
+    if(btn){btn.disabled=true;btn.textContent='저장 중…';}
+    await _msFlushResults();
+    if(btn){btn.disabled=false;btn.textContent='저장';}
+    const m=getTabMonth('ms');
+    _msHasDBData.add(`${curSample}_${curDay}_${m.year}_${m.month}`);
+    _msSetReadOnly(true);
+    renderMsCheckTable();
+  };
+  if(_msIssues.length>0&&typeof window._showSpecWarnModal==='function'){
+    window._showSpecWarnModal(_msIssues,_doMsSave); return;
+  }
+  await _doMsSave();
 };
 window._msEditMode = function() { _msSetReadOnly(false); renderMsCheckTable(); };
 

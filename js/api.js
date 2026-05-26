@@ -85,6 +85,7 @@ const AIT_API = (() => {
     getMsMonthStatus:   (sampleId, yearMonth) => _get('ait/ms/month-status', { sampleId, yearMonth }),
     saveDailyResults:   (payload) => _post('ait/daily/results', payload),
     // payload = { equip_id, check_date, worker, results:[{item_id,result,remark}] }
+    validateDailyResults: (equip_id, check_date, results) => _post('ait/daily/validate', { equip_id, check_date, results }),
 
     /* ── 초중종물 ──────────────────────────────── */
     getImfSheets:     (carId)   => _get('ait/imf/sheets', { carId }),
@@ -259,11 +260,14 @@ const AIT_API = (() => {
     updateCpOrder:      (cId, items) => _real.updateCpOrder(cId, items),
     /* 설비일상 */
     getDailyEquipments: (carId)      => impl.getDailyEquipment ? impl.getDailyEquipment(carId) : _real.getDailyEquipments(carId),
+    createDailyEquip:   (carId, d)   => _real.createDailyEquip(carId, d),
+    updateDailyEquip:   (id, d)      => _real.updateDailyEquip(id, d),
     syncDailyEquip:     (carId, equipments) => _real.syncDailyEquip(carId, equipments),
     getDailyResults:    (eId, date)  => _real.getDailyResults(eId, date),
     getDailyMonthStatus:(eId, ym)    => _real.getDailyMonthStatus(eId, ym),
     getMsMonthStatus:   (sId, ym)    => _real.getMsMonthStatus(sId, ym),
     saveDailyResults:   (payload)    => _real.saveDailyResults(payload),
+    validateDailyResults: (equip_id, check_date, results) => _real.validateDailyResults(equip_id, check_date, results),
     resetDailyOnCpChange: (carId, fromDate) => _post('ait/cp/reset-daily', { carId, fromDate }),
     /* IMF */
     getImfSheets:       (carId)      => _real.getImfSheets(carId),

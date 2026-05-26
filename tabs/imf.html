@@ -72,6 +72,10 @@
       style="border:none;background:transparent;font-size:11px;font-family:inherit;width:90px;outline:none;color:#fff;caret-color:#fff"
       onchange="window._imfSaveWorker(this.value)">
   </div>
+  <button onclick="window._imfSaveNow()" id="imf-save-btn"
+    style="font-size:11px;font-weight:700;padding:5px 14px;border-radius:8px;border:1px solid #fff;background:#fff;color:#1e3264;cursor:pointer;letter-spacing:.5px">
+    저장
+  </button>
 </div>
 
 <!-- 날짜 선택 -->
@@ -153,13 +157,6 @@ async function _imfFlushResults() {
     const payload = { sheet_id, check_date: g.date, worker, results: g.results };
     try {
       await AIT_API.saveImfResults(payload);
-      if (typeof window._aitAlarmValidate === 'function') {
-        const alarmRes = g.results.map(r => {
-          const imfItem = IMF_ITEMS[`${g.sheetIdx}_${r.item_no}`] || {};
-          return { item_no: String(r.item_no), result: r.result, item_name: imfItem.item_name || '' };
-        });
-        window._aitAlarmValidate('imf', sheet_id, g.date, alarmRes).catch(() => {});
-      }
     } catch(e) { console.warn('IMF 결과 저장 실패', e); }
   }
 }
@@ -650,6 +647,62 @@ window.imfSetEditable = function(on){
   const hint = document.getElementById('imf-empty-edit-hint'); if(hint) hint.style.display = (on && IMF_DATA.length === 0) ? '' : 'none';
   imfRenderSheetTabs();
   if(IMF_DATA.length > 0) imfRenderCheckTable();
+};
+
+/* ── 저장 버튼 핸들러 ── */
+window._imfSaveNow = async function() {
+  const _w = document.getElementById('imf-worker-input')?.value.trim() || '';
+  if (!_w) { alert('점검자를 입력해주세요.'); return; }
+  // ── 미입력 검증 ──────────────────────────────────────────
+  const _imfIssues = [];
+  const _imfP = getPROC();
+  if (_imfP && _imfP.items) {
+    const _imfM = getTabMonth('imf'), _imfCar = getCar();
+    _imfP.items.forEach(item => {
+      const _base = `imf_daily_${_imfCar}_${_imfM.year}_${_imfM.month}_${imfCurDay}_s${curSheet}_${item.no}`;
+      const _allEmpty = ['cho','jung','jong'].every(t => !localStorage.getItem(`${_base}_${t}_res`));
+      const _imfItm = IMF_ITEMS[`${curSheet}_${item.no}`] || {};
+      const _nm = _imfItm.item_name || item.name || `항목 ${item.no}`;
+      const _std = _imfItm.standard || item.std || '';
+      if (_allEmpty) {
+        _imfIssues.push({ type: 'empty', name: _nm, std: _std });
+      } else {
+        ['cho','jung','jong'].forEach(t => {
+          const _rv = localStorage.getItem(`${_base}_${t}_res`) || '';
+          const _ph = t==='cho'?' (초물)':t==='jung'?' (중물)':' (종물)';
+          if (_rv === '✕') _imfIssues.push({ type: 'outofspec', name: _nm+_ph, val: '✕', std: _std });
+        });
+      }
+    });
+  }
+  // ────────────────────────────────────────────────────────
+  const _doImfSave = async () => {
+    // 현재 날짜 결과 전부 stage (pending이 없는 경우 대비)
+    const _p2 = getPROC();
+    if (_p2 && _p2.items) {
+      const _m2 = getTabMonth('imf'), _c2 = getCar();
+      const _ds = `${_m2.year}-${String(_m2.month).padStart(2,'0')}-${String(imfCurDay).padStart(2,'0')}`;
+      _p2.items.forEach(item => {
+        const _b = `imf_daily_${_c2}_${_m2.year}_${_m2.month}_${imfCurDay}_s${curSheet}_${item.no}`;
+        ['cho','jung','jong'].forEach(ph => {
+          const rv = localStorage.getItem(`${_b}_${ph}_res`) || '';
+          const tv = localStorage.getItem(`${_b}_${ph}_time`) || '';
+          const rmkv = localStorage.getItem(`${_b}_rmk`) || '';
+          if (rv || tv) _imfStageResult(curSheet, item.no, _ds, ph, rv, tv, rmkv);
+        });
+      });
+    }
+    clearTimeout(_imfSaveTimer);
+    const btn = document.getElementById('imf-save-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '저장 중…'; }
+    await _imfFlushResults();
+    if (btn) { btn.disabled = false; btn.textContent = '저장'; }
+    if (typeof showToast === 'function') showToast('저장됐습니다', 'success');
+  };
+  if (_imfIssues.length > 0 && typeof window._showSpecWarnModal === 'function') {
+    window._showSpecWarnModal(_imfIssues, _doImfSave); return;
+  }
+  await _doImfSave();
 };
 
 /* ── Init ── */
