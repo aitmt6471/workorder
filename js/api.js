@@ -65,6 +65,7 @@ const AIT_API = (() => {
     signRevision:     (carId, docType, rev, role, name, base64, filename) => _post('ait/revisions/sign', { carId, docType, rev, role, name, base64, filename }, 30000).then(r => Array.isArray(r) ? r[0] : r),
     getRevisionSigns: (carId, docType) => _get('ait/revisions/signs', { carId, docType }),
     deleteSign:       (carId, docType, rev, role) => _post('ait/sign/del', { carId, docType, rev, role }),
+    deleteRevision:   (id) => _post('ait/revisions/del', { id }),
     uploadSignSimple: (docType, base64, filename) => _post('ait/sign/upload', { docType, base64, filename }, 30000).then(r => Array.isArray(r) ? r[0] : r),
     deleteSignFile:   (fileId) => _post('ait/sign/delete-file', { fileId }),
 
@@ -252,6 +253,7 @@ const AIT_API = (() => {
     signRevision:       (cId, dt, rv, role, name, b64, fn) => _real.signRevision(cId, dt, rv, role, name, b64, fn),
     getRevisionSigns:   (cId, dt) => _real.getRevisionSigns(cId, dt),
     deleteSign:         (cId, dt, rv, role) => _real.deleteSign(cId, dt, rv, role),
+    deleteRevision:     (id) => _real.deleteRevision(id),
     /* CP */
     getCpRows:          (carId)      => _real.getCpRows(carId),
     createCpRow:        (cId, d)     => _real.createCpRow(cId, d),

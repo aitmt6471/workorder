@@ -104,7 +104,7 @@
         <span id="ms-month-label" style="font-weight:700;font-size:14px;min-width:90px;text-align:center;color:#fff">2026년 4월</span>
         <button class="btn btn-ghost btn-sm" onclick="nextMonth('ms');window.msRenderDayPicker()"
           style="color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.08)">&#x203A;</button>
-        <span style="font-size:11px;color:rgba(255,255,255,.5);margin-left:4px">날짜를 선택하세요</span>
+        <span id="ms-sel-date" style="font-size:13px;font-weight:700;color:#fff;background:rgba(255,255,255,.15);padding:3px 12px;border-radius:6px;letter-spacing:.5px">날짜 선택</span>
         <div style="flex:1"></div>
         <div style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:4px 10px">
           <span style="font-size:11px;font-weight:600;color:rgba(255,255,255,.8)">점검자</span>
@@ -144,7 +144,14 @@
               <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">판정기준</th>
               <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:78px">확인방법</th>
               <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:65px">주기</th>
-              <th style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:80px">결과</th>
+              <th style="padding:4px 6px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:100px">
+                결과
+                <div style="display:flex;gap:2px;justify-content:center;margin-top:4px">
+                  <button onclick="window._msBulkSetResult('○')" style="padding:2px 5px;font-size:9px;font-weight:700;background:rgba(22,163,74,.7);color:#fff;border:none;border-radius:3px;cursor:pointer;line-height:1.4">전체○</button>
+                  <button onclick="window._msBulkSetResult('✕')" style="padding:2px 5px;font-size:9px;font-weight:700;background:rgba(220,38,38,.7);color:#fff;border:none;border-radius:3px;cursor:pointer;line-height:1.4">전체✕</button>
+                  <button onclick="window._msBulkSetResult('N/A')" style="padding:2px 5px;font-size:9px;font-weight:700;background:rgba(107,114,128,.7);color:#fff;border:none;border-radius:3px;cursor:pointer;line-height:1.4">N/A</button>
+                </div>
+              </th>
               <th style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;width:120px">비고</th>
             </tr>
           </thead>
@@ -667,6 +674,7 @@ window.msRenderDayPicker = function(){
       style="min-width:30px;height:30px;padding:0 4px;border:1px solid ${s.bdr};border-radius:6px;background:${s.bg};color:${s.col};font-size:11px;font-weight:600;cursor:pointer">${d}</button>`;
   }).join('');
   _msLoadMonthStatus(curSample);
+  _msUpdateDateBadge();
 };
 function msRenderDayPicker(){ window.msRenderDayPicker(); }
 function _msUpdateDayBtn(day){
@@ -740,9 +748,16 @@ async function _msLoadMonthStatus(sampleIdx) {
     });
   } catch(e) { console.warn('MS 월 상태 로드 실패', e); }
 }
+function _msUpdateDateBadge(){
+  const el=document.getElementById('ms-sel-date'); if(!el) return;
+  const m=getTabMonth('ms');
+  const yy=String(m.year).slice(2), mm=String(m.month).padStart(2,'0'), dd=String(curDay).padStart(2,'0');
+  el.textContent=`${yy}-${mm}-${dd}`;
+}
 window._msSelDay = function(day){
   const prev=curDay; curDay=day;
   _msUpdateDayBtn(prev); _msUpdateDayBtn(day);
+  _msUpdateDateBadge();
   const _mm=getTabMonth('ms');
   _msSetReadOnly(_msHasDBData.has(`${curSample}_${day}_${_mm.year}_${_mm.month}`));
   renderMsCheckTable();
@@ -797,7 +812,7 @@ function renderMsCheckTable(){
       ${delTd}
       <td style="padding:7px 8px;text-align:center;border-right:1px solid var(--border);color:var(--text3);font-size:11px">${i+1}</td>
       <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_name"  style="padding:7px 10px;border-right:1px solid var(--border);font-weight:500;${es}" onblur="window._msSaveItemDef(this)">${n}</td>
-      <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_std"   style="padding:7px 10px;border-right:1px solid var(--border);color:${std.includes('NG')&&std.includes('판정')?'#dc2626':'var(--text2)'};font-weight:${std.includes('NG')&&std.includes('판정')?'600':'400'};${es}" onblur="window._msSaveItemDef(this)">${std}</td>
+      <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_std"   style="padding:7px 10px;border-right:1px solid var(--border);color:${std.includes('NG')?'#dc2626':'var(--text2)'};font-weight:${std.includes('NG')?'700':'400'};${es}" onblur="window._msSaveItemDef(this)">${std}</td>
       <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_method" style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._msSaveItemDef(this)">${mt}</td>
       <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_cycle"  style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._msSaveItemDef(this)">${cy}</td>
       <td style="padding:4px 5px;border-right:1px solid var(--border);text-align:center;vertical-align:middle">
@@ -849,6 +864,36 @@ function _msUpdateRowTs(itemNo,savedAt,modifiedAt){
   const badge=tr.querySelector('.ms-ts-badge');
   if(badge) badge.innerHTML=_msTsBadgeHtml(savedAt,modifiedAt);
 }
+window._msBulkSetResult = function(v) {
+  if (_msReadOnly) return;
+  const s = MS_DATA[curSample]; if (!s || !s.items) return;
+  const m = getTabMonth('ms'), car = getCar();
+  const dateStr = `${m.year}-${String(m.month).padStart(2,'0')}-${String(curDay).padStart(2,'0')}`;
+  s.items.forEach((item, i) => {
+    const k = `ms_${car}_${m.year}_${m.month}_${curDay}_${curSample}_${item.no}`;
+    if (v) localStorage.setItem(k, v); else localStorage.removeItem(k);
+    const tr = document.querySelector(`#ms-check-tbody tr[data-mrow="${i}"]`);
+    if (tr) {
+      tr.style.background = v==='✕' ? '#fff5f5' : v==='○' ? '#f7fef9' : '#fff';
+      const sel = tr.querySelector('select');
+      if (sel) {
+        sel.value = v;
+        sel.style.background = v==='✕' ? '#fee2e2' : v==='○' ? '#dcfce7' : '#fff';
+        sel.style.borderColor = v==='✕' ? '#fca5a5' : v==='○' ? '#86efac' : 'var(--border)';
+      }
+      const rmkInput = tr.querySelector('td:last-child input');
+      if (rmkInput) {
+        const isNg = v==='✕';
+        rmkInput.style.borderColor = isNg ? '#fca5a5' : 'var(--border)';
+        rmkInput.style.background  = isNg ? '#fff0f0' : '#fff';
+        rmkInput.placeholder = isNg ? '이상조치 입력' : '비고';
+      }
+    }
+    const rmk = localStorage.getItem(`ms_rmk_${car}_${m.year}_${m.month}_${curDay}_${curSample}_${item.no}`) || '';
+    _msStageResult(curSample, item.no, dateStr, v, rmk);
+  });
+  _msUpdateDayBtn(curDay);
+};
 window._msSaveRes=function(k,v,rowIdx,sIdx,ino,day){
   if(v) localStorage.setItem(k,v); else localStorage.removeItem(k);
   _msUpdateRowBg(rowIdx,v); _msUpdateDayBtn(curDay);

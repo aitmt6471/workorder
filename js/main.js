@@ -307,12 +307,25 @@ function deleteRevEntry(idx) {
   const pane = _revModalPane;
   const isStandalone = pane && _STANDALONE_PANES.includes(pane);
   const rd = isStandalone ? getRevDataFor(pane, carName) : getRevData(carName);
-  rd.history.splice(idx, 1);
-  rd.rev = rd.history.length > 0 ? Math.max(...rd.history.map(h => h.rev)) : 0;
-  if (isStandalone) saveRevDataFor(pane, carName, rd);
-  else saveRevData(carName, rd);
-  updateAllRevDisplays();
-  openRevModal(pane);
+  const entry = rd.history[idx];
+  const dbId = entry && entry.dbId;
+
+  const _doDelete = () => {
+    rd.history.splice(idx, 1);
+    rd.rev = rd.history.length > 0 ? Math.max(...rd.history.map(h => h.rev)) : 0;
+    if (isStandalone) saveRevDataFor(pane, carName, rd);
+    else saveRevData(carName, rd);
+    updateAllRevDisplays();
+    openRevModal(pane);
+  };
+
+  if (dbId && !AIT_API.MOCK && window.currentCarId) {
+    AIT_API.deleteRevision(dbId)
+      .then(_doDelete)
+      .catch(e => alert('삭제 실패: ' + (e.message || e)));
+  } else {
+    _doDelete();
+  }
 }
 
 function closeRevModal() {

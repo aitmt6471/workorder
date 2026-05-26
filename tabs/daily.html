@@ -679,11 +679,12 @@ function renderCheckTable(){
     const val=rd.result||'';
     const rmk=(rd.remark||'').replace(/"/g,'&quot;');
     const isNg=val==='✕';
-    const rowBg=isNg?'#fff5f5':val==='○'?'#f7fef9':'#fff';
+    let rowBg=isNg?'#fff5f5':val==='○'?'#f7fef9':'#fff';
     const resBg=isNg?'#fee2e2':val==='○'?'#dcfce7':'#fff';
     const resBdr=isNg?'#fca5a5':val==='○'?'#86efac':'var(--border)';
     const rmkStyle=isNg?'border-color:#fca5a5;background:#fff0f0;':'border-color:var(--border);background:#fff;';
     const _isNum=_dIsNumericStd(s);
+    if(_isNum&&val!==''){const _rr=_dCheckInRange(parseFloat(val),s);if(_rr===true)rowBg='#f7fef9';else if(_rr===false)rowBg='#fff5f5';}
     const k=`daily_${car}_${m.year}_${m.month}_${curDay}_${curEquip}_${item.no}`;
     const kr=`daily_rmk_${car}_${m.year}_${m.month}_${curDay}_${curEquip}_${item.no}`;
     const savedAt=rd.savedAt||null, modifiedAt=rd.modifiedAt||null;
@@ -897,11 +898,12 @@ window._dSaveRes=function(k,v,rowIdx){
     const std=tr.cells[2]?.textContent?.trim()||'';
     if(_dIsNumericStd(std)){
       const numInput=tr.querySelector('input[type="text"]');
+      const inR=v===''?null:_dCheckInRange(parseFloat(v),std);
       if(numInput){
-        const inR=v===''?null:_dCheckInRange(parseFloat(v),std);
         numInput.style.borderColor=inR===null?'var(--border)':(inR?'#86efac':'#fca5a5');
         numInput.style.background=inR===null?'#fff':(inR?'#dcfce7':'#fee2e2');
       }
+      tr.style.background=inR===null?'#fff':(inR?'#f7fef9':'#fff5f5');
     } else {
       const sel=tr.querySelector('select');
       if(sel){
