@@ -189,6 +189,24 @@ const _PART_TYPE_MAP = {
   '928C2': {label:'LAMP SRF',     color:'#374151', bg:'#f3f4f6'},
   '928D2': {label:'LAMP VRF',     color:'#374151', bg:'#e5e7eb'},
 };
+
+// 색상코드별 고유 스타일 (작업자가 한눈에 구분할 수 있도록)
+const _COLOR_STYLE_MAP = {
+  'YGU': {bg:'#fef08a', color:'#713f12'},  // 노란색
+  'YUB': {bg:'#f9a8d4', color:'#831843'},  // 핑크색
+  'NNB': {bg:'#93c5fd', color:'#1e3a8a'},  // 파란색
+  'MDE': {bg:'#86efac', color:'#14532d'},  // 초록색
+  'VKN': {bg:'#fca5a5', color:'#7f1d1d'},  // 빨간색
+  'SOS': {bg:'#c4b5fd', color:'#4c1d95'},  // 보라색
+  'RZP': {bg:'#fdba74', color:'#7c2d12'},  // 주황색
+  'NM5': {bg:'#67e8f9', color:'#164e63'},  // 하늘색
+  'TS5': {bg:'#6ee7b7', color:'#064e3b'},  // 에메랄드
+};
+function _colorBadge(code){
+  if(!code||code==='미분류') return '';
+  const s=_COLOR_STYLE_MAP[code]||{bg:'#e5e7eb',color:'#374151'};
+  return `<span style="margin-left:5px;padding:2px 8px;background:${s.bg};color:${s.color};border-radius:3px;font-size:14px;font-family:sans-serif;font-weight:800;letter-spacing:0.5px">${code}</span>`;
+}
 function _partTypeBadge(partNo){
   const prefix=(partNo||'').split('-')[0];
   const t=_PART_TYPE_MAP[prefix];
@@ -567,7 +585,7 @@ function specRenderTable(){
         html+=`<tr data-pn="${row.part_no}" data-bg="${bg}" onclick="specSelectRow('${bomKey}','${row.part_no}')"
           style="background:${bg};border-bottom:1px solid #e5e7eb;cursor:pointer">
           <td style="padding:5px 8px;text-align:center">${thumb}</td>
-          <td style="padding:5px 8px;font-weight:600;color:#1e3264;font-family:monospace;font-size:19px;white-space:nowrap">${mesBadge}${row.part_no||''}${(row._color&&row._color!=='미분류')?`<span style="margin-left:5px;padding:1px 6px;background:#dbeafe;color:#1e40af;border-radius:3px;font-size:13px;font-family:sans-serif;font-weight:500">${row._color}</span>`:''}</td>
+          <td style="padding:5px 8px;font-weight:600;color:#1e3264;font-family:monospace;font-size:19px;white-space:nowrap">${mesBadge}${row.part_no||''}${_colorBadge(row._color)}</td>
           <td style="padding:5px 8px;text-align:center">${_partTypeBadge(row.part_no)}</td>
           <td style="padding:5px 8px;font-size:18px;color:#374151">${nm}</td>
           <td style="padding:5px 8px;text-align:center;color:#6b7280;font-size:19px">${row.bom_count||0}</td>
@@ -608,7 +626,7 @@ function specRenderTable(){
     html+=`<tr data-pn="${row.part_no}" onclick="specSelectRow('${row.part_no}','${row._base||row.part_no}')"
       style="background:${bg};border-bottom:1px solid #f0f0f0;cursor:pointer">
       <td style="padding:5px 8px;text-align:center">${thumb}</td>
-      <td style="padding:5px 8px;font-weight:600;color:#1e3264;font-family:monospace;font-size:19px;white-space:nowrap">${mesBadge}${row._base||row.part_no||''}${colorCode?`<span style="margin-left:5px;padding:1px 6px;background:#dcfce7;color:#166534;border-radius:3px;font-size:13px;font-family:sans-serif;font-weight:500">${colorCode}</span>`:''}</td>
+      <td style="padding:5px 8px;font-weight:600;color:#1e3264;font-family:monospace;font-size:19px;white-space:nowrap">${mesBadge}${row._base||row.part_no||''}${_colorBadge(colorCode)}</td>
       <td style="padding:5px 8px;text-align:center">${_partTypeBadge(row._base||row.part_no)}</td>
       <td style="padding:5px 8px;font-size:19px;color:#374151">${nm}</td>
       <td style="padding:5px 8px;text-align:center;color:#6b7280;font-size:19px">${row.bom_count||0}</td>
