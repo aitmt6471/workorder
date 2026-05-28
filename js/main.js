@@ -188,7 +188,7 @@ function updateRevDisplay(pane) {
   const rd = _STANDALONE_PANES.includes(pane) ? getRevDataFor(pane, carName) : getRevData(carName);
   const badge = document.getElementById(pane + '-rev-badge');
   const dateEl = document.getElementById(pane + '-rev-date');
-  if (badge) badge.textContent = `Rev. ${rd.rev}`;
+  if (badge) badge.textContent = rd.history[0]?.rev_display || `Rev. ${rd.rev}`;
   if (dateEl) dateEl.textContent = `개정일: ${rd.history[0]?.date || '-'}`;
 }
 
@@ -243,6 +243,7 @@ function openRevModal(pane) {
         const au = sg.author   || {}, rv = sg.reviewer || {}, ap = sg.approver || {};
         return `<tr>
           <td class="td-center"><span class="rev-num">Rev.${h.rev}</span></td>
+          <td class="td-center" style="color:#0f766e;font-weight:600">${h.rev_display||''}</td>
           <td class="td-center">${h.date}</td>
           <td>${h.desc}</td>
           <td class="td-center">${_signCell(h.rev,'author',  au.fileId||'', au.name||h.user||'', liveMode)}</td>
@@ -279,7 +280,7 @@ function openRevModal(pane) {
           const rev = parseInt(r.rev) || 0;
           if (rev > rd.rev) rd.rev = rev;
           _revDbMap[rev] = r;
-          rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane, dbId: r.id });
+          rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane, dbId: r.id, rev_display: r.rev_display || '' });
         });
         rd.history.sort((a, b) => b.rev - a.rev);
         saveRevDataFor(pane, carName, rd);
@@ -456,18 +457,19 @@ function saveDocument(pane) {
       if (desc === null) {
         doRevise = false; // 설명 입력 취소 → 개정 없이 저장만 진행
       } else {
+        const revDisplay = prompt(`표시 리비전 코드 입력 (선택사항)\n비우면 숫자 Rev.${newRev} 그대로 사용\n예: AAB, 001, AAA`) || '';
         const today = new Date();
         const dateStr = `${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
         rd.rev = newRev;
-        rd.history.unshift({ rev: newRev, date: dateStr, user: '', desc: desc || '내용 변경', docs: paneLabels[pane] || pane });
+        rd.history.unshift({ rev: newRev, date: dateStr, user: '', desc: desc || '내용 변경', docs: paneLabels[pane] || pane, rev_display: revDisplay });
         saveRevDataFor(pane, carName, rd);
         updateAllRevDisplays();
         if (!AIT_API.MOCK && window.currentCarId) {
           AIT_API.addRevision(window.currentCarId, _revGroupKey(pane), {
-            rev_date: dateStr, note: desc || '내용 변경', author: ''
+            rev_date: dateStr, note: desc || '내용 변경', author: '', rev_display: revDisplay
           }).catch(e => console.warn('개정이력 DB 저장 실패', e));
         }
-        alert(`✅ Rev.${newRev} 개정 완료\n개정일: ${dateStr}`);
+        alert(`✅ Rev.${newRev}${revDisplay ? ' (' + revDisplay + ')' : ''} 개정 완료\n개정일: ${dateStr}`);
       }
     }
 
@@ -730,7 +732,7 @@ async function initCars() {
             if (rev > rd.rev) rd.rev = rev;
             _revDbMap[rev] = r;
             rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane,
-              dbId: r.id,
+              dbId: r.id, rev_display: r.rev_display || '',
               authorSign: r.author_sign || '',
               reviewerName: r.reviewer_name || '', reviewerSign: r.reviewer_sign || '',
               approverName: r.approver_name || '', approverSign: r.approver_sign || ''

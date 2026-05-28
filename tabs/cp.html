@@ -15,6 +15,7 @@
   <button class="btn btn-ghost btn-sm edit-only" onclick="addCpRow()">&#xFF0B; 항목 추가</button>
   <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('cp')">저장</button>
   <button class="btn btn-ghost btn-sm" onclick="window.print_cp && window.print_cp()">🖨 인쇄</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_cp_gentex && window.print_cp_gentex()" style="color:#0f766e;border-color:rgba(15,118,110,.4)">🖨 영문인쇄</button>
   <button class="btn btn-ghost btn-sm" id="cp-edit-btn" onclick="toggleTabEditMode('cp', this)">&#x270F; 편집 모드</button>
 </div>
 
@@ -179,7 +180,7 @@ window.print_cp = async function() {
   let revRows = revsSorted.map(r => {
     const sg = sigsByRev[String(r.rev||0)] || {};
     return `<tr>
-      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${r.rev===0||!r.rev?'-':r.rev}</td>
+      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${r.rev_display || (r.rev===0||!r.rev?'-':r.rev)}</td>
       <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${safe(r.rev_date).substring(0,10)}</td>
       <td style="border:0.5pt solid #000;padding:2px 8px;text-align:left">${safe(r.note)}</td>
       <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${sg.author?.signer_name||safe(r.author)}</td>
