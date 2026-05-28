@@ -282,6 +282,14 @@ window._dInitEquip = async function(list) {
       catch(e) { console.warn('daily items 동기화 실패', e); }
     }
     await _dLoadItems(); // DB id 필드 반드시 로드 (저장 시 item_id FK에 필요)
+    // CP standard → DAILY_ITEMS 강제 반영 (DB standard가 오래됐어도 CP 기준 항상 우선)
+    DAILY_EQUIP.forEach(e => {
+      if (!e.id || !e.items) return;
+      e.items.forEach(item => {
+        const key = `${e.id}_${item.no}`;
+        if (DAILY_ITEMS[key]) DAILY_ITEMS[key].standard = item.std || '';
+      });
+    });
   }
   const c = document.getElementById('d-equip-tabs');
   if (!c) return;
@@ -830,28 +838,30 @@ async function _dFlushResults() {
     grouped.get(gKey).meta.push({ itemNo: v.itemNo, rKey, isFirst: !existing.savedAt });
   });
 
-  // ── 저장 전 alarm_rules 검증 ──────────────────────────────
-  if (!AIT_API.MOCK) {
+  // ── 저장 전 기준값 검증 (DAILY_ITEMS.standard 기준, 클라이언트 사이드) ──────────────────────────────
+  {
     const allViolations = [];
     for (const [, g] of grouped) {
       const equip = DAILY_EQUIP[g.equipIdx] || {};
-      const equip_id = equip.id || g.equipIdx;
-      if (!equip_id) continue;
-      const alarmRes = g.results.map(r => {
+      g.results.forEach(r => {
         const dItem = Object.values(DAILY_ITEMS).find(it => it.id === r.item_id) || {};
-        return { item_no: String(dItem.item_no || r.item_id), result: r.result, item_name: dItem.item_name || '' };
+        const std = dItem.standard || '';
+        const result = (r.result || '').trim();
+        if (!result || !_dIsNumericStd(std)) return;
+        if (_dCheckInRange(parseFloat(result), std) === false) {
+          allViolations.push({
+            equip_name: equip.sheet || '',
+            item_name: dItem.item_name || '',
+            result,
+            standard: std,
+            issue: `범위초과 (기준:${std}, 입력:${result})`
+          });
+        }
       });
-      try {
-        const vRes = await AIT_API.validateDailyResults(equip_id, g.date, alarmRes);
-        const viols = (vRes && vRes.violations) || [];
-        viols.forEach(vio => allViolations.push({ ...vio, equip_name: equip.sheet || '' }));
-      } catch(e) {
-        console.warn('검증 API 실패, 저장 진행', e);
-      }
     }
     if (allViolations.length) {
       _dShowAlarmBlockModal(allViolations);
-      return false; // pending 유지 — 저장 안 함
+      return false;
     }
   }
   // ─────────────────────────────────────────────────────────

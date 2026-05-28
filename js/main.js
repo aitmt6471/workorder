@@ -482,9 +482,34 @@ function saveDocument(pane) {
         const paneEl = document.getElementById('pane-cp');
         window.showSaving && window.showSaving();
         _saveCpToDb(carName, paneEl)
-          .then(msg => {
+          .then(async msg => {
             window.hideSaving && window.hideSaving();
             window.showToast && window.showToast('CP 저장 완료 (' + msg + ')', 'success');
+            // CP 변경 → daily_equipments + daily_items.standard 동기화 (검증 기준 즉시 반영)
+            if (window.currentCarId) {
+              try {
+                const cpRows = await AIT_API.getCpRows(window.currentCarId);
+                const carObj = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
+                const equipments = _buildDailyFromCpRows(cpRows, carObj?.linename || '');
+                if (equipments.length) {
+                  await AIT_API.syncDailyEquip(window.currentCarId, equipments);
+                  const freshEquips = await AIT_API.getDailyEquipments(window.currentCarId);
+                  const equipIdMap = {};
+                  freshEquips.forEach(e => { equipIdMap[e.equip_name] = e.id; });
+                  const allItems = [];
+                  equipments.forEach(eq => {
+                    const eId = equipIdMap[eq.sheet || eq.equip_name];
+                    if (!eId) return;
+                    (eq.items || []).forEach((it, idx) => {
+                      allItems.push({ equip_id: eId, item_no: it.no, item_name: it.name, standard: it.std, method: it.method, cycle: it.cycle, sort_order: idx });
+                    });
+                  });
+                  if (allItems.length) await AIT_API.syncDailyItems(window.currentCarId, allItems);
+                }
+              } catch(e) {
+                console.warn('설비일상 기준 동기화 실패:', e);
+              }
+            }
             // CP 변경 → 작표·설비일상 탭 즉시 갱신 (관리기준 반영)
             loadCarContent('daily');
             loadCarContent('ws');
