@@ -211,6 +211,9 @@ function _msStageResult(sampleIdx, itemNo, date, result, remark) {
 
 async function _msFlushResults() {
   if (!_msPendingResults.size || !window.currentCarId) return;
+  const _fw = document.getElementById('ms-worker-input')?.value.trim() || '';
+  const _fv = document.getElementById('ms-verifier-input')?.value.trim() || '';
+  if (!_fw || !_fv) return;
   const grouped = new Map();
   _msPendingResults.forEach((v) => {
     const gKey = `${v.sampleIdx}_${v.date}`;

@@ -26,6 +26,29 @@
   </div>
 </div>
 
+<!-- 검사항목 추가 모달 -->
+<div id="insp-item-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.45);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;width:420px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.2);overflow:hidden">
+    <div style="background:#1e3264;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">
+      <span style="color:#fff;font-weight:700;font-size:14px">검사항목 추가</span>
+    </div>
+    <div style="padding:20px 18px">
+      <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">항목명</label>
+      <input id="insp-item-input" type="text" placeholder="예: 바디커버 후크 설체결"
+        style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"
+        onfocus="this.style.borderColor='#1e3264'"
+        onblur="this.style.borderColor='#d1d5db'"
+        onkeydown="if(event.key==='Enter')inspAddItemConfirm();if(event.key==='Escape')inspAddItemCancel()">
+    </div>
+    <div style="padding:12px 18px;background:#f9fafb;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #e5e7eb">
+      <button onclick="inspAddItemCancel()"
+        style="border:1px solid #d1d5db;background:#fff;border-radius:6px;padding:8px 20px;font-size:13px;cursor:pointer;font-family:inherit">취소</button>
+      <button onclick="inspAddItemConfirm()"
+        style="border:none;background:#1e3264;color:#fff;border-radius:6px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">추가</button>
+    </div>
+  </div>
+</div>
+
 <!-- CP 공정 선택 모달 -->
 <div class="car-modal-overlay" id="insp-cp-picker">
   <div class="car-modal" style="width:min(480px,96vw);max-height:70vh;overflow:hidden;display:flex;flex-direction:column;padding:0">
@@ -64,8 +87,6 @@ function carKey(){
   return s?s.value:'';
 }
 
-function lsKey(){ return 'insp_doc_'+_carKey; }
-
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 function compressImg(file,cb){
@@ -85,34 +106,43 @@ function compressImg(file,cb){
 }
 
 /* ── 데이터 ── */
+function _emptyDoc(){ return {part_no:'',part_name:'',procs:[]}; }
+
 function loadDoc(){
   _carKey=carKey();
   if(!_carKey){ _doc=null; render(); return; }
+
+  // 로딩 중 표시
+  var el=document.getElementById('insp-content');
+  if(el) el.innerHTML='<div style="padding:80px 20px;text-align:center;color:#9ca3af">'
+    +'<div style="font-size:40px;margin-bottom:14px">&#x1F4CB;</div>'
+    +'<div style="font-size:14px;font-weight:600;color:#6b7280">로딩 중...</div>'
+    +'</div>';
+
   if(typeof AIT_API!=='undefined' && !AIT_API.MOCK && window.currentCarId){
-    AIT_API.getInspDoc(window.currentCarId).then(function(doc){
-      _doc=doc||{part_no:'',part_name:'',procs:[]};
-      try{localStorage.setItem(lsKey(),JSON.stringify(_doc));}catch(e){}
+    AIT_API.getInspDoc(window.currentCarId).then(function(res){
+      _doc=res||_emptyDoc();
       if(_procId===null && _doc.procs&&_doc.procs.length) _procId=_doc.procs[0].id;
       render();
     }).catch(function(){
-      try{var raw=localStorage.getItem(lsKey());_doc=raw?JSON.parse(raw):{part_no:'',part_name:'',procs:[]};}
-      catch(e){_doc={part_no:'',part_name:'',procs:[]};}
-      if(_procId===null && _doc.procs&&_doc.procs.length) _procId=_doc.procs[0].id;
+      _doc=_emptyDoc();
       render();
     });
     return;
   }
-  try{var raw=localStorage.getItem(lsKey());_doc=raw?JSON.parse(raw):{part_no:'',part_name:'',procs:[]};}
-  catch(e){_doc={part_no:'',part_name:'',procs:[]};}
-  if(_procId===null && _doc.procs&&_doc.procs.length) _procId=_doc.procs[0].id;
+  _doc=_emptyDoc();
   render();
 }
 
-function saveDoc(silent){
-  if(!_carKey||!_doc) return;
-  try{ localStorage.setItem(lsKey(),JSON.stringify(_doc)); }
-  catch(e){ if(typeof showToast==='function') showToast('저장 실패 (용량 초과)','error'); return; }
-  if(!silent && typeof showToast==='function') showToast('저장 완료','success');
+/* ── 사진 높이 동적 계산 ── */
+function calcPhotoH(){
+  var main=document.getElementById('insp-main');
+  if(!main) return 200;
+  var mainH=main.clientHeight;
+  var rows=2; // 항상 2행 기준으로 높이 계산
+  var reserved=212+(rows-1)*12; // 헤더테이블+마진+검사포인트바+패딩+행간격
+  var perRow=(mainH-reserved)/rows;
+  return Math.max(80,Math.floor(perRow-64)); // 항목제목(30)+설명여유(34)
 }
 
 /* ── 렌더 ── */
@@ -207,17 +237,19 @@ function renderContent(){
   html+='<div style="background:#fff;border:1px solid #c8d3e0;border-top:none;padding:14px;border-radius:0 0 6px 6px;margin-bottom:14px;box-shadow:0 1px 4px rgba(15,23,42,.06)">';
 
   var items=proc.items||[];
+  var photoH=calcPhotoH();
+  var phStr=photoH+'px';
   if(!items.length){
     html+='<div style="padding:32px;text-align:center;color:#9ca3af;font-size:12px">'
       +(eMode?'위 [+ 검사항목 추가] 버튼으로 항목을 등록하세요':'등록된 검사항목이 없습니다')
       +'</div>';
   } else {
-    html+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(428px,1fr));gap:12px">';
+    html+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">';
     items.forEach(function(item){
       var delBtn=eMode?'<button onclick="event.stopPropagation();inspDeleteItem(\''+proc.id+'\',\''+item.id+'\')" style="position:absolute;top:6px;right:6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;z-index:3;line-height:20px;padding:0;font-weight:700">x</button>':'';
       var photoHtml=item.photo
-        ?'<img src="'+item.photo+'" style="width:100%;height:315px;object-fit:contain;background:#f3f4f6;display:block;cursor:zoom-in" onclick="typeof openLightbox===\'function\'&&openLightbox(\''+item.photo+'\',\''+esc(item.name||'')+'\')">'
-        :'<div style="width:100%;height:315px;background:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#9ca3af">'
+        ?'<img src="'+item.photo+'" style="width:100%;height:'+phStr+';object-fit:contain;background:#f3f4f6;display:block;cursor:zoom-in" onclick="typeof openLightbox===\'function\'&&openLightbox(\''+item.photo+'\',\''+esc(item.name||'')+'\')">'
+        :'<div style="width:100%;height:'+phStr+';background:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#9ca3af">'
           +'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>'
           +'<span style="font-size:11px">사진 없음</span></div>';
       var photoWrap=eMode
@@ -246,17 +278,22 @@ function renderContent(){
 /* ── main.js 연동 ── */
 window.inspSetEditable=function(on){
   _editMode=on;
+  // 편집 모드 진입 시 _doc가 없으면 빈 doc으로 초기화해 편집 버튼 표시
+  if(on && !_doc) _doc=_emptyDoc();
   render();
 };
 
 window.inspSaveDocData=function(){
-  saveDoc(true);
+  // localStorage 사용 안 함 — 메모리 내 _doc 유지
 };
 
 window._inspSyncToDb=function(){
   if(!_doc||!window.currentCarId) return Promise.reject(new Error('데이터 없음'));
   return AIT_API.saveInspDoc(window.currentCarId,_doc);
 };
+
+// print_insp가 _doc에 접근할 수 있도록 참조 노출
+window._inspDocRef=function(){ return _doc; };
 
 window.inspLoadDoc=loadDoc;
 
@@ -288,20 +325,30 @@ function _showCpPicker(list){
   var existing={};
   (_doc.procs||[]).forEach(function(p){ existing[p.proc_no]=true; });
   var html='';
-  list.forEach(function(item){
+  list.forEach(function(item,idx){
     var done=existing[item.proc_no];
-    html+='<div '+(done?'':'onclick="inspPickProc(\''+item.proc_no+'\',\''+item.proc_name+'\')"')
+    html+='<div data-idx="'+idx+'"'+(done?' data-done="1"':'')
       +' style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:6px;'
       +'cursor:'+(done?'default':'pointer')+';background:'+(done?'#f3f4f6':'#fff')+';'
-      +'border:1px solid '+(done?'#e5e7eb':'#c8d3e0')+';margin-bottom:6px;opacity:'+(done?'0.5':'1')+'" '
-      +(done?'':' onmouseover="this.style.background=\'#eff6ff\';this.style.borderColor=\'#3b82f6\'" onmouseout="this.style.background=\'#fff\';this.style.borderColor=\'#c8d3e0\'"')
-      +'>'
+      +'border:1px solid '+(done?'#e5e7eb':'#c8d3e0')+';margin-bottom:6px;opacity:'+(done?'0.5':'1')+'">'
       +'<span style="background:#1e3264;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;white-space:nowrap;flex-shrink:0">'+esc(item.proc_no)+'</span>'
       +'<span style="font-size:12px;font-weight:600;color:#374151;flex:1">'+esc(item.proc_name)+'</span>'
       +(done?'<span style="font-size:10px;color:#9ca3af">추가됨</span>':'')
       +'</div>';
   });
   body.innerHTML=html||'<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">CP에 공정 데이터가 없습니다</div>';
+
+  // onclick 문자열 조합 대신 addEventListener — proc_no/proc_name 특수문자 무관하게 안전
+  body.querySelectorAll('[data-idx]:not([data-done])').forEach(function(el){
+    var item=list[parseInt(el.dataset.idx,10)];
+    el.addEventListener('mouseover',function(){ this.style.background='#eff6ff'; this.style.borderColor='#3b82f6'; });
+    el.addEventListener('mouseout', function(){ this.style.background='#fff';    this.style.borderColor='#c8d3e0'; });
+    el.addEventListener('click',function(){
+      document.getElementById('insp-cp-picker').classList.remove('open');
+      _createProc(item.proc_no,item.proc_name);
+    });
+  });
+
   document.getElementById('insp-cp-picker').classList.add('open');
 }
 
@@ -313,24 +360,43 @@ window.inspPickProc=function(no,nm){
 function _createProc(no,nm){
   var p={id:uid(),proc_no:no,proc_name:nm,proc_type:'일반공정',
     car_models:carName(),part_no:_doc.part_no,part_name:_doc.part_name,items:[]};
-  _doc.procs.push(p); _procId=p.id; saveDoc(true); render();
+  _doc.procs.push(p); _procId=p.id; render();
 }
 
 window.inspDeleteProc=function(id){
   if(!confirm('이 공정을 삭제하시겠습니까?')) return;
   _doc.procs=_doc.procs.filter(function(p){return p.id!==id;});
   _procId=_doc.procs.length?_doc.procs[0].id:null;
-  saveDoc(true); render();
+  render();
 };
 
 /* ── 검사항목 관리 ── */
+var _addItemProcId=null;
+
 window.inspAddItem=function(procId){
+  _addItemProcId=procId;
+  var modal=document.getElementById('insp-item-modal');
+  var input=document.getElementById('insp-item-input');
+  if(!modal||!input) return;
+  input.value='';
+  modal.style.display='flex';
+  setTimeout(function(){ input.focus(); },50);
+};
+
+window.inspAddItemConfirm=function(){
+  var input=document.getElementById('insp-item-input');
+  var nm=(input?input.value:'').trim();
+  if(!nm){ if(input){ input.style.borderColor='#ef4444'; setTimeout(function(){ input.style.borderColor='#d1d5db'; },1000); } return; }
+  document.getElementById('insp-item-modal').style.display='none';
   var proc=null;
-  for(var i=0;i<_doc.procs.length;i++){if(_doc.procs[i].id===procId){proc=_doc.procs[i];break;}}
+  for(var i=0;i<_doc.procs.length;i++){if(_doc.procs[i].id===_addItemProcId){proc=_doc.procs[i];break;}}
   if(!proc) return;
-  var nm=prompt('검사항목명 입력 (예: 바디커버 후크 설체결)'); if(!nm) return;
-  proc.items.push({id:uid(),name:nm.trim(),description:'',photo:'',sort_order:proc.items.length});
-  saveDoc(true); renderContent();
+  proc.items.push({id:uid(),name:nm,description:'',photo:'',sort_order:proc.items.length});
+  renderContent();
+};
+
+window.inspAddItemCancel=function(){
+  document.getElementById('insp-item-modal').style.display='none';
 };
 
 window.inspDeleteItem=function(procId,itemId){
@@ -338,7 +404,7 @@ window.inspDeleteItem=function(procId,itemId){
   for(var i=0;i<_doc.procs.length;i++){if(_doc.procs[i].id===procId){proc=_doc.procs[i];break;}}
   if(!proc||!confirm('검사항목을 삭제하시겠습니까?')) return;
   proc.items=proc.items.filter(function(it){return it.id!==itemId;});
-  saveDoc(true); renderContent();
+  renderContent();
 };
 
 window.inspUploadPhoto=function(procId,itemId,input){
@@ -349,7 +415,7 @@ window.inspUploadPhoto=function(procId,itemId,input){
   for(var j=0;j<proc.items.length;j++){if(proc.items[j].id===itemId){item=proc.items[j];break;}}
   if(!item) return;
   var file=input.files[0]; if(!file) return;
-  compressImg(file,function(data){ item.photo=data; saveDoc(true); renderContent(); });
+  compressImg(file,function(data){ item.photo=data; renderContent(); });
 };
 
 window.inspHdrInput=function(el,field){
@@ -382,8 +448,8 @@ window.print_insp = async function() {
   const revDate= document.getElementById('insp-rev-date')?.textContent.trim() || '';
   const revNum = parseInt((rev || '').replace(/[^0-9]/g, '')) || 0;
 
-  let doc = null;
-  try { doc = JSON.parse(localStorage.getItem('insp_doc_' + carKey) || 'null'); } catch(e) {}
+  // localStorage 대신 메모리 내 _doc 참조
+  const doc = window._inspDocRef ? window._inspDocRef() : null;
   if (!doc || !doc.procs || !doc.procs.length) { alert('공정검사기준서 데이터가 없습니다.'); return; }
 
   let authorSignUrl = '', authorName = '';
@@ -495,4 +561,3 @@ ${pagesHtml}
   win.document.write(html);
   win.document.close();
 };
-</script>
