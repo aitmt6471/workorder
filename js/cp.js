@@ -492,6 +492,8 @@ function savePartModal() {
   const wsPnm = document.getElementById('ws-pname');
   if (wsPn)  wsPn.textContent  = partno;
   if (wsPnm) wsPnm.textContent = partname;
+  // 공정검사기준서 품번/품명 실시간 반영
+  if (typeof window._inspRefreshPart === 'function') window._inspRefreshPart();
   closePartModal();
 }
 

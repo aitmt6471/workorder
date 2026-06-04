@@ -108,6 +108,20 @@ function compressImg(file,cb){
 /* ── 데이터 ── */
 function _emptyDoc(){ return {part_no:'',part_name:'',procs:[]}; }
 
+/* CP 메타에서 품번/품명 동기화 */
+function _fillPartFromCp(){
+  if(!_doc) return;
+  var cn=carName();
+  var meta=(typeof _cpMetaGet==='function' && cn)?_cpMetaGet(cn):{};
+  if(!meta.partno && !meta.partname){
+    var pnoEl=document.querySelector('#pane-cp #cp-meta-partno');
+    var pnmEl=document.querySelector('#pane-cp #cp-meta-partname');
+    meta={partno:(pnoEl?pnoEl.textContent.trim():''),partname:(pnmEl?pnmEl.textContent.trim():'')};
+  }
+  if(meta.partno)   _doc.part_no  =meta.partno;
+  if(meta.partname) _doc.part_name=meta.partname;
+}
+
 function loadDoc(){
   _carKey=carKey();
   if(!_carKey){ _doc=null; render(); return; }
@@ -122,17 +136,27 @@ function loadDoc(){
   if(typeof AIT_API!=='undefined' && !AIT_API.MOCK && window.currentCarId){
     AIT_API.getInspDoc(window.currentCarId).then(function(res){
       _doc=res||_emptyDoc();
+      _fillPartFromCp();
       if(_procId===null && _doc.procs&&_doc.procs.length) _procId=_doc.procs[0].id;
       render();
     }).catch(function(){
       _doc=_emptyDoc();
+      _fillPartFromCp();
       render();
     });
     return;
   }
   _doc=_emptyDoc();
+  _fillPartFromCp();
   render();
 }
+
+/* CP에서 품번/품명 변경 시 외부 호출용 */
+window._inspRefreshPart=function(){
+  if(!_doc) return;
+  _fillPartFromCp();
+  renderContent();
+};
 
 /* ── 사진 높이 동적 계산 ── */
 function calcPhotoH(){
@@ -259,11 +283,11 @@ function renderContent(){
           +'<input type="file" accept="image/*" style="display:none" onchange="inspUploadPhoto(\''+proc.id+'\',\''+item.id+'\',this)"></label>'
         :photoHtml;
       var descHtml=(item.description||eMode)
-        ?'<div style="padding:8px 10px;font-size:11px;color:#4b5563;min-height:32px;border-top:1px solid #e5e7eb;line-height:1.5;outline:none"'+(eMode?' contenteditable="true" oninput="inspItemInput(\''+proc.id+'\',\''+item.id+'\',this,\'description\')"':'')+'>'+(item.description||'')+'</div>'
+        ?'<div style="padding:8px 10px;font-size:15px;color:#4b5563;min-height:32px;border-top:1px solid #e5e7eb;line-height:1.5;outline:none;display:flex;align-items:center;justify-content:center;text-align:center"'+(eMode?' contenteditable="true" oninput="inspItemInput(\''+proc.id+'\',\''+item.id+'\',this,\'description\')"':'')+'>'+(item.description||'')+'</div>'
         :'';
       html+='<div style="border:1px solid #c8d3e0;border-radius:6px;overflow:hidden;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.06)">'
         +delBtn
-        +'<div style="background:#374151;color:#fff;padding:7px 10px;font-size:11px;font-weight:700;line-height:1.4;min-height:32px;outline:none"'+(eMode?' contenteditable="true" oninput="inspItemInput(\''+proc.id+'\',\''+item.id+'\',this,\'name\')"':'')+'>'+esc(item.name||'항목명')+'</div>'
+        +'<div style="background:#374151;color:#fff;padding:7px 10px;font-size:15px;font-weight:700;line-height:1.4;min-height:32px;outline:none;display:flex;align-items:center;justify-content:center;text-align:center"'+(eMode?' contenteditable="true" oninput="inspItemInput(\''+proc.id+'\',\''+item.id+'\',this,\'name\')"':'')+'>'+esc(item.name||'항목명')+'</div>'
         +photoWrap
         +descHtml
         +'</div>';
