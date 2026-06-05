@@ -824,7 +824,17 @@ function _dStageResult(equipIdx, itemNo, date, result, remark) {
 async function _dFlushResults() {
   if (!_dPendingResults.size || !window.currentCarId) return;
   const now = new Date().toISOString();
+
+  // dItem.id가 없는 항목이 있으면 DB에서 다시 로드 후 재시도
+  let _hasNoId = false;
+  _dPendingResults.forEach(v => {
+    const equipDbId = (DAILY_EQUIP[v.equipIdx] || {}).id || v.equipIdx;
+    if (!(DAILY_ITEMS[`${equipDbId}_${v.itemNo}`] || {}).id) _hasNoId = true;
+  });
+  if (_hasNoId) await _dLoadItems();
+
   const grouped = new Map();
+  const _skippedNames = [];
   _dPendingResults.forEach((v) => {
     const gKey = `${v.equipIdx}_${v.date}`;
     if (!grouped.has(gKey)) grouped.set(gKey, { equipIdx: v.equipIdx, date: v.date, results: [], meta: [] });
@@ -833,10 +843,18 @@ async function _dFlushResults() {
     const existing = (_dResults[rKey] || {})[v.itemNo] || {};
     const equipDbId = (DAILY_EQUIP[v.equipIdx] || {}).id || v.equipIdx;
     const dItem = DAILY_ITEMS[`${equipDbId}_${v.itemNo}`] || {};
-    if (!dItem.id) return;
+    if (!dItem.id) {
+      const _nm = ((DAILY_EQUIP[v.equipIdx]||{}).items||[]).find(it=>String(it.no)===String(v.itemNo))?.name || `항목 ${v.itemNo}`;
+      _skippedNames.push(_nm);
+      console.warn('[daily] dItem.id 없음 — DAILY_ITEMS 동기화 필요:', {equipDbId, itemNo: v.itemNo});
+      return;
+    }
     grouped.get(gKey).results.push({ item_id: dItem.id, result: v.result || '', remark: v.remark || '', saved_at: now });
     grouped.get(gKey).meta.push({ itemNo: v.itemNo, rKey, isFirst: !existing.savedAt });
   });
+  if (_skippedNames.length) {
+    if (typeof showToast === 'function') showToast(`저장 실패 (DB 동기화 누락): ${_skippedNames.join(', ')} — 새로고침 후 재시도`, 'error');
+  }
 
   // ── 저장 전 기준값 검증 (DAILY_ITEMS.standard 기준, 클라이언트 사이드) ──────────────────────────────
   {
@@ -973,9 +991,12 @@ window._dSaveNow=async function(){
     clearTimeout(_dSaveTimer);
     const btn=document.getElementById('d-save-btn');
     if(btn){btn.disabled=true;btn.textContent='저장 중…';}
+    window.showSaving && window.showSaving();
     const _saved=await _dFlushResults();
+    window.hideSaving && window.hideSaving();
     if(btn){btn.disabled=false;btn.textContent='저장';}
     if(_saved===false) return;
+    window.showToast && window.showToast('점검 결과 저장 완료', 'success');
     const _sm=getTabMonth('daily');
     _dHasDBData.add(`${curEquip}_${curDay}_${_sm.year}_${_sm.month}`);
     _dSetReadOnly(true);
