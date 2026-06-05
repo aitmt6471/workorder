@@ -1,3 +1,48 @@
+/* ── 역할 기반 접근 제어 ── */
+const ROLE_PERMS = {
+  admin:         ['cp','ws','daily','imf','ms','spec','insp','qpoint'],
+  cp_editor:     ['cp','ws','daily'],
+  qpoint_editor: ['qpoint'],
+  viewer:        [],
+  general:       []
+};
+
+function getMyRole() {
+  try { return JSON.parse(localStorage.getItem('ait_user') || '{}').role || 'viewer'; }
+  catch { return 'viewer'; }
+}
+
+function canEdit(pane) {
+  return (ROLE_PERMS[getMyRole()] || []).includes(pane);
+}
+
+function applyRoleUI() {
+  const role = getMyRole();
+  const isAdmin = role === 'admin';
+
+  // 아이템 관리 버튼 (admin만)
+  document.querySelectorAll('.sidebar-footer .sidebar-btn').forEach(btn => {
+    if ((btn.getAttribute('onclick') || '').includes('openCarModal'))
+      btn.style.display = isAdmin ? '' : 'none';
+  });
+
+  // 전체 초기화 버튼 (admin만)
+  const resetWrap = document.getElementById('sidebar-reset-btn');
+  if (resetWrap && !isAdmin) resetWrap.style.display = 'none';
+
+  // 사용자 정보 표시
+  try {
+    const u = JSON.parse(localStorage.getItem('ait_user') || '{}');
+    const nameEl = document.getElementById('sidebar-user-name');
+    if (nameEl) nameEl.textContent = u.name || u.email || '';
+    const roleEl = document.getElementById('sidebar-user-role');
+    if (roleEl) {
+      const labels = { admin: '전체관리자', cp_editor: 'CP편집자', qpoint_editor: 'Q-Point편집자', viewer: '읽기전용', general: '읽기전용' };
+      roleEl.textContent = labels[role] || role;
+    }
+  } catch {}
+}
+
 /* ── 탭 전환 ── */
 function showTab(id, el) {
   document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
@@ -86,6 +131,7 @@ function _syncSidebarReset() {
 }
 
 function toggleTabEditMode(pane, btn) {
+  if (!canEdit(pane)) { alert('편집 권한이 없습니다.'); return; }
   const paneEl = document.getElementById('pane-' + pane);
   if (paneEl.classList.contains('edit-mode')) {
     // 나가기 클릭
@@ -101,9 +147,6 @@ function toggleTabEditMode(pane, btn) {
       if (typeof loadTab === 'function') loadTab(pane);
     }
   } else {
-    const pw = prompt('편집 모드 비밀번호를 입력하세요');
-    if (pw === null) return;
-    if (pw !== 'ait1234') { alert('비밀번호가 올바르지 않습니다.'); return; }
     snapshots[pane] = snapshotPane(pane); // 변경 감지용 스냅샷
     paneEl.classList.add('edit-mode');
     _syncSidebarReset();
@@ -218,9 +261,7 @@ function _signCell(rev, role, fileId, name, liveMode) {
 }
 
 function removeSign(rev, role) {
-  const pw = prompt('비밀번호를 입력하세요');
-  if (pw === null) return;
-  if (pw !== 'ait1234') { alert('비밀번호가 올바르지 않습니다.'); return; }
+  if (getMyRole() !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
   AIT_API.deleteSign(window.currentCarId, _revGroupKey(_revModalPane), rev, role)
     .then(() => openRevModal(_revModalPane))
     .catch(e => alert('삭제 실패: ' + (e.message || e)));
@@ -301,8 +342,7 @@ function openRevModal(pane) {
 }
 
 function deleteRevEntry(idx) {
-  const pw = prompt('비밀번호를 입력하세요');
-  if (pw !== 'ait1234') { alert('비밀번호가 올바르지 않습니다.'); return; }
+  if (getMyRole() !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
   if (!confirm('이 개정 이력을 삭제하시겠습니까?')) return;
   const carName = getCurrentCar();
   const pane = _revModalPane;
@@ -756,9 +796,7 @@ function renderCarSelect(cars) {
   ).join('');
 }
 function openCarModal() {
-  const pw = prompt('관리자 비밀번호를 입력하세요');
-  if (pw === null) return;
-  if (pw !== 'ait1234') { alert('비밀번호가 올바르지 않습니다.'); return; }
+  if (getMyRole() !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
   renderCarListInModal();
   document.getElementById('car-modal').classList.add('open');
 }

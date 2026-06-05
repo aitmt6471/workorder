@@ -70,12 +70,20 @@
       </div>
     </nav>
 
+    <div class="sidebar-user" style="padding:10px 12px;border-top:1px solid var(--border)">
+      <div id="sidebar-user-name" style="font-size:12px;font-weight:600;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">
+        <span id="sidebar-user-role" style="font-size:10px;background:#eff6ff;color:#2563eb;border-radius:4px;padding:1px 6px;font-weight:600"></span>
+        <button onclick="(function(){localStorage.removeItem('ait_token');localStorage.removeItem('ait_token_exp');localStorage.removeItem('ait_user');window.location.replace('login.html');})()" style="font-size:10px;color:#94a3b8;background:none;border:none;cursor:pointer;padding:0">로그아웃</button>
+      </div>
+    </div>
+
     <div class="sidebar-footer">
       <button class="btn btn-sm sidebar-btn" onclick="openCarModal()">⚙ 아이템관리</button>
       <button class="btn btn-sm sidebar-btn" onclick="(function(){var t=document.querySelector('.nav-item.active')?.dataset.tab;var fn=window['print_'+t];if(typeof fn==='function')fn();else alert('이 탭은 아직 인쇄 기능이 준비 중입니다.');})()">🖨 인쇄</button>
     </div>
     <div id="sidebar-reset-btn" style="display:none;padding:8px 12px;border-top:1px solid var(--border)">
-      <button class="btn btn-sm sidebar-btn" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}resetAllData();})()" style="width:100%;color:#f87171;border-color:rgba(248,113,113,.4)">🗑 전체 초기화</button>
+      <button class="btn btn-sm sidebar-btn" onclick="(function(){if(typeof getMyRole==='function'&&getMyRole()!=='admin'){alert('관리자 권한이 필요합니다.');return;}resetAllData();})()" style="width:100%;color:#f87171;border-color:rgba(248,113,113,.4)">🗑 전체 초기화</button>
     </div>
   </aside>
 
@@ -344,6 +352,7 @@ async function loadTab(id) {
 }
 document.addEventListener('DOMContentLoaded', async () => {
   await initCars();
+  if (typeof applyRoleUI === 'function') applyRoleUI();
   loadTab('cp');
 });
 const _origShowTab = window.showTab;
