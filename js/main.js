@@ -130,7 +130,7 @@ function _syncSidebarReset() {
   if (wrap) wrap.style.display = anyEdit ? 'block' : 'none';
 }
 
-function toggleTabEditMode(pane, btn) {
+async function toggleTabEditMode(pane, btn) {
   if (!canEdit(pane)) { alert('편집 권한이 없습니다.'); return; }
   const paneEl = document.getElementById('pane-' + pane);
   if (paneEl.classList.contains('edit-mode')) {
@@ -147,6 +147,17 @@ function toggleTabEditMode(pane, btn) {
       if (typeof loadTab === 'function') loadTab(pane);
     }
   } else {
+    const pw = prompt('편집 모드 비밀번호를 입력하세요');
+    if (pw === null) return;
+    try {
+      const res = await fetch('https://aitechn8n.ngrok.app/webhook/ait/auth/edit-pw', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw })
+      });
+      const data = await res.json();
+      if (!data.ok) { alert('비밀번호가 올바르지 않습니다.'); return; }
+    } catch { alert('서버 연결 오류. 잠시 후 다시 시도하세요.'); return; }
     snapshots[pane] = snapshotPane(pane); // 변경 감지용 스냅샷
     paneEl.classList.add('edit-mode');
     _syncSidebarReset();
