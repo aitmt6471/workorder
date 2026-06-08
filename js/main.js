@@ -110,6 +110,24 @@ function onCarChange(sel) {
   const car  = cars.find(c => String(c.id) === String(opt.value));
   applyEnabledDocs(car?.enabled_docs);
   if (car) _syncCarMetaToLocal(car);
+  // 개정이력 DB 갱신 (차종 전환 시)
+  if (!AIT_API.MOCK && window.currentCarId) {
+    const _ncId = window.currentCarId, _ncName = window.currentCar;
+    [...new Set(['cp','ws','daily','imf','ms','spec'].map(p => _revGroupKey(p)))].forEach(pane => {
+      AIT_API.getRevisions(_ncId, pane).then(rows => {
+        const validRows = (rows || []).filter(r => r && r.id != null);
+        const rd = { rev: 0, history: [] };
+        validRows.forEach(r => {
+          const rev = parseInt(r.rev) || 0;
+          if (rev > rd.rev) rd.rev = rev;
+          rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane, dbId: r.id, rev_display: r.rev_display || '' });
+        });
+        rd.history.sort((a, b) => b.rev - a.rev);
+        saveRevDataFor(pane, _ncName, rd);
+        updateAllRevDisplays();
+      }).catch(() => {});
+    });
+  }
   // 모든 탭 캐시 초기화
   Object.keys(loaded).forEach(id => {
     loaded[id] = false;
@@ -1300,6 +1318,7 @@ function loadCarContent(pane) {
       // 뷰 모드에서도 전체 행 표시 (기본 펼침)
       paneEl.querySelectorAll('.cp-group-hd').forEach(hd => hd.classList.add('cp-grp-open'));
       paneEl.querySelectorAll('.cp-child').forEach(tr => tr.classList.add('cp-open'));
+      updateRevDisplay('cp');
     };
 
     if (!AIT_API.MOCK) {

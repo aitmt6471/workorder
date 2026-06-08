@@ -255,6 +255,7 @@ function submitCpAddModal() {
       <span class="cp-gid-no" onclick="event.stopPropagation()" style="font-size:16px;font-weight:800;margin-right:10px;color:#1e3264">${procNo}</span>
       <span class="cp-gid-name" onclick="event.stopPropagation()" style="font-size:13px;color:#1e3264">${procName}</span>
       <span class="cp-chevron" style="float:right;font-size:11px;display:inline-block;color:#1e3264">&#x25BC;</span>
+      <button class="edit-only" onclick="event.stopPropagation();deleteCpGroup('${targetGid}')" style="float:right;margin-left:8px;background:#fee2e2;border:1px solid #fca5a5;color:#ef4444;border-radius:4px;padding:1px 8px;font-size:11px;cursor:pointer;font-weight:600;line-height:1.8" title="그룹 삭제">🗑 삭제</button>
     </td>`;
     tbody.appendChild(hd);
     _addCpDragHandle(hd);
@@ -319,15 +320,15 @@ function copyCpRow(tr) {
 }
 
 function autofillCpGroup(gid) {
+  const hd = document.querySelector(`.cp-group-hd[data-gid="${gid}"]`);
   const children = document.querySelectorAll(`.cp-child[data-gid="${gid}"]`);
   if (children.length < 2) { alert('그룹에 행이 1개뿐입니다.'); return; }
-  const first = children[0];
-  const no = first.cells[0]?.textContent.trim();
-  const nm = first.cells[2]?.textContent.trim();  // 공정명 (col shifted)
-  const eq = first.cells[3]?.textContent.trim();  // 설비명 (col shifted)
+  // 공정번호·공정명은 그룹 헤더 편집값 우선 (cp-gid-no / cp-gid-name)
+  const no = hd?.querySelector('.cp-gid-no')?.textContent.trim()   || children[0].cells[0]?.textContent.trim();
+  const nm = hd?.querySelector('.cp-gid-name')?.textContent.trim() || children[0].cells[2]?.textContent.trim();
+  const eq = children[0].cells[3]?.textContent.trim();
   if (!confirm(`공정번호 "${no}", 공정명 "${nm}", 설비명 "${eq}"\n이 값을 그룹 내 모든 행에 적용하시겠습니까?`)) return;
-  children.forEach((tr, i) => {
-    if (i === 0) return;
+  children.forEach(tr => {
     if (tr.cells[0]) tr.cells[0].textContent = no;
     if (tr.cells[2]) tr.cells[2].textContent = nm;
     if (tr.cells[3]) tr.cells[3].textContent = eq;
@@ -674,6 +675,7 @@ async function _buildCpHtmlFromDb(car) {
           <span class="cp-gid-no" onclick="event.stopPropagation()" style="font-size:16px;font-weight:800;margin-right:10px;color:#1e3264">${g.proc_no || ''}</span>
           <span class="cp-gid-name" onclick="event.stopPropagation()" style="font-size:13px;color:#1e3264">${g.proc_name || ''}</span>
           <span class="cp-chevron" style="float:right;font-size:11px;color:#1e3264">&#x25BC;</span>
+          <button class="edit-only" onclick="event.stopPropagation();deleteCpGroup('${gid}')" style="float:right;margin-left:8px;background:#fee2e2;border:1px solid #fca5a5;color:#ef4444;border-radius:4px;padding:1px 8px;font-size:11px;cursor:pointer;font-weight:600;line-height:1.8" title="그룹 삭제">🗑 삭제</button>
         </td></tr>`;
       const _n = v => (!v || v === 'null') ? '' : v;
       g.rows.forEach(r => {
@@ -816,6 +818,15 @@ function _cpClearDropIndicator(paneEl) {
     paneEl._cpDropTarget.style.outlineOffset = '';
     paneEl._cpDropTarget = null;
   }
+}
+
+function deleteCpGroup(gid) {
+  const hd = document.querySelector(`.cp-group-hd[data-gid="${gid}"]`);
+  const children = [...document.querySelectorAll(`.cp-child[data-gid="${gid}"]`)];
+  const no = hd?.querySelector('.cp-gid-no')?.textContent.trim() || '';
+  if (!confirm(`공정번호 "${no}" 그룹과 하위 ${children.length}개 행을 모두 삭제하시겠습니까?\n저장 버튼을 눌러야 DB에 반영됩니다.`)) return;
+  children.forEach(tr => tr.remove());
+  if (hd) hd.remove();
 }
 
 function _cpMoveGroup(tbody, fromGid, toGid) {
