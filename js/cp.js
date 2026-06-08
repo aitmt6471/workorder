@@ -347,20 +347,11 @@ async function _saveCpToDb(carName, paneEl) {
   const domDbIds = new Set();
   const saves = [];
 
-  // proc_no 순서 변경 감지 (ws_processes.proc_no 동기화 — ▲▼ 이동 포함)
+  // proc_no 변경 감지: 그룹 dbId 기반 (▲▼ 이동 후 번호 수동변경 감지)
   const _toInt = v => parseInt(v) || 0;
-  const oldSeq = [...new Map(
-    [...dbRows].sort((a,b) => _toInt(a.sort_order) - _toInt(b.sort_order))
-      .filter(r => r.proc_no).map(r => [_toInt(r.proc_no), true])
-  ).keys()].filter(Boolean);
-  const newSeq = [...new Map(
-    domRows.map(tr => [_toInt(tr.cells[0]?.textContent.trim()), true])
-  ).keys()].filter(Boolean);
+  const oldProcNoByDbId = new Map(dbRows.map(r => [_toInt(r.id), _toInt(r.proc_no)]));
   const procNoSwaps = [];
-  const _minLen = Math.min(oldSeq.length, newSeq.length);
-  for (let i = 0; i < _minLen; i++) {
-    if (oldSeq[i] !== newSeq[i]) procNoSwaps.push({ from: oldSeq[i], to: newSeq[i] });
-  }
+  const _seenFromNos = new Set();
 
   const _cv = s => { const v = (s || '').trim(); return (v && v !== 'null') ? v : null; };
   domRows.forEach((tr, idx) => {
@@ -389,6 +380,12 @@ async function _saveCpToDb(carName, paneEl) {
       is_deleted:   0
     };
     if (dbId) {
+      const oldNo = oldProcNoByDbId.get(dbId) || 0;
+      const newNo = _toInt(cells[0]?.textContent.trim());
+      if (oldNo && newNo && oldNo !== newNo && !_seenFromNos.has(oldNo)) {
+        _seenFromNos.add(oldNo);
+        procNoSwaps.push({ from: oldNo, to: newNo });
+      }
       domDbIds.add(dbId);
       saves.push(() => AIT_API.updateCpRow(dbId, data));
     } else {
