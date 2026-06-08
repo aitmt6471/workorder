@@ -179,10 +179,10 @@ function setCpEditable(paneEl, on) {
         if (td) td.appendChild(btn);
       }
     });
-    initCpDrag(paneEl);
+    initCpOrder(paneEl);
   } else {
     paneEl.querySelectorAll('.cp-copy-btn, .cp-autofill-btn').forEach(b => b.remove());
-    destroyCpDrag(paneEl);
+    destroyCpOrder(paneEl);
   }
 }
 
@@ -258,7 +258,7 @@ function submitCpAddModal() {
       <button class="edit-only" onclick="event.stopPropagation();deleteCpGroup('${targetGid}')" style="float:right;margin-left:8px;background:#fee2e2;border:1px solid #fca5a5;color:#ef4444;border-radius:4px;padding:1px 8px;font-size:11px;cursor:pointer;font-weight:600;line-height:1.8" title="그룹 삭제">🗑 삭제</button>
     </td>`;
     tbody.appendChild(hd);
-    _addCpDragHandle(hd);
+    _addCpOrderBtns(hd);
   }
   const tr = document.createElement('tr');
   tr.className = 'cp-child cp-open';
@@ -712,112 +712,47 @@ async function _buildCpHtmlFromDb(car) {
   }
 }
 
-/* ── CP 그룹 드래그 순서 변경 (편집 모드 전용) ── */
-function _addCpDragHandle(hd) {
-  if (hd.querySelector('.cp-drag-handle')) return;
+/* ── CP 그룹 순서 변경 버튼 ▲▼ (편집 모드 전용) ── */
+function _addCpOrderBtns(hd) {
+  if (hd.querySelector('.cp-order-btn')) return;
   const td = hd.querySelector('td');
   if (!td) return;
-  const handle = document.createElement('span');
-  handle.className = 'cp-drag-handle';
-  handle.draggable = true;
-  handle.textContent = '⠿';
-  handle.title = '드래그하여 공정 순서 변경';
-  handle.style.cssText = 'cursor:grab;font-size:17px;color:#7a90b8;margin-right:8px;user-select:none;vertical-align:middle;padding:1px 4px;border-radius:3px;display:inline-block;line-height:1';
-  handle.addEventListener('click', e => e.stopPropagation());
-  td.insertBefore(handle, td.firstChild);
+  const gid = hd.dataset.gid;
+  const wrap = document.createElement('span');
+  wrap.className = 'cp-order-btn';
+  wrap.style.cssText = 'display:inline-flex;gap:2px;margin-right:8px;vertical-align:middle';
+  wrap.innerHTML =
+    `<button onclick="event.stopPropagation();moveCpGroupUp('${gid}')"
+       style="width:22px;height:22px;border:1px solid #b8ccec;background:#fff;color:#1e3264;border-radius:3px;cursor:pointer;font-size:11px;line-height:1;padding:0" title="위로">▲</button>` +
+    `<button onclick="event.stopPropagation();moveCpGroupDown('${gid}')"
+       style="width:22px;height:22px;border:1px solid #b8ccec;background:#fff;color:#1e3264;border-radius:3px;cursor:pointer;font-size:11px;line-height:1;padding:0" title="아래로">▼</button>`;
+  td.insertBefore(wrap, td.firstChild);
 }
 
-function initCpDrag(paneEl) {
-  const tbody = paneEl.querySelector('#cp-tbody');
-  if (!tbody || tbody._cpDragAttached) return;
-  tbody._cpDragAttached = true;
-
-  paneEl.querySelectorAll('#cp-tbody .cp-group-hd').forEach(hd => _addCpDragHandle(hd));
-
-  function onDragStart(e) {
-    const handle = e.target.closest('.cp-drag-handle');
-    if (!handle) return;
-    const hd = handle.closest('.cp-group-hd');
-    if (!hd) return;
-    tbody._dragGid = hd.dataset.gid;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', hd.dataset.gid);
-    setTimeout(() => { hd.style.opacity = '0.4'; }, 0);
-  }
-
-  function onDragEnd() {
-    paneEl.querySelectorAll('#cp-tbody .cp-group-hd').forEach(hd => { hd.style.opacity = ''; });
-    _cpClearDropIndicator(paneEl);
-    tbody._dragGid = null;
-    tbody._dragTargetGid = null;
-  }
-
-  function onDragOver(e) {
-    if (!tbody._dragGid) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    const tr = e.target.closest('tr');
-    if (!tr) return;
-    let targetHd = null;
-    if (tr.classList.contains('cp-group-hd')) {
-      targetHd = tr;
-    } else if (tr.classList.contains('cp-child')) {
-      targetHd = tbody.querySelector(`.cp-group-hd[data-gid="${tr.dataset.gid}"]`);
-    }
-    if (!targetHd || targetHd.dataset.gid === tbody._dragGid) {
-      _cpClearDropIndicator(paneEl);
-      return;
-    }
-    if (tbody._dragTargetGid === targetHd.dataset.gid) return;
-    tbody._dragTargetGid = targetHd.dataset.gid;
-    _cpShowDropIndicator(paneEl, targetHd);
-  }
-
-  function onDrop(e) {
-    e.preventDefault();
-    const fromGid = tbody._dragGid;
-    const toGid   = tbody._dragTargetGid;
-    _cpClearDropIndicator(paneEl);
-    tbody._dragGid = null;
-    tbody._dragTargetGid = null;
-    if (!fromGid || !toGid || fromGid === toGid) return;
-    _cpMoveGroup(tbody, fromGid, toGid);
-  }
-
-  tbody._cpDragHandlers = { onDragStart, onDragEnd, onDragOver, onDrop };
-  tbody.addEventListener('dragstart', onDragStart);
-  tbody.addEventListener('dragend',   onDragEnd);
-  tbody.addEventListener('dragover',  onDragOver);
-  tbody.addEventListener('drop',      onDrop);
+function initCpOrder(paneEl) {
+  paneEl.querySelectorAll('#cp-tbody .cp-group-hd').forEach(hd => _addCpOrderBtns(hd));
 }
 
-function destroyCpDrag(paneEl) {
-  const tbody = paneEl.querySelector('#cp-tbody');
-  if (!tbody || !tbody._cpDragAttached) return;
-  tbody._cpDragAttached = false;
-  paneEl.querySelectorAll('#cp-tbody .cp-drag-handle').forEach(h => h.remove());
-  _cpClearDropIndicator(paneEl);
-  const h = tbody._cpDragHandlers || {};
-  if (h.onDragStart) tbody.removeEventListener('dragstart', h.onDragStart);
-  if (h.onDragEnd)   tbody.removeEventListener('dragend',   h.onDragEnd);
-  if (h.onDragOver)  tbody.removeEventListener('dragover',  h.onDragOver);
-  if (h.onDrop)      tbody.removeEventListener('drop',      h.onDrop);
-  delete tbody._cpDragHandlers;
+function destroyCpOrder(paneEl) {
+  paneEl.querySelectorAll('#cp-tbody .cp-order-btn').forEach(el => el.remove());
 }
 
-function _cpShowDropIndicator(paneEl, targetHd) {
-  _cpClearDropIndicator(paneEl);
-  targetHd.style.outline = '3px solid #1e3264';
-  targetHd.style.outlineOffset = '-3px';
-  paneEl._cpDropTarget = targetHd;
+function moveCpGroupUp(gid) {
+  const tbody = document.querySelector('#cp-tbody');
+  if (!tbody) return;
+  const allHds = [...tbody.querySelectorAll('.cp-group-hd')];
+  const idx = allHds.findIndex(hd => hd.dataset.gid === gid);
+  if (idx <= 0) return;
+  _cpMoveGroup(tbody, gid, allHds[idx - 1].dataset.gid);
 }
 
-function _cpClearDropIndicator(paneEl) {
-  if (paneEl._cpDropTarget) {
-    paneEl._cpDropTarget.style.outline = '';
-    paneEl._cpDropTarget.style.outlineOffset = '';
-    paneEl._cpDropTarget = null;
-  }
+function moveCpGroupDown(gid) {
+  const tbody = document.querySelector('#cp-tbody');
+  if (!tbody) return;
+  const allHds = [...tbody.querySelectorAll('.cp-group-hd')];
+  const idx = allHds.findIndex(hd => hd.dataset.gid === gid);
+  if (idx < 0 || idx >= allHds.length - 1) return;
+  _cpMoveGroup(tbody, allHds[idx + 1].dataset.gid, gid);
 }
 
 function deleteCpGroup(gid) {
