@@ -1,7 +1,7 @@
 /* ── 역할 기반 접근 제어 ── */
 const ROLE_PERMS = {
   admin:         ['cp','ws','daily','imf','ms','spec','insp','qpoint'],
-  cp_editor:     ['cp','ws','daily'],
+  cp_editor:     ['cp','ws','daily','ms','insp'],
   qpoint_editor: ['qpoint'],
   viewer:        [],
   general:       []
