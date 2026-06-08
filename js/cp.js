@@ -347,6 +347,11 @@ async function _saveCpToDb(carName, paneEl) {
   const domDbIds = new Set();
   const saves = [];
 
+  // proc_no 변경 감지 (ws_processes 동기화용)
+  const oldProcNoById = new Map(dbRows.map(r => [r.id, parseInt(r.proc_no) || 0]));
+  const procNoSwaps = [];
+  const _seenFromNos = new Set();
+
   const _cv = s => { const v = (s || '').trim(); return (v && v !== 'null') ? v : null; };
   domRows.forEach((tr, idx) => {
     const cells = tr.cells;
@@ -374,6 +379,12 @@ async function _saveCpToDb(carName, paneEl) {
       is_deleted:   0
     };
     if (dbId) {
+      const oldNo = oldProcNoById.get(dbId) || 0;
+      const newNo = parseInt(cells[0]?.textContent.trim()) || 0;
+      if (oldNo && newNo && oldNo !== newNo && !_seenFromNos.has(oldNo)) {
+        _seenFromNos.add(oldNo);
+        procNoSwaps.push({ from: oldNo, to: newNo });
+      }
       domDbIds.add(dbId);
       saves.push(() => AIT_API.updateCpRow(dbId, data));
     } else {
@@ -388,6 +399,9 @@ async function _saveCpToDb(carName, paneEl) {
     .map(id => () => AIT_API.deleteCpRow(id));
 
   await _batchRun([...saves, ...deletes], 3);
+  if (!AIT_API.MOCK && procNoSwaps.length > 0) {
+    await AIT_API.swapWsProcNos(carId, procNoSwaps).catch(e => console.warn('ws proc_no sync 실패:', e));
+  }
   return `${saves.length}개 저장, ${deletes.length}개 삭제`;
 }
 

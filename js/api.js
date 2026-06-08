@@ -134,6 +134,7 @@ const AIT_API = (() => {
     createWsProcess:  (carId, data) => _post('ait/ws/processes', { carId, ...data }),
     updateWsProcess:  (id, data)=> _put('ait/ws/processes',  { id, ...data }),
     deleteWsProcess:  (id)      => _del('ait/ws/processes',  { id }),
+    swapWsProcNos:    (carId, swaps) => _post('ait/ws/proc-no-swap', { carId, swaps }),
 
     /* ── CP 메타 ──────────────────────────────── */
     getCpMeta:    (carId)       => _get('ait/cp/meta', { carId }),
@@ -292,6 +293,7 @@ const AIT_API = (() => {
     syncWsSteps:        (carId, steps) => _real.syncWsSteps(carId, steps),
     getWsMeta:          (carId)      => _real.getWsMeta(carId),
     saveWsMeta:         (carId, s)   => _real.saveWsMeta(carId, s),
+    swapWsProcNos:      (carId, swaps) => _real.swapWsProcNos(carId, swaps),
     /* 하위 호환 */
     getImfMeta:         (car)        => impl.getImfMeta(car),
     getMsMeta:          (car)        => impl.getMsMeta(car),
