@@ -1054,7 +1054,7 @@ function _wsRenderStepsFromDb(rows, paneEl, car, extraProcs) {
   });
   const stepProcs = Object.keys(byProc).map(Number).filter(Boolean).sort((a,b)=>a-b);
   const procs = (extraProcs && extraProcs.length)
-    ? [...new Set([...stepProcs, ...extraProcs])].sort((a,b)=>a-b)
+    ? [...extraProcs, ...stepProcs.filter(p => !extraProcs.includes(p))]
     : stepProcs;
   if (!procs.length) return false;
   buildWsProcs(procs, paneEl);

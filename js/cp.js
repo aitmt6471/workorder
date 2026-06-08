@@ -45,7 +45,7 @@ function _buildDailyFromCpRows(rows, linename) {
 
 /* ── CP DB rows → WS 관리항목 렌더 (단일 진실 소스) ── */
 function _buildWsMgmtFromCpRows(rows, paneEl) {
-  const seenProc = {};
+  const seenProc = {}, procOrder = [];
   let mgmtHtml = '';
   const delBtn = `<td class="edit-only" style="padding:2px;text-align:center"><button onclick="this.closest('tr').remove()" style="width:28px;height:28px;border:none;background:#fee2e2;color:#ef4444;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;line-height:1" title="삭제">✕</button></td>`;
   const _n = v => (!v || v === 'null') ? '' : v;
@@ -54,7 +54,7 @@ function _buildWsMgmtFromCpRows(rows, paneEl) {
     if (!procNo) return;
     const procNm = r.proc_name || '';
     if (['수입검사','출하검사'].some(k => procNm.includes(k))) return;
-    if (!seenProc[procNo]) seenProc[procNo] = 0;
+    if (!seenProc[procNo]) { seenProc[procNo] = 0; procOrder.push(Number(procNo)); }
     seenProc[procNo]++;
     const cat = _n(r.ctrl_category), item = _n(r.ctrl_item), std = _n(r.standard);
     const method = _n(r.tool), cycle = _n(r.sample_freq), plan = _n(r.ctrl_method);
@@ -74,7 +74,7 @@ function _buildWsMgmtFromCpRows(rows, paneEl) {
   });
   const tb = paneEl.querySelector('#ws-mgmt-tbody');
   if (tb) { tb.innerHTML = mgmtHtml; refreshMgmtRowColors(paneEl); }
-  return Object.keys(seenProc).map(Number).filter(Boolean).sort((a,b)=>a-b);
+  return procOrder.filter(Boolean);
 }
 
 
@@ -326,12 +326,10 @@ function autofillCpGroup(gid) {
   // 공정번호·공정명은 그룹 헤더 편집값 우선 (cp-gid-no / cp-gid-name)
   const no = hd?.querySelector('.cp-gid-no')?.textContent.trim()   || children[0].cells[0]?.textContent.trim();
   const nm = hd?.querySelector('.cp-gid-name')?.textContent.trim() || children[0].cells[2]?.textContent.trim();
-  const eq = children[0].cells[3]?.textContent.trim();
-  if (!confirm(`공정번호 "${no}", 공정명 "${nm}", 설비명 "${eq}"\n이 값을 그룹 내 모든 행에 적용하시겠습니까?`)) return;
+  if (!confirm(`공정번호 "${no}", 공정명 "${nm}"\n이 값을 그룹 내 모든 행에 적용하시겠습니까?`)) return;
   children.forEach(tr => {
     if (tr.cells[0]) tr.cells[0].textContent = no;
     if (tr.cells[2]) tr.cells[2].textContent = nm;
-    if (tr.cells[3]) tr.cells[3].textContent = eq;
   });
 }
 
