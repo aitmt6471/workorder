@@ -20,11 +20,14 @@ function applyRoleUI() {
   const role = getMyRole();
   const isAdmin = role === 'admin';
 
-  // 아이템 관리 버튼 (admin만)
+  // 아이템 관리 + 설정 버튼 (admin만)
   document.querySelectorAll('.sidebar-footer .sidebar-btn').forEach(btn => {
-    if ((btn.getAttribute('onclick') || '').includes('openCarModal'))
+    const oc = btn.getAttribute('onclick') || '';
+    if (oc.includes('openCarModal') || oc.includes('openSettingsModal'))
       btn.style.display = isAdmin ? '' : 'none';
   });
+  const btnSettings = document.getElementById('btn-settings');
+  if (btnSettings) btnSettings.style.display = isAdmin ? '' : 'none';
 
   // 전체 초기화 버튼 (admin만)
   const resetWrap = document.getElementById('sidebar-reset-btn');
@@ -149,15 +152,20 @@ async function toggleTabEditMode(pane, btn) {
   } else {
     const pw = prompt('편집 모드 비밀번호를 입력하세요');
     if (pw === null) return;
-    try {
-      const res = await fetch('https://aitechn8n.ngrok.app/webhook/ait/auth/edit-pw', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw })
-      });
-      const data = await res.json();
-      if (!data.ok) { alert('비밀번호가 올바르지 않습니다.'); return; }
-    } catch { alert('서버 연결 오류. 잠시 후 다시 시도하세요.'); return; }
+    const _storedPw = localStorage.getItem('ait_edit_pw');
+    if (_storedPw) {
+      if (pw !== _storedPw) { alert('비밀번호가 올바르지 않습니다.'); return; }
+    } else {
+      try {
+        const res = await fetch('https://aitechn8n.ngrok.app/webhook/ait/auth/edit-pw', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pw })
+        });
+        const data = await res.json();
+        if (!data.ok) { alert('비밀번호가 올바르지 않습니다.'); return; }
+      } catch { alert('서버 연결 오류. 잠시 후 다시 시도하세요.'); return; }
+    }
     snapshots[pane] = snapshotPane(pane); // 변경 감지용 스냅샷
     paneEl.classList.add('edit-mode');
     _syncSidebarReset();
@@ -690,8 +698,38 @@ document.addEventListener('keydown', e => {
     closeCarModal();
     closeCftModal();
     closePartModal();
+    closeSettingsModal();
   }
 });
+
+/* ── 설정 모달 ── */
+function openSettingsModal() {
+  if (getMyRole() !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
+  const stored = localStorage.getItem('ait_edit_pw');
+  if (stored) {
+    const pw = prompt('설정에 접근하려면 현재 비밀번호를 입력하세요');
+    if (pw === null) return;
+    if (pw !== stored) { alert('비밀번호가 올바르지 않습니다.'); return; }
+  }
+  document.getElementById('settings-new-pw').value = '';
+  document.getElementById('settings-new-pw2').value = '';
+  document.getElementById('settings-modal').classList.add('open');
+}
+
+function closeSettingsModal() {
+  const el = document.getElementById('settings-modal');
+  if (el) el.classList.remove('open');
+}
+
+function saveSettingsPw() {
+  const pw1 = document.getElementById('settings-new-pw').value;
+  const pw2 = document.getElementById('settings-new-pw2').value;
+  if (!pw1) { alert('새 비밀번호를 입력하세요.'); return; }
+  if (pw1 !== pw2) { alert('비밀번호가 일치하지 않습니다.'); return; }
+  localStorage.setItem('ait_edit_pw', pw1);
+  closeSettingsModal();
+  alert('✅ 비밀번호가 변경되었습니다.');
+}
 
 /* ── 결과 셀 (달력 구형) ── */
 function cycleResult(input) {

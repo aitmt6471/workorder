@@ -143,8 +143,9 @@ let _specSelectedCdItem = null;
 const KR_FIXED = ['1-1','3-1','5-5','6-6','8-15','10-3','10-9','12-25'];
 const KR_EXTRA = {
   2025:['1-27','1-28','1-29','3-3','10-5','10-6','10-7','10-8'],
-  2026:['2-16','2-17','2-18','3-2','6-8','8-17','9-25','9-26','9-27','9-28','9-29','10-5']
+  2026:['2-16','2-17','2-18','3-2','6-3','8-17','9-25','9-26','9-27','9-28','9-29','10-5']
 };
+const KR_NO_SUB = { 2026:['6-8'] }; // 자동계산 대체공휴일 제외 (지방선거로 인해 미지정)
 const _subCache = {};
 function _calcSubs(year){
   const s=new Set();
@@ -161,7 +162,8 @@ function _isHol(year,month,d){
   if(KR_FIXED.includes(md)) return true;
   const ex=KR_EXTRA[year]; if(ex&&ex.includes(md)) return true;
   if(!_subCache[year])_subCache[year]=_calcSubs(year);
-  return _subCache[year].has(md);
+  const noSub = KR_NO_SUB[year] || [];
+  return _subCache[year].has(md) && !noSub.includes(md);
 }
 
 function _getCarModel(){

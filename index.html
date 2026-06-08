@@ -80,7 +80,7 @@
 
     <div class="sidebar-footer">
       <button class="btn btn-sm sidebar-btn" onclick="openCarModal()">⚙ 아이템관리</button>
-      <button class="btn btn-sm sidebar-btn" onclick="(function(){var t=document.querySelector('.nav-item.active')?.dataset.tab;var fn=window['print_'+t];if(typeof fn==='function')fn();else alert('이 탭은 아직 인쇄 기능이 준비 중입니다.');})()">🖨 인쇄</button>
+      <button id="btn-settings" class="btn btn-sm sidebar-btn" onclick="openSettingsModal()">⚙ 설정</button>
     </div>
     <div id="sidebar-reset-btn" style="display:none;padding:8px 12px;border-top:1px solid var(--border)">
       <button class="btn btn-sm sidebar-btn" onclick="(function(){if(typeof getMyRole==='function'&&getMyRole()!=='admin'){alert('관리자 권한이 필요합니다.');return;}resetAllData();})()" style="width:100%;color:#f87171;border-color:rgba(248,113,113,.4)">🗑 전체 초기화</button>
@@ -321,6 +321,40 @@
   </div>
 </div>
 
+
+<!-- ── 설정 모달 ── -->
+<div class="car-modal-overlay" id="settings-modal">
+  <div class="car-modal" style="width:380px;max-width:96vw">
+    <div class="car-modal-hd">
+      <h4>설정</h4>
+      <button class="btn btn-ghost btn-sm" onclick="closeSettingsModal()">✕</button>
+    </div>
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:16px">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#1e3264;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #e5e7eb">편집 모드 비밀번호 변경</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <label style="font-size:11px;color:#6b7280;font-weight:600;display:block;margin-bottom:4px">새 비밀번호</label>
+            <input id="settings-new-pw" type="password" placeholder="새 비밀번호 입력"
+              style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"
+              onfocus="this.style.borderColor='#1e3264'" onblur="this.style.borderColor='#d1d5db'">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#6b7280;font-weight:600;display:block;margin-bottom:4px">비밀번호 확인</label>
+            <input id="settings-new-pw2" type="password" placeholder="새 비밀번호 재입력"
+              style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"
+              onfocus="this.style.borderColor='#1e3264'" onblur="this.style.borderColor='#d1d5db'"
+              onkeydown="if(event.key==='Enter')saveSettingsPw()">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:12px 18px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="closeSettingsModal()">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSettingsPw()">저장</button>
+    </div>
+  </div>
+</div>
 
 <script src="js/api.js?v=20260523a"></script>
 <script src="js/cp.js?v=20260523a"></script>
