@@ -158,7 +158,8 @@ async function toggleTabEditMode(pane, btn) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw })
       });
-      const data = await res.json();
+      const raw = await res.json();
+      const data = Array.isArray(raw) ? raw[0] : raw;
       if (!data.ok) { alert('비밀번호가 올바르지 않습니다.'); return; }
     } catch { alert('서버 연결 오류. 잠시 후 다시 시도하세요.'); return; }
     snapshots[pane] = snapshotPane(pane); // 변경 감지용 스냅샷
@@ -706,7 +707,8 @@ function openSettingsModal() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ password: pw })
-  }).then(r => r.json()).then(data => {
+  }).then(r => r.json()).then(raw => {
+    const data = Array.isArray(raw) ? raw[0] : raw;
     if (!data.ok) { alert('비밀번호가 올바르지 않습니다.'); return; }
     document.getElementById('settings-new-pw').value = '';
     document.getElementById('settings-new-pw2').value = '';
