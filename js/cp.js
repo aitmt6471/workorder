@@ -347,10 +347,20 @@ async function _saveCpToDb(carName, paneEl) {
   const domDbIds = new Set();
   const saves = [];
 
-  // proc_no 변경 감지 (ws_processes 동기화용)
-  const oldProcNoById = new Map(dbRows.map(r => [r.id, parseInt(r.proc_no) || 0]));
+  // proc_no 순서 변경 감지 (ws_processes.proc_no 동기화 — ▲▼ 이동 포함)
+  const _toInt = v => parseInt(v) || 0;
+  const oldSeq = [...new Map(
+    [...dbRows].sort((a,b) => _toInt(a.sort_order) - _toInt(b.sort_order))
+      .filter(r => r.proc_no).map(r => [_toInt(r.proc_no), true])
+  ).keys()].filter(Boolean);
+  const newSeq = [...new Map(
+    domRows.map(tr => [_toInt(tr.cells[0]?.textContent.trim()), true])
+  ).keys()].filter(Boolean);
   const procNoSwaps = [];
-  const _seenFromNos = new Set();
+  const _minLen = Math.min(oldSeq.length, newSeq.length);
+  for (let i = 0; i < _minLen; i++) {
+    if (oldSeq[i] !== newSeq[i]) procNoSwaps.push({ from: oldSeq[i], to: newSeq[i] });
+  }
 
   const _cv = s => { const v = (s || '').trim(); return (v && v !== 'null') ? v : null; };
   domRows.forEach((tr, idx) => {
@@ -379,12 +389,6 @@ async function _saveCpToDb(carName, paneEl) {
       is_deleted:   0
     };
     if (dbId) {
-      const oldNo = oldProcNoById.get(dbId) || 0;
-      const newNo = parseInt(cells[0]?.textContent.trim()) || 0;
-      if (oldNo && newNo && oldNo !== newNo && !_seenFromNos.has(oldNo)) {
-        _seenFromNos.add(oldNo);
-        procNoSwaps.push({ from: oldNo, to: newNo });
-      }
       domDbIds.add(dbId);
       saves.push(() => AIT_API.updateCpRow(dbId, data));
     } else {
