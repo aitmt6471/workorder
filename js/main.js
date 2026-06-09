@@ -525,8 +525,8 @@ function saveDocument(pane) {
 
     if (doRevise) {
       const rd = getRevDataFor(pane, carName);
-      const newRev = rd.rev + 1;
-      const desc = prompt(`개정 내용을 입력하세요\nRev.${rd.rev} → Rev.${newRev}`);
+      const newRev = rd.history.length === 0 ? 0 : rd.rev + 1;
+      const desc = prompt(newRev === 0 ? `개정 내용을 입력하세요\nRev.0 (최초 작성)` : `개정 내용을 입력하세요\nRev.${rd.rev} → Rev.${newRev}`);
       if (desc === null) {
         doRevise = false; // 설명 입력 취소 → 개정 없이 저장만 진행
       } else {
@@ -1214,7 +1214,10 @@ function buildWsProcs(procs, paneEl) {
   if (!nav || !area) return;
 
   nav.innerHTML = procs.map((p, i) =>
-    `<button class="proc-btn${i === 0 ? ' active' : ''}" onclick="showProcess(${p},this)">공정 ${p}</button>`
+    `<span class="proc-tab-wrap">` +
+    `<button class="proc-btn${i === 0 ? ' active' : ''}" onclick="showProcess(${p},this)">공정 ${p}</button>` +
+    `<button class="edit-only proc-del-btn" onclick="event.stopPropagation();deleteWsProc(${p},this)" title="공정 삭제">✕</button>` +
+    `</span>`
   ).join('');
 
   area.innerHTML = procs.map((p, i) => `

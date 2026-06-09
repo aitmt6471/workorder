@@ -160,6 +160,33 @@ function wsLoadPhoto(input) {
   input.value = '';
 }
 
+function deleteWsProc(procNo, btnEl) {
+  if (!confirm(`공정 ${procNo}을(를) 삭제하시겠습니까?\n해당 공정의 모든 STEP과 관리항목이 삭제됩니다.`)) return;
+
+  const pane = document.getElementById('pane-ws');
+  const car = typeof getCurrentCar === 'function' ? getCurrentCar() : (window.currentCarId || '');
+
+  const procId = window._wsProcIdMap?.[car]?.[procNo];
+  if (procId && typeof AIT_API !== 'undefined' && !AIT_API.MOCK) {
+    AIT_API.deleteWsProcess(procId).catch(e => console.warn('[WS] 공정 삭제 실패', e));
+  }
+
+  const wrap = btnEl.closest('.proc-tab-wrap');
+  const wasActive = wrap?.querySelector('.proc-btn')?.classList.contains('active');
+  wrap?.remove();
+
+  pane?.querySelector(`#ws-step-list-${procNo}`)?.remove();
+  pane?.querySelectorAll(`#ws-mgmt-tbody tr[data-proc="${procNo}"]`).forEach(r => r.remove());
+
+  if (wasActive) {
+    const nextBtn = pane?.querySelector('#ws-proc-nav .proc-btn');
+    if (nextBtn) {
+      const nextProc = parseInt(nextBtn.textContent.replace('공정', '').trim());
+      showProcess(nextProc, nextBtn);
+    }
+  }
+}
+
 function wsRemovePhoto(btn) {
   const inner = btn.closest('.ws-photo-inner');
   const mediaEl = inner.querySelector('img[data-file-id], video[data-file-id], .ws-drive-video[data-file-id]');
