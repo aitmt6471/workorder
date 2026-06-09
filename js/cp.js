@@ -288,8 +288,15 @@ function submitCpAddModal() {
   tr.querySelector('.cp-copy-btn').onclick = function() { copyCpRow(tr); };
   const children = [...tbody.querySelectorAll(`.cp-child[data-gid="${targetGid}"]`)];
   const lastChild = children[children.length - 1];
-  if (lastChild?.nextSibling) tbody.insertBefore(tr, lastChild.nextSibling);
-  else tbody.appendChild(tr);
+  if (lastChild) {
+    if (lastChild.nextSibling) tbody.insertBefore(tr, lastChild.nextSibling);
+    else tbody.appendChild(tr);
+  } else {
+    // 그룹에 자식 행이 없으면 그룹 헤더 바로 다음에 삽입
+    const groupHd = tbody.querySelector(`.cp-group-hd[data-gid="${targetGid}"]`);
+    if (groupHd?.nextSibling) tbody.insertBefore(tr, groupHd.nextSibling);
+    else tbody.appendChild(tr);
+  }
   tr.scrollIntoView({ block: 'nearest' });
   const cpPane = document.getElementById('pane-cp');
   if (cpPane) {
