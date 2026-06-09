@@ -588,6 +588,30 @@ function saveDocument(pane) {
             // CP 변경 → 작표·설비일상 탭 즉시 갱신 (관리기준 반영)
             loadCarContent('daily');
             loadCarContent('ws');
+            // CP 변경 → 공정검사기준서 공정명 동기화 (proc_no 기준 매핑)
+            if (window.currentCarId) {
+              try {
+                const inspDoc = await AIT_API.getInspDoc(window.currentCarId);
+                if (inspDoc && inspDoc.procs && inspDoc.procs.length) {
+                  const procMap = {};
+                  cpRows.forEach(r => { if (r.proc_no) procMap[String(r.proc_no)] = r.proc_name || ''; });
+                  let changed = false;
+                  inspDoc.procs.forEach(p => {
+                    const mapped = procMap[String(p.proc_no)];
+                    if (mapped !== undefined && mapped !== p.proc_name) {
+                      p.proc_name = mapped;
+                      changed = true;
+                    }
+                  });
+                  if (changed) {
+                    await AIT_API.saveInspDoc(window.currentCarId, inspDoc);
+                    if (typeof window.inspLoadDoc === 'function') window.inspLoadDoc();
+                  }
+                }
+              } catch(e) {
+                console.warn('공정검사기준서 공정명 동기화 실패:', e);
+              }
+            }
             // CP 변경 → 이번 달부터의 설비일상 실적만 초기화 (과거 기록 보존, 이미지 제외)
             if (window.currentCarId) {
               const now = new Date();
