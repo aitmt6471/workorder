@@ -733,18 +733,30 @@ async function _buildCpHtmlFromDb(car) {
 }
 
 /* ── CP 그룹 순서 변경 버튼 ▲▼ (편집 모드 전용) ── */
+
+/* 헤더 바로 다음에 붙어있는 cp-child 행들만 DOM 위치 기반으로 수집 */
+function _getGroupDirectChildren(hdEl) {
+  const children = [];
+  let next = hdEl.nextSibling;
+  while (next && !next.classList?.contains('cp-group-hd')) {
+    if (next.classList?.contains('cp-child')) children.push(next);
+    next = next.nextSibling;
+  }
+  return children;
+}
+
 function _addCpOrderBtns(hd) {
   if (hd.querySelector('.cp-order-btn')) return;
   const td = hd.querySelector('td');
   if (!td) return;
-  const gid = hd.dataset.gid;
   const wrap = document.createElement('span');
   wrap.className = 'cp-order-btn';
   wrap.style.cssText = 'display:inline-flex;gap:2px;margin-right:8px;vertical-align:middle';
+  // gid 문자열 대신 DOM 요소 참조를 직접 전달 → 같은 gid 중복 헤더가 있어도 정확히 동작
   wrap.innerHTML =
-    `<button onclick="event.stopPropagation();moveCpGroupUp('${gid}')"
+    `<button onclick="event.stopPropagation();moveCpGroupUp(this.closest('tr'))"
        style="width:22px;height:22px;border:1px solid #b8ccec;background:#fff;color:#1e3264;border-radius:3px;cursor:pointer;font-size:11px;line-height:1;padding:0" title="위로">▲</button>` +
-    `<button onclick="event.stopPropagation();moveCpGroupDown('${gid}')"
+    `<button onclick="event.stopPropagation();moveCpGroupDown(this.closest('tr'))"
        style="width:22px;height:22px;border:1px solid #b8ccec;background:#fff;color:#1e3264;border-radius:3px;cursor:pointer;font-size:11px;line-height:1;padding:0" title="아래로">▼</button>`;
   td.insertBefore(wrap, td.firstChild);
 }
@@ -757,38 +769,39 @@ function destroyCpOrder(paneEl) {
   paneEl.querySelectorAll('#cp-tbody .cp-order-btn').forEach(el => el.remove());
 }
 
-function moveCpGroupUp(gid) {
+function moveCpGroupUp(hdEl) {
   const tbody = document.querySelector('#cp-tbody');
   if (!tbody) return;
   const allHds = [...tbody.querySelectorAll('.cp-group-hd')];
-  const idx = allHds.findIndex(hd => hd.dataset.gid === gid);
+  const idx = allHds.indexOf(hdEl);
   if (idx <= 0) return;
-  _cpMoveGroup(tbody, gid, allHds[idx - 1].dataset.gid);
+  _cpMoveGroup(hdEl, allHds[idx - 1]);
 }
 
-function moveCpGroupDown(gid) {
+function moveCpGroupDown(hdEl) {
   const tbody = document.querySelector('#cp-tbody');
   if (!tbody) return;
   const allHds = [...tbody.querySelectorAll('.cp-group-hd')];
-  const idx = allHds.findIndex(hd => hd.dataset.gid === gid);
+  const idx = allHds.indexOf(hdEl);
   if (idx < 0 || idx >= allHds.length - 1) return;
-  _cpMoveGroup(tbody, allHds[idx + 1].dataset.gid, gid);
+  _cpMoveGroup(allHds[idx + 1], hdEl);
 }
 
 function deleteCpGroup(gid) {
   const hd = document.querySelector(`.cp-group-hd[data-gid="${gid}"]`);
-  const children = [...document.querySelectorAll(`.cp-child[data-gid="${gid}"]`)];
-  const no = hd?.querySelector('.cp-gid-no')?.textContent.trim() || '';
+  if (!hd) return;
+  const children = _getGroupDirectChildren(hd);
+  const no = hd.querySelector('.cp-gid-no')?.textContent.trim() || '';
   if (!confirm(`공정번호 "${no}" 그룹과 하위 ${children.length}개 행을 모두 삭제하시겠습니까?\n저장 버튼을 눌러야 DB에 반영됩니다.`)) return;
   children.forEach(tr => tr.remove());
-  if (hd) hd.remove();
+  hd.remove();
 }
 
-function _cpMoveGroup(tbody, fromGid, toGid) {
-  const fromHd = tbody.querySelector(`.cp-group-hd[data-gid="${fromGid}"]`);
-  const toHd   = tbody.querySelector(`.cp-group-hd[data-gid="${toGid}"]`);
+/* fromHd 그룹을 toHd 바로 앞으로 이동 — 요소 참조 직접 사용 */
+function _cpMoveGroup(fromHd, toHd) {
   if (!fromHd || !toHd) return;
-  const fromChildren = [...tbody.querySelectorAll(`.cp-child[data-gid="${fromGid}"]`)];
+  const tbody = fromHd.closest('tbody') || document.querySelector('#cp-tbody');
+  const fromChildren = _getGroupDirectChildren(fromHd);
   fromHd.remove();
   fromChildren.forEach(tr => tr.remove());
   tbody.insertBefore(fromHd, toHd);
