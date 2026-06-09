@@ -242,8 +242,14 @@ function submitCpAddModal() {
   const planStyle= plan.includes('작업표준서')||plan.includes('작표')?'color:#1e3264;font-weight:600':plan.includes('설비일상')?'color:#16a34a;font-weight:600':'color:#6b7280';
   const tbody = document.querySelector('#cp-tbody'); if (!tbody) { closeCpAddModal(); return; }
   tbody.querySelectorAll('tr:not(.cp-group-hd):not(.cp-child)').forEach(tr => tr.remove());
+  const cpPane = document.getElementById('pane-cp');
+  const _isEditMode = cpPane?.classList.contains('edit-mode') || false;
+  const _ce = _isEditMode ? 'true' : 'false';
+
   const groupSel = document.getElementById('cpa-group');
   let targetGid = groupSel.value;
+  let targetGroupHd = null; // 삽입 기준이 되는 그룹 헤더 요소 (직접 참조)
+
   if (!targetGid) {
     if (!procNo || !procName) { alert('새 그룹을 추가하려면 공정번호와 공정명을 입력하세요.'); return; }
     targetGid = 'cpg-' + procNo;
@@ -259,55 +265,51 @@ function submitCpAddModal() {
     </td>`;
     tbody.appendChild(hd);
     _addCpOrderBtns(hd);
+    targetGroupHd = hd; // 새로 만든 헤더를 직접 참조
+  } else {
+    targetGroupHd = tbody.querySelector(`.cp-group-hd[data-gid="${targetGid}"]`);
   }
+
   const tr = document.createElement('tr');
   tr.className = 'cp-child cp-open';
   tr.setAttribute('data-gid', targetGid);
   tr.style.background = '#fff';
-  const _isEditMode = document.getElementById('pane-cp')?.classList.contains('edit-mode') || false;
   tr.innerHTML = `
-    <td class="td-center td-mono" contenteditable="false">${procNo}</td>
+    <td class="td-center td-mono" contenteditable="${_ce}">${procNo}</td>
     <td class="cp-flow-cell" data-ms="${mainsub}" style="padding:0;vertical-align:middle;text-align:center">${_cpFlowHtml(mainsub, _isEditMode)}</td>
-    <td contenteditable="false">${procName}</td>
-    <td contenteditable="false">${equip}</td>
-    <td class="td-center" contenteditable="false">${special||'—'}</td>
-    <td class="td-center" contenteditable="false">${fpf||'—'}</td>
-    <td class="td-center" contenteditable="false"><span style="${catStyle}">${cat}</span></td>
-    <td contenteditable="false">${item}</td>
-    <td contenteditable="false">${spec}</td>
-    <td class="td-center" contenteditable="false">${method}</td>
-    <td class="td-center" contenteditable="false">${cycle}</td>
-    <td contenteditable="false"><span style="${planStyle}">${plan}</span></td>
-    <td class="td-center" contenteditable="false">${owner}</td>
-    <td contenteditable="false">${action}</td>
-    <td contenteditable="false">${note}</td>
+    <td contenteditable="${_ce}">${procName}</td>
+    <td contenteditable="${_ce}">${equip}</td>
+    <td class="td-center" contenteditable="${_ce}">${special||'—'}</td>
+    <td class="td-center" contenteditable="${_ce}">${fpf||'—'}</td>
+    <td class="td-center" contenteditable="${_ce}"><span style="${catStyle}">${cat}</span></td>
+    <td contenteditable="${_ce}">${item}</td>
+    <td contenteditable="${_ce}">${spec}</td>
+    <td class="td-center" contenteditable="${_ce}">${method}</td>
+    <td class="td-center" contenteditable="${_ce}">${cycle}</td>
+    <td contenteditable="${_ce}"><span style="${planStyle}">${plan}</span></td>
+    <td class="td-center" contenteditable="${_ce}">${owner}</td>
+    <td contenteditable="${_ce}">${action}</td>
+    <td contenteditable="${_ce}">${note}</td>
     <td class="td-center edit-only" style="width:36px;padding:4px 2px;vertical-align:top">
       <button class="cp-copy-btn" title="행 복사" style="display:block;width:28px;height:28px;border:none;background:#e0f2fe;color:#0369a1;border-radius:5px;cursor:pointer;font-size:13px;line-height:1;margin-bottom:2px">⎘</button>
       <button onclick="this.closest('tr').remove()" style="display:block;width:28px;height:28px;border:none;background:#fee2e2;color:#ef4444;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;line-height:1" title="행 삭제">✕</button>
     </td>`;
   tr.querySelector('.cp-copy-btn').onclick = function() { copyCpRow(tr); };
-  const children = [...tbody.querySelectorAll(`.cp-child[data-gid="${targetGid}"]`)];
-  const lastChild = children[children.length - 1];
-  if (lastChild) {
-    if (lastChild.nextSibling) tbody.insertBefore(tr, lastChild.nextSibling);
+
+  // 대상 헤더의 직접 자식만 DOM 위치 기반으로 조회 → gid 중복 시에도 정확히 동작
+  const directChildren = targetGroupHd ? _getGroupDirectChildren(targetGroupHd) : [];
+  const lastDirect = directChildren[directChildren.length - 1];
+  if (lastDirect) {
+    if (lastDirect.nextSibling) tbody.insertBefore(tr, lastDirect.nextSibling);
     else tbody.appendChild(tr);
+  } else if (targetGroupHd?.nextSibling) {
+    tbody.insertBefore(tr, targetGroupHd.nextSibling);
   } else {
-    // 그룹에 자식 행이 없으면 그룹 헤더 바로 다음에 삽입
-    const groupHd = tbody.querySelector(`.cp-group-hd[data-gid="${targetGid}"]`);
-    if (groupHd?.nextSibling) tbody.insertBefore(tr, groupHd.nextSibling);
-    else tbody.appendChild(tr);
+    tbody.appendChild(tr);
   }
+
   tr.scrollIntoView({ block: 'nearest' });
-  const cpPane = document.getElementById('pane-cp');
-  if (cpPane) {
-    initCpFlowDiagram(cpPane);
-    if (cpPane.classList.contains('edit-mode')) {
-      for (let i = 0; i <= 14; i++) {
-        if (i === 1) continue;
-        const td = tr.cells[i]; if (td) td.contentEditable = 'true';
-      }
-    }
-  }
+  if (cpPane) initCpFlowDiagram(cpPane);
   closeCpAddModal();
 }
 
