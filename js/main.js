@@ -560,11 +560,13 @@ function saveDocument(pane) {
           .then(async msg => {
             window.hideSaving && window.hideSaving();
             window.showToast && window.showToast('CP 저장 완료 (' + msg + ')', 'success');
-            // CP 변경 → daily_equipments + daily_items.standard 동기화 (검증 기준 즉시 반영)
+            // CP 변경 → daily + 공정검사기준서 동기화
             if (window.currentCarId) {
               try {
                 const cpRows = await AIT_API.getCpRows(window.currentCarId);
                 const carObj = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
+
+                // ① 설비일상 기준 동기화
                 const equipments = _buildDailyFromCpRows(cpRows, carObj?.linename || '');
                 if (equipments.length) {
                   await AIT_API.syncDailyEquip(window.currentCarId, equipments);
@@ -581,35 +583,28 @@ function saveDocument(pane) {
                   });
                   if (allItems.length) await AIT_API.syncDailyItems(window.currentCarId, allItems);
                 }
-              } catch(e) {
-                console.warn('설비일상 기준 동기화 실패:', e);
-              }
-            }
-            // CP 변경 → 작표·설비일상 탭 즉시 갱신 (관리기준 반영)
-            loadCarContent('daily');
-            loadCarContent('ws');
-            // CP 변경 → 공정검사기준서 공정명 동기화 (proc_no 기준 매핑)
-            if (window.currentCarId) {
-              try {
-                const inspDoc = await AIT_API.getInspDoc(window.currentCarId);
-                if (inspDoc && inspDoc.procs && inspDoc.procs.length) {
-                  const procMap = {};
-                  cpRows.forEach(r => { if (r.proc_no) procMap[String(r.proc_no)] = r.proc_name || ''; });
-                  let changed = false;
-                  inspDoc.procs.forEach(p => {
-                    const mapped = procMap[String(p.proc_no)];
-                    if (mapped !== undefined && mapped !== p.proc_name) {
-                      p.proc_name = mapped;
-                      changed = true;
-                    }
+
+                // ② 공정검사기준서 공정 탭 동기화 (proc_no 기준, 사진·검사항목 보존)
+                const cpProcOrder = [], cpProcMap = {};
+                cpRows.forEach(r => {
+                  const key = String(r.proc_no || '');
+                  if (key && !cpProcMap[key]) { cpProcMap[key] = r.proc_name || ''; cpProcOrder.push(key); }
+                });
+                if (cpProcOrder.length) {
+                  const inspDoc = await AIT_API.getInspDoc(window.currentCarId);
+                  const existingMap = {};
+                  ((inspDoc && inspDoc.procs) || []).forEach(p => { existingMap[String(p.proc_no)] = p; });
+                  const newProcs = cpProcOrder.map(procNo => {
+                    const ex = existingMap[procNo];
+                    if (ex) { ex.proc_name = cpProcMap[procNo]; return ex; }
+                    return { id: Date.now().toString(36) + Math.random().toString(36).slice(2,5), proc_no: procNo, proc_name: cpProcMap[procNo], proc_type: '일반공정', items: [] };
                   });
-                  if (changed) {
-                    await AIT_API.saveInspDoc(window.currentCarId, inspDoc);
-                    if (typeof window.inspLoadDoc === 'function') window.inspLoadDoc();
-                  }
+                  const merged = Object.assign({}, inspDoc || {}, { procs: newProcs });
+                  await AIT_API.saveInspDoc(window.currentCarId, merged);
+                  if (typeof window.inspLoadDoc === 'function') window.inspLoadDoc();
                 }
               } catch(e) {
-                console.warn('공정검사기준서 공정명 동기화 실패:', e);
+                console.warn('CP 연동 동기화 실패:', e);
               }
             }
             // CP 변경 → 이번 달부터의 설비일상 실적만 초기화 (과거 기록 보존, 이미지 제외)
