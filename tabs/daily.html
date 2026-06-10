@@ -148,6 +148,10 @@ async function _dLoadItems() {
     const rows = await AIT_API.getDailyItems(window.currentCarId);
     DAILY_ITEMS = {};
     rows.forEach(r => { DAILY_ITEMS[`${r.equip_id}_${r.item_no}`] = r; });
+    // equip_name 역매핑으로 DAILY_EQUIP.id 보완 (getDailyEquipments 매핑 실패 방어)
+    const _nameToEquipId = {};
+    rows.forEach(r => { if (r.equip_name && r.equip_id) _nameToEquipId[r.equip_name] = r.equip_id; });
+    DAILY_EQUIP.forEach(e => { if (!e.id && _nameToEquipId[e.sheet]) e.id = _nameToEquipId[e.sheet]; });
     // daily_items가 비어있고 장비 항목이 있으면 자동 동기화
     if (rows.length === 0 && DAILY_EQUIP.length > 0) {
       const allItems = [];
@@ -891,6 +895,7 @@ async function _dFlushResults(userConfirmed) {
 
   _dPendingResults.clear();
   for (const [, g] of grouped) {
+    if (!g.results.length) continue;
     const equip = DAILY_EQUIP[g.equipIdx] || {};
     const equip_id = equip.id || g.equipIdx;
     const worker = document.getElementById('d-worker-input')?.value || '';
