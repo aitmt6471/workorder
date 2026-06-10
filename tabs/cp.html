@@ -345,75 +345,89 @@ window.print_cp = async function() {
     }
   }
 
-  // 본문 헤더용 개정이력 행 (6행 미만이면 빈 행으로 패딩)
-  let bodyRevRows = revsSorted.map(r => {
+  // ── 본문 헤더용 통합 개정이력 구조 (10.png 단일 테이블 방식) ──
+  const nRevData = Math.max(revsSorted.length, 6);
+  const bodyRevData = [...revsSorted];
+  while (bodyRevData.length < nRevData) bodyRevData.push(null);
+  // 단계·서명 셀 rowspan = 차종헤더행(1) + 개정이력행(nRevData) + CFT행(1)
+  const hdrRowspan = nRevData + 2;
+
+  // 시작/양산 선택 표시 (원형 마커)
+  const stageCircle = (label, val) =>
+    `<div style="display:flex;align-items:center;gap:2px;margin:1px 0">
+       <span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:0.8pt solid #000;background:${stage===val?'#000':'transparent'};flex-shrink:0"></span>
+       <span style="font-size:5pt">${label}</span>
+     </div>`;
+
+  // 개정이력 td 셀만 생성 (tr 없이)
+  const mkRevCells = r => {
+    if (!r) return `<td style="${B}padding:2px">&nbsp;</td><td style="${B}"></td><td style="${B}"></td><td style="${B}"></td><td style="${B}"></td><td style="${B}"></td>`;
     const sg = sigsByRev[String(r.rev||0)] || {};
-    return `<tr>
-      <td style="border:0.5pt solid #000;text-align:center;padding:1px 2px;font-size:5pt">${r.rev_display||(r.rev===0?'0':r.rev||'-')}</td>
-      <td style="border:0.5pt solid #000;text-align:center;padding:1px 2px;font-size:5pt">${safe(r.rev_date).substring(0,10)}</td>
-      <td style="border:0.5pt solid #000;text-align:left;padding:1px 4px;font-size:5pt">${safe(r.note)}</td>
-      <td style="border:0.5pt solid #000;text-align:center;padding:1px 2px;font-size:5pt">${sg.author?.signer_name||safe(r.author)}</td>
-      <td style="border:0.5pt solid #000;text-align:center;padding:1px 2px;font-size:5pt">${sg.reviewer?.signer_name||''}</td>
-      <td style="border:0.5pt solid #000;text-align:center;padding:1px 2px;font-size:5pt">${sg.approver?.signer_name||''}</td>
-    </tr>`;
+    return `<td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${r.rev_display||(r.rev===0?'0':r.rev||'-')}</td>
+      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${safe(r.rev_date).substring(0,10)}</td>
+      <td style="${B}text-align:left;padding:1px 4px;font-size:5pt">${safe(r.note)}</td>
+      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.author?.signer_name||safe(r.author)}</td>
+      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.reviewer?.signer_name||''}</td>
+      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.approver?.signer_name||''}</td>`;
+  };
+
+  // 각 행: 왼쪽 메타 셀 + 오른쪽 개정이력 셀
+  const bodyRevTrs = bodyRevData.map((r, i) => {
+    let metaCells = '';
+    if (i === 0) {
+      metaCells = `<td style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">부품명/품명</td>
+        <td style="${B}font-size:5.5pt;padding:2px 4px">${partname}</td>`;
+    } else if (i === 1) {
+      metaCells = `<td style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">부번/품번</td>
+        <td style="${B}font-size:5.5pt;padding:2px 4px">${partno}</td>`;
+    } else {
+      metaCells = `<td style="${B}"></td><td style="${B}"></td>`;
+    }
+    return `<tr>${metaCells}${mkRevCells(r)}</tr>`;
   });
-  while (bodyRevRows.length < 6) bodyRevRows.push(`<tr>
-    <td style="border:0.5pt solid #000;padding:2px">&nbsp;</td>
-    <td style="border:0.5pt solid #000"></td><td style="border:0.5pt solid #000"></td>
-    <td style="border:0.5pt solid #000"></td><td style="border:0.5pt solid #000"></td>
-    <td style="border:0.5pt solid #000"></td></tr>`);
 
   const bodyHtml = `
 <div style="padding:8mm 10mm;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:7pt">
 
-  <!-- ▶ 페이지 헤더 (10.png 양식) -->
+  <!-- ▶ 제목 -->
   <div style="text-align:center;font-size:12pt;font-weight:900;letter-spacing:4px;padding:3px 0;border:0.5pt solid #000;border-bottom:none">
     관 리 계 획 서 &nbsp;(Control Plan)
   </div>
+
+  <!-- ▶ 단일 통합 헤더 테이블 (10.png 구조) -->
   <table style="border-collapse:collapse;width:100%;border:0.5pt solid #000;border-top:none;margin-bottom:2px">
+    <colgroup>
+      <col style="width:3.5%">  <!-- 단계 label -->
+      <col style="width:9%">    <!-- 차종/부품명/부번 label -->
+      <col style="width:12%">   <!-- 차종/부품명/부번 value -->
+      <col style="width:4%">    <!-- NO -->
+      <col style="width:9%">    <!-- 개정일자 -->
+      <col>                     <!-- 개정사유 (flex) -->
+      <col style="width:7%">    <!-- 작성 -->
+      <col style="width:7%">    <!-- 검토 -->
+      <col style="width:7%">    <!-- 승인 -->
+      <col style="width:13%">   <!-- 제정일자+서명 -->
+    </colgroup>
+
+    <!-- 행1: 단계(rowspan전체) | 차종 | 개정이력 헤더 | 서명(rowspan전체) -->
     <tr>
-      <!-- LEFT: 메타 정보 -->
-      <td style="vertical-align:top;padding:0;width:20%;border-right:0.5pt solid #000">
-        <table style="border-collapse:collapse;width:100%;height:100%">
-          <tr>
-            <td style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px;width:40%">단&nbsp;&nbsp;계</td>
-            <td style="border-bottom:0.5pt solid #000;font-size:5.5pt;padding:2px 4px">${stage}</td>
-          </tr>
-          <tr>
-            <td style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">차&nbsp;&nbsp;종</td>
-            <td style="border-bottom:0.5pt solid #000;font-size:5.5pt;padding:2px 4px">${carmodel}</td>
-          </tr>
-          <tr>
-            <td style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">부품명/품명</td>
-            <td style="border-bottom:0.5pt solid #000;font-size:5.5pt;padding:2px 4px">${partname}</td>
-          </tr>
-          <tr>
-            <td style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">부번/품번</td>
-            <td style="border-bottom:0.5pt solid #000;font-size:5.5pt;padding:2px 4px">${partno}</td>
-          </tr>
-          <tr>
-            <td colspan="2" style="font-size:4.5pt;padding:2px 4px;vertical-align:top;line-height:1.6">
-              <span style="font-weight:700">상호기능원(CFT)&nbsp;</span>${cftHtml||''}
-            </td>
-          </tr>
-        </table>
+      <td rowspan="${hdrRowspan}" style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;vertical-align:middle;padding:3px 2px">
+        단<br>계
+        <div style="margin-top:6px">
+          ${stageCircle('시작','시작')}
+          ${stageCircle('선행양산','선행양산')}
+          ${stageCircle('양산','양산')}
+        </div>
       </td>
-      <!-- MIDDLE: 개정이력 -->
-      <td style="vertical-align:top;padding:0;border-right:0.5pt solid #000">
-        <table style="border-collapse:collapse;width:100%">
-          <tr style="background:#FFFF99;text-align:center">
-            <th style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;font-size:5pt;padding:2px;width:6%">NO</th>
-            <th style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;font-size:5pt;padding:2px;width:14%">개 정 일 자</th>
-            <th style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;font-size:5pt;padding:2px">개 정 사 유</th>
-            <th style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;font-size:5pt;padding:2px;width:10%">작성</th>
-            <th style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;font-size:5pt;padding:2px;width:10%">검토</th>
-            <th style="border-bottom:0.5pt solid #000;font-size:5pt;padding:2px;width:10%">승인</th>
-          </tr>
-          ${bodyRevRows.join('')}
-        </table>
-      </td>
-      <!-- RIGHT: 제정일자 + 서명란 -->
-      <td style="vertical-align:top;padding:0;width:14%">
+      <td style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">차&nbsp;&nbsp;종</td>
+      <td style="${B}font-size:5.5pt;padding:2px 4px">${carmodel}</td>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">NO</th>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">개 정 일 자</th>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">개 정 사 유</th>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">작성</th>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">검토</th>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">승인</th>
+      <td rowspan="${hdrRowspan}" style="${B}vertical-align:top;padding:0">
         <div style="font-size:5pt;text-align:right;padding:2px 4px;border-bottom:0.5pt solid #000">
           제정일자 : ${revsSorted.length ? safe(revsSorted[0].rev_date).substring(0,10) : ''}
         </div>
@@ -430,6 +444,15 @@ window.print_cp = async function() {
           </tr>
         </table>
       </td>
+    </tr>
+
+    <!-- 행2+: 부품명/부번/빈셀 + 개정이력 데이터 -->
+    ${bodyRevTrs.join('')}
+
+    <!-- CFT 행 -->
+    <tr>
+      <td colspan="2" style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">상호기능원(CFT)</td>
+      <td colspan="7" style="${B}font-size:4.5pt;padding:2px 6px;line-height:1.6">${cftHtml||''}</td>
     </tr>
   </table>
 
