@@ -390,6 +390,14 @@ window.print_cp = async function() {
     return `<tr>${metaCells}${mkRevCells(r)}</tr>`;
   });
 
+  // 본문 헤더 결재란 전용 — 이미지가 셀에 자동 맞춤
+  const signCellFit = sg => {
+    const img = sg?.sign_file_id
+      ? `<img src="${dUrl(sg.sign_file_id)}" style="max-width:95%;max-height:40px;width:auto;height:auto;object-fit:contain;display:block;margin:1px auto" onerror="this.style.display='none'">`
+      : '';
+    return `<div style="font-size:6pt;text-align:center;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sg?.signer_name||''}</div>${img}`;
+  };
+
   const bodyHtml = `
 <div style="padding:8mm 10mm;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:7pt">
 
@@ -432,31 +440,31 @@ window.print_cp = async function() {
       <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">검토</th>
       <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">승인</th>
       <td rowspan="${hdrRowspan}" style="${B}vertical-align:top;padding:0">
-        <table style="border-collapse:collapse;width:100%;height:100%">
+        <table style="border-collapse:collapse;width:100%;height:100%;table-layout:fixed">
           <colgroup>
             <col style="width:20%"> <!-- 결재 label -->
-            <col>                   <!-- 작성 -->
-            <col>                   <!-- 검토 -->
-            <col>                   <!-- 승인 -->
+            <col style="width:26.7%"> <!-- 작성 -->
+            <col style="width:26.7%"> <!-- 검토 -->
+            <col style="width:26.6%"> <!-- 승인 -->
           </colgroup>
-          <!-- 제정일자 행 -->
-          <tr>
-            <td colspan="4" style="border-bottom:0.5pt solid #000;padding:2px 5px;font-size:5pt;text-align:right">
+          <!-- 제정일자 행 (고정 높이) -->
+          <tr style="height:14px">
+            <td colspan="4" style="border-bottom:0.5pt solid #000;padding:1px 5px;font-size:5pt;text-align:right;white-space:nowrap;overflow:hidden">
               제정일자 : ${revsSorted.length ? safe(revsSorted[0].rev_date).substring(0,10) : ''}
             </td>
           </tr>
-          <!-- 결재 label + 작성/검토/승인 헤더 -->
-          <tr>
+          <!-- 결재(rowspan=2) + 작성/검토/승인 헤더 (고정 높이) -->
+          <tr style="height:14px">
             <td rowspan="2" style="border-right:0.5pt solid #000;text-align:center;vertical-align:middle;padding:2px;font-size:6pt;font-weight:700;letter-spacing:3px">결<br>재</td>
-            <td style="background:#1e3264;color:#fff;text-align:center;padding:2px;font-size:5pt;border-right:0.5pt solid rgba(255,255,255,.3)">작성</td>
-            <td style="background:#1e3264;color:#fff;text-align:center;padding:2px;font-size:5pt;border-right:0.5pt solid rgba(255,255,255,.3)">검토</td>
-            <td style="background:#1e3264;color:#fff;text-align:center;padding:2px;font-size:5pt">승인</td>
+            <td style="background:#1e3264;color:#fff;text-align:center;padding:2px;font-size:5pt;border-right:0.5pt solid rgba(255,255,255,.3);overflow:hidden">작성</td>
+            <td style="background:#1e3264;color:#fff;text-align:center;padding:2px;font-size:5pt;border-right:0.5pt solid rgba(255,255,255,.3);overflow:hidden">검토</td>
+            <td style="background:#1e3264;color:#fff;text-align:center;padding:2px;font-size:5pt;overflow:hidden">승인</td>
           </tr>
-          <!-- 서명 행 -->
-          <tr>
-            <td style="border-right:0.5pt solid #000;border-top:0.5pt solid #000;text-align:center;vertical-align:middle;padding:2px;height:50px">${signCell(latestSigns.author)}</td>
-            <td style="border-right:0.5pt solid #000;border-top:0.5pt solid #000;text-align:center;vertical-align:middle;padding:2px">${signCell(latestSigns.reviewer)}</td>
-            <td style="border-top:0.5pt solid #000;text-align:center;vertical-align:middle;padding:2px">${signCell(latestSigns.approver)}</td>
+          <!-- 서명 행 (나머지 높이 전체 채움) -->
+          <tr style="height:100%">
+            <td style="border-right:0.5pt solid #000;border-top:0.5pt solid #000;text-align:center;vertical-align:middle;padding:2px;overflow:hidden;height:100%">${signCellFit(latestSigns.author)}</td>
+            <td style="border-right:0.5pt solid #000;border-top:0.5pt solid #000;text-align:center;vertical-align:middle;padding:2px;overflow:hidden;height:100%">${signCellFit(latestSigns.reviewer)}</td>
+            <td style="border-top:0.5pt solid #000;text-align:center;vertical-align:middle;padding:2px;overflow:hidden;height:100%">${signCellFit(latestSigns.approver)}</td>
           </tr>
         </table>
       </td>
