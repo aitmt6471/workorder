@@ -345,22 +345,107 @@ window.print_cp = async function() {
     }
   }
 
+  // 본문 헤더용 개정이력 행 (6행 미만이면 빈 행으로 패딩)
+  let bodyRevRows = revsSorted.map(r => {
+    const sg = sigsByRev[String(r.rev||0)] || {};
+    return `<tr>
+      <td style="border:0.5pt solid #000;text-align:center;padding:1px 2px;font-size:5pt">${r.rev_display||(r.rev===0?'0':r.rev||'-')}</td>
+      <td style="border:0.5pt solid #000;text-align:center;padding:1px 2px;font-size:5pt">${safe(r.rev_date).substring(0,10)}</td>
+      <td style="border:0.5pt solid #000;text-align:left;padding:1px 4px;font-size:5pt">${safe(r.note)}</td>
+      <td style="border:0.5pt solid #000;text-align:center;padding:1px 2px;font-size:5pt">${sg.author?.signer_name||safe(r.author)}</td>
+      <td style="border:0.5pt solid #000;text-align:center;padding:1px 2px;font-size:5pt">${sg.reviewer?.signer_name||''}</td>
+      <td style="border:0.5pt solid #000;text-align:center;padding:1px 2px;font-size:5pt">${sg.approver?.signer_name||''}</td>
+    </tr>`;
+  });
+  while (bodyRevRows.length < 6) bodyRevRows.push(`<tr>
+    <td style="border:0.5pt solid #000;padding:2px">&nbsp;</td>
+    <td style="border:0.5pt solid #000"></td><td style="border:0.5pt solid #000"></td>
+    <td style="border:0.5pt solid #000"></td><td style="border:0.5pt solid #000"></td>
+    <td style="border:0.5pt solid #000"></td></tr>`);
+
   const bodyHtml = `
 <div style="padding:8mm 10mm;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:7pt">
-  <!-- 페이지 헤더 -->
-  <table style="border-collapse:collapse;width:100%;margin-bottom:3px">
+
+  <!-- ▶ 페이지 헤더 (10.png 양식) -->
+  <div style="text-align:center;font-size:12pt;font-weight:900;letter-spacing:4px;padding:3px 0;border:0.5pt solid #000;border-bottom:none">
+    관 리 계 획 서 &nbsp;(Control Plan)
+  </div>
+  <table style="border-collapse:collapse;width:100%;border:0.5pt solid #000;border-top:none;margin-bottom:2px">
     <tr>
-      <td style="${B}background:#1e3264;color:#fff;padding:3px 6px;font-size:9pt;font-weight:900;letter-spacing:2px;width:13%">관리계획서</td>
-      <td style="${B}background:#FFFF99;font-weight:700;padding:2px 5px;width:5%">단&nbsp;계</td>
-      <td style="${B}padding:2px 5px;width:7%">${stage}</td>
-      <td style="${B}background:#FFFF99;font-weight:700;padding:2px 5px;width:5%">차&nbsp;&nbsp;종</td>
-      <td style="${B}padding:2px 5px;text-align:left;width:14%">${carmodel}</td>
-      <td style="${B}background:#FFFF99;font-weight:700;padding:2px 5px;width:5%">품&nbsp;&nbsp;명</td>
-      <td style="${B}padding:2px 5px;text-align:left;width:12%">${partname}</td>
-      <td style="${B}background:#FFFF99;font-weight:700;padding:2px 5px;width:5%">품&nbsp;&nbsp;번</td>
-      <td style="${B}padding:2px 5px;text-align:left">${partno}</td>
+      <!-- LEFT: 메타 정보 -->
+      <td style="vertical-align:top;padding:0;width:20%;border-right:0.5pt solid #000">
+        <table style="border-collapse:collapse;width:100%;height:100%">
+          <tr>
+            <td style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px;width:40%">단&nbsp;&nbsp;계</td>
+            <td style="border-bottom:0.5pt solid #000;font-size:5.5pt;padding:2px 4px">${stage}</td>
+          </tr>
+          <tr>
+            <td style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">차&nbsp;&nbsp;종</td>
+            <td style="border-bottom:0.5pt solid #000;font-size:5.5pt;padding:2px 4px">${carmodel}</td>
+          </tr>
+          <tr>
+            <td style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">부품명/품명</td>
+            <td style="border-bottom:0.5pt solid #000;font-size:5.5pt;padding:2px 4px">${partname}</td>
+          </tr>
+          <tr>
+            <td style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">부번/품번</td>
+            <td style="border-bottom:0.5pt solid #000;font-size:5.5pt;padding:2px 4px">${partno}</td>
+          </tr>
+          <tr>
+            <td colspan="2" style="font-size:4.5pt;padding:2px 4px;vertical-align:top;line-height:1.6">
+              <span style="font-weight:700">상호기능원(CFT)&nbsp;</span>${cftHtml||''}
+            </td>
+          </tr>
+        </table>
+      </td>
+      <!-- MIDDLE: 개정이력 -->
+      <td style="vertical-align:top;padding:0;border-right:0.5pt solid #000">
+        <table style="border-collapse:collapse;width:100%">
+          <tr style="background:#FFFF99;text-align:center">
+            <th style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;font-size:5pt;padding:2px;width:6%">NO</th>
+            <th style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;font-size:5pt;padding:2px;width:14%">개 정 일 자</th>
+            <th style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;font-size:5pt;padding:2px">개 정 사 유</th>
+            <th style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;font-size:5pt;padding:2px;width:10%">작성</th>
+            <th style="border-bottom:0.5pt solid #000;border-right:0.5pt solid #000;font-size:5pt;padding:2px;width:10%">검토</th>
+            <th style="border-bottom:0.5pt solid #000;font-size:5pt;padding:2px;width:10%">승인</th>
+          </tr>
+          ${bodyRevRows.join('')}
+        </table>
+      </td>
+      <!-- RIGHT: 제정일자 + 서명란 -->
+      <td style="vertical-align:top;padding:0;width:14%">
+        <div style="font-size:5pt;text-align:right;padding:2px 4px;border-bottom:0.5pt solid #000">
+          제정일자 : ${revsSorted.length ? safe(revsSorted[0].rev_date).substring(0,10) : ''}
+        </div>
+        <table style="border-collapse:collapse;width:100%">
+          <tr>
+            <td style="background:#1e3264;color:#fff;text-align:center;padding:2px;font-size:5pt;width:33%;border-right:0.5pt solid rgba(255,255,255,.3)">작성</td>
+            <td style="background:#1e3264;color:#fff;text-align:center;padding:2px;font-size:5pt;width:33%;border-right:0.5pt solid rgba(255,255,255,.3)">검토</td>
+            <td style="background:#1e3264;color:#fff;text-align:center;padding:2px;font-size:5pt;width:34%">승인</td>
+          </tr>
+          <tr>
+            <td style="border-right:0.5pt solid #000;border-top:0.5pt solid #000;text-align:center;vertical-align:middle;padding:2px;height:44px">${signCell(latestSigns.author)}</td>
+            <td style="border-right:0.5pt solid #000;border-top:0.5pt solid #000;text-align:center;vertical-align:middle;padding:2px">${signCell(latestSigns.reviewer)}</td>
+            <td style="border-top:0.5pt solid #000;text-align:center;vertical-align:middle;padding:2px">${signCell(latestSigns.approver)}</td>
+          </tr>
+        </table>
+      </td>
     </tr>
   </table>
+
+  <!-- 업체코드 / 고객기술승인 / 관리기준 행 -->
+  <table style="border-collapse:collapse;width:100%;margin-bottom:2px">
+    <tr>
+      <td style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px;width:8%">업체코드</td>
+      <td style="${B}font-size:5.5pt;text-align:center;padding:2px;width:7%">#AIT</td>
+      <td style="${B}background:#FFFF99;font-weight:700;font-size:4.8pt;text-align:center;padding:2px;width:14%">고객 기술 승인/일자(요구시)</td>
+      <td style="${B}font-size:5.5pt;padding:2px;width:9%"></td>
+      <td style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px;width:7%">대상여부</td>
+      <td colspan="2" style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">관 &nbsp; 리 &nbsp; 기 &nbsp; 준</td>
+      <td style="${B}background:#FFFF99;font-weight:700;font-size:4.8pt;text-align:center;padding:2px;width:13%">기타 승인/일자(요구시)</td>
+    </tr>
+  </table>
+
   <!-- CP 테이블 -->
   <table style="border-collapse:collapse;width:100%">
     <colgroup>
