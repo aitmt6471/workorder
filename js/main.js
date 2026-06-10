@@ -173,7 +173,7 @@ async function toggleTabEditMode(pane, btn) {
     try {
       const res = await fetch('https://aitechn8n.ngrok.app/webhook/ait/auth/edit-pw', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...AIT_API.authHeaders() },
         body: JSON.stringify({ password: pw })
       });
       const raw = await res.json();
@@ -328,7 +328,7 @@ function openRevModal(pane) {
       }).join('');
     // 서명 이미지 비동기 로드 (n8n proxy → base64 data URL)
     tbody.querySelectorAll('img[data-proxy-img]').forEach(img => {
-      fetch(img.dataset.proxyImg, {cache: 'no-store'})
+      fetch(img.dataset.proxyImg, {cache: 'no-store', headers: AIT_API.authHeaders()})
         .then(r => r.json())
         .then(data => {
           const d = Array.isArray(data) ? data[0] : data;
@@ -742,7 +742,7 @@ function openSettingsModal() {
   if (pw === null) return;
   fetch('https://aitechn8n.ngrok.app/webhook/ait/auth/edit-pw', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...AIT_API.authHeaders() },
     body: JSON.stringify({ password: pw })
   }).then(r => r.json()).then(raw => {
     const data = Array.isArray(raw) ? raw[0] : raw;
@@ -766,7 +766,7 @@ async function saveSettingsPw() {
   try {
     const res = await fetch('https://aitechn8n.ngrok.app/webhook/ait/auth/edit-pw/update', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AIT_API.authHeaders() },
       body: JSON.stringify({ new_password: pw1 })
     });
     if (!res.ok) throw new Error('서버 오류');
@@ -1520,7 +1520,7 @@ window._aitAlarmValidate = async function(doc_type, parent_id, check_date, resul
   try {
     const res = await fetch('https://aitechn8n.ngrok.app/webhook/ait/alarm/validate', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...AIT_API.authHeaders() },
       body: JSON.stringify({ doc_type, parent_id, check_date, results, ...(extra || {}) })
     });
     if (!res.ok) return;
@@ -1557,7 +1557,7 @@ function _alarmUpdateBtn(enabled) {
 window._aitLoadAlarmState = async function() {
   try {
     const res = await fetch(_ALARM_SETTINGS_URL, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...AIT_API.authHeaders() },
       body: JSON.stringify({ action: 'get' })
     });
     if (!res.ok) return;
@@ -1676,7 +1676,7 @@ window._aitSaveAlarmSettings = async function() {
   const enabled = cb ? cb.checked : _alarmEnabled;
   try {
     const res = await fetch(_ALARM_SETTINGS_URL, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...AIT_API.authHeaders() },
       body: JSON.stringify({ action: 'save', enabled, receivers: _alarmReceivers })
     });
     if (!res.ok) throw new Error('응답 오류');

@@ -826,7 +826,7 @@ function _dStageResult(equipIdx, itemNo, date, result, remark) {
   });
 }
 
-async function _dFlushResults() {
+async function _dFlushResults(userConfirmed) {
   if (!_dPendingResults.size || !window.currentCarId) return;
   const now = new Date().toISOString();
 
@@ -882,7 +882,7 @@ async function _dFlushResults() {
         }
       });
     }
-    if (allViolations.length) {
+    if (!userConfirmed && allViolations.length) {
       _dShowAlarmBlockModal(allViolations);
       return false;
     }
@@ -997,7 +997,7 @@ window._dSaveNow=async function(){
     const btn=document.getElementById('d-save-btn');
     if(btn){btn.disabled=true;btn.textContent='저장 중…';}
     window.showSaving && window.showSaving();
-    const _saved=await _dFlushResults();
+    const _saved=await _dFlushResults(true);
     window.hideSaving && window.hideSaving();
     if(btn){btn.disabled=false;btn.textContent='저장';}
     if(_saved===false) return;

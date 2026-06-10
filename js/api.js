@@ -11,10 +11,28 @@ const AIT_API = (() => {
   /* ────────────────────────────────────────────────
      공통 fetch 헬퍼
   ──────────────────────────────────────────────── */
+  function _authHeaders() {
+    const t = localStorage.getItem('ait_token');
+    return t ? { 'Authorization': 'Bearer ' + t } : {};
+  }
+  let _authRedirecting = false;
+  function _onAuthFail() {
+    if (_authRedirecting) return;
+    _authRedirecting = true;
+    localStorage.removeItem('ait_token');
+    localStorage.removeItem('ait_token_exp');
+    localStorage.removeItem('ait_user');
+    alert('세션이 만료되었습니다. 다시 로그인해주세요.');
+    window.location.replace('login.html');
+  }
   function _fetchT(url, options = {}, ms = 10000) {
     const ctrl = new AbortController();
     const id = setTimeout(() => ctrl.abort(), ms);
-    return fetch(url, { ...options, signal: ctrl.signal }).finally(() => clearTimeout(id));
+    const opts = { ...options, headers: { ...(options.headers || {}), ..._authHeaders() }, signal: ctrl.signal };
+    return fetch(url, opts).then(r => {
+      if (r.status === 401 || r.status === 403) { _onAuthFail(); throw new Error('세션 만료 (' + r.status + ')'); }
+      return r;
+    }).finally(() => clearTimeout(id));
   }
   async function _get(path, params = {}) {
     const qs = new URLSearchParams(params).toString();
@@ -244,6 +262,7 @@ const AIT_API = (() => {
   return {
     MOCK,
     N8N,
+    authHeaders: _authHeaders,
     /* 차종 */
     getCars:            ()           => _real.getCars(),
     createCar:          (data)       => _real.createCar(data),
