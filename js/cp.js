@@ -344,10 +344,14 @@ function autofillCpGroup(gid) {
 
 /* ── CP DB CRUD 저장 ── */
 async function _saveCpToDb(carName, paneEl) {
-  const cars = await AIT_API.getCars();
-  const found = cars.find(c => c.code === carName || c.name === carName);
-  if (!found) throw new Error('차종을 찾을 수 없습니다: ' + carName);
-  const carId = found.id;
+  // 안정적인 carId(행 id) 우선 사용 — 이름 변경 후에도 깨지지 않음
+  let carId = window.currentCarId;
+  if (!carId) {
+    const cars = await AIT_API.getCars();
+    const found = cars.find(c => c.code === carName || c.name === carName);
+    if (!found) throw new Error('차종을 찾을 수 없습니다: ' + carName);
+    carId = found.id;
+  }
 
   const dbRows = await AIT_API.getCpRows(carId);
   const dbIds = new Set(dbRows.filter(r => !r.is_deleted).map(r => r.id));

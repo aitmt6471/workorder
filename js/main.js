@@ -951,15 +951,57 @@ function startEditCar(id) {
   item.querySelector('.car-save-btn').style.display = 'inline-flex';
   item.querySelector('.car-name-input').focus();
 }
+// 이름을 키로 쓰는 메모리/로컬 캐시를 옛 이름 → 새 이름으로 이전
+function _migrateCarNameCaches(oldName, newName) {
+  if (window._cpMetaCache && window._cpMetaCache[oldName] !== undefined) {
+    window._cpMetaCache[newName] = window._cpMetaCache[oldName];
+    delete window._cpMetaCache[oldName];
+  }
+  if (window._cftCache && window._cftCache[oldName] !== undefined) {
+    window._cftCache[newName] = window._cftCache[oldName];
+    delete window._cftCache[oldName];
+  }
+  try {
+    const cft = localStorage.getItem(`ait_cft_${oldName}`);
+    if (cft !== null) {
+      localStorage.setItem(`ait_cft_${newName}`, cft);
+      localStorage.removeItem(`ait_cft_${oldName}`);
+    }
+  } catch {}
+  try {
+    const all = JSON.parse(localStorage.getItem('ait_revisions') || '{}');
+    if (all[oldName] !== undefined) {
+      all[newName] = all[oldName];
+      delete all[oldName];
+      localStorage.setItem('ait_revisions', JSON.stringify(all));
+    }
+  } catch {}
+  Object.keys(_revMemStore).forEach(k => {
+    const sep = k.indexOf(':');
+    if (sep >= 0 && k.slice(sep + 1) === oldName) {
+      _revMemStore[`${k.slice(0, sep)}:${newName}`] = _revMemStore[k];
+      delete _revMemStore[k];
+    }
+  });
+}
 async function confirmEditCar(id) {
   const item = document.querySelector(`.car-item[data-id="${id}"]`);
   const newName = item.querySelector('.car-name-input').value.trim();
   if (!newName) return;
   const cars = loadCars();
   const car = cars.find(c => c.id === id);
+  const oldName = car?.name;
   if (car) car.name = newName;
   saveCarsToStorage(cars);
   await AIT_API.updateCar(id, { name: newName });
+  // 이름 변경 시 세션/캐시 동기화 — 이름-키 데이터가 새 이름을 따라가도록
+  if (oldName && oldName !== newName) {
+    _migrateCarNameCaches(oldName, newName);
+    if (window.currentCar === oldName) {
+      window.currentCar = newName;
+      localStorage.setItem('ait_cur_car', newName);
+    }
+  }
   renderCarSelect(cars);
   renderCarListInModal();
 }
