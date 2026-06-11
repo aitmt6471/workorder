@@ -846,6 +846,11 @@ async function initCars() {
   window.currentCar = localStorage.getItem('ait_cur_car') || cars[0]?.name || 'GN7 FL OHCL';
   const cur = cars.find(c => c.name === window.currentCar) || cars[0];
   if (cur) {
+    // 이름 변경 등으로 저장된 이름이 DB와 다르면 실제 아이템 이름으로 동기화 (캐시 키 불일치 방지)
+    if (window.currentCar !== cur.name) {
+      window.currentCar = cur.name;
+      localStorage.setItem('ait_cur_car', cur.name);
+    }
     window.currentCarId = cur.id;
     applyEnabledDocs(cur.enabled_docs);
     // DB 메타를 window 캐시 + localStorage에 동기화
