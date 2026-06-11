@@ -184,8 +184,8 @@ window.print_cp = async function() {
       <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${safe(r.rev_date).substring(0,10)}</td>
       <td style="border:0.5pt solid #000;padding:2px 8px;text-align:left">${safe(r.note)}</td>
       <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${sg.author?.signer_name||safe(r.author)}</td>
-      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${sg.reviewer?.signer_name||''}</td>
-      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${sg.approver?.signer_name||''}</td>
+      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${sg.reviewer?.signer_name||safe(r.reviewer)}</td>
+      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${sg.approver?.signer_name||safe(r.approver)}</td>
     </tr>`;
   });
   while (revRows.length < 8) revRows.push(`<tr>
@@ -229,7 +229,7 @@ window.print_cp = async function() {
     <tr>
       <td style="border:0.5pt solid #000;background:#FFFF99;font-weight:700;padding:3px 5px;text-align:center">단&nbsp;&nbsp;&nbsp;계</td>
       <td colspan="5" style="border:0.5pt solid #000;padding:3px 10px">
-        ${stageBox('시작품','시작')}${stageBox('선행양산','선행양산')}${stageBox('양산','양산')}
+        ${stageBox('시작','시작')}${stageBox('양산','양산')}
       </td>
     </tr>
     <tr>
@@ -367,8 +367,8 @@ window.print_cp = async function() {
       <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${safe(r.rev_date).substring(0,10)}</td>
       <td style="${B}text-align:left;padding:1px 4px;font-size:5pt">${safe(r.note)}</td>
       <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.author?.signer_name||safe(r.author)}</td>
-      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.reviewer?.signer_name||''}</td>
-      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.approver?.signer_name||''}</td>`;
+      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.reviewer?.signer_name||safe(r.reviewer)}</td>
+      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.approver?.signer_name||safe(r.approver)}</td>`;
   };
 
   // 각 행: 왼쪽 메타 셀 + 오른쪽 개정이력 셀
@@ -389,6 +389,8 @@ window.print_cp = async function() {
     // i >= 3: 메타 셀 없음 — CFT rowspan이 커버
     return `<tr>${metaCells}${mkRevCells(r)}</tr>`;
   });
+
+  const latestRev = revsSorted.length ? revsSorted[revsSorted.length - 1] : null;
 
   // 본문 헤더 결재란 전용 — 서명 이미지·이름이 칸 크기에 맞춰 자동 축소 (14.png 양식)
   // 헤더(작성/검토/승인) + 서명 영역이 블록 바닥까지 채워지는 1열 (빈칸 없이 세로 합침)
@@ -434,7 +436,6 @@ window.print_cp = async function() {
         단<br>계
         <div style="margin-top:6px">
           ${stageCircle('시작','시작')}
-          ${stageCircle('선행양산','선행양산')}
           ${stageCircle('양산','양산')}
         </div>
       </td>
@@ -456,9 +457,9 @@ window.print_cp = async function() {
           <!-- 결재 라벨 + 작성/검토/승인 (바닥까지 세로로 합쳐진 칸) -->
           <div style="flex:1 1 auto;min-height:0;display:flex">
             <div style="flex:0 0 13%;border-right:0.5pt solid #000;display:flex;align-items:center;justify-content:center;text-align:center;font-size:6.5pt;font-weight:700;letter-spacing:2px;line-height:1.5">결<br>재</div>
-            ${signCol(latestSigns.author,'작&nbsp;성',false)}
-            ${signCol(latestSigns.reviewer,'검&nbsp;토',false)}
-            ${signCol(latestSigns.approver,'승&nbsp;인',true)}
+            ${signCol(latestSigns.author||(latestRev?{signer_name:safe(latestRev.author)}:null),'작&nbsp;성',false)}
+            ${signCol(latestSigns.reviewer||(latestRev?{signer_name:safe(latestRev.reviewer)}:null),'검&nbsp;토',false)}
+            ${signCol(latestSigns.approver||(latestRev?{signer_name:safe(latestRev.approver)}:null),'승&nbsp;인',true)}
           </div>
         </div>
       </td>
