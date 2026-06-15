@@ -1052,6 +1052,10 @@ window._dSaveNow=async function(){
     const btn=document.getElementById('d-save-btn');
     if(btn){btn.disabled=true;btn.textContent='저장 중…';}
     window.showSaving && window.showSaving();
+    // 점검자/확인자만 수정한 경우에도 저장되도록 현재 날짜 결과를 재-staging
+    // (worker/verifier는 results 페이로드에 묶여서만 전송되므로, 변경된 결과가 없으면
+    //  _dFlushResults가 조기 return 하여 이름 수정이 서버에 반영되지 않음)
+    _dStageCurrentDayResults();
     const _saved=await _dFlushResults(true);
     window.hideSaving && window.hideSaving();
     if(btn){btn.disabled=false;btn.textContent='저장';}
