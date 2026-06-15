@@ -101,6 +101,7 @@ const AIT_API = (() => {
     syncDailyEquip:     (carId, equipments) => _post('ait/daily/sync', { carId, equipments }),
     getDailyResults:    (equipId, date) => _get('ait/daily/results', { equipId, date }),
     getDailyMonthStatus:(equipId, yearMonth) => _get('ait/daily/month-status', { equipId, yearMonth }),
+    getDailyMonthResults:(equipId, yearMonth) => _get('ait/daily/month-results', { equipId, yearMonth }),
     getMsMonthStatus:   (sampleId, yearMonth) => _get('ait/ms/month-status', { sampleId, yearMonth }),
     saveDailyResults:   (payload) => _post('ait/daily/results', payload),
     // payload = { equip_id, check_date, worker, results:[{item_id,result,remark}] }
@@ -287,6 +288,7 @@ const AIT_API = (() => {
     syncDailyEquip:     (carId, equipments) => _real.syncDailyEquip(carId, equipments),
     getDailyResults:    (eId, date)  => _real.getDailyResults(eId, date),
     getDailyMonthStatus:(eId, ym)    => _real.getDailyMonthStatus(eId, ym),
+    getDailyMonthResults:(eId, ym)   => _real.getDailyMonthResults(eId, ym),
     getMsMonthStatus:   (sId, ym)    => _real.getMsMonthStatus(sId, ym),
     saveDailyResults:   (payload)    => _real.saveDailyResults(payload),
     validateDailyResults: (equip_id, check_date, results) => _real.validateDailyResults(equip_id, check_date, results),

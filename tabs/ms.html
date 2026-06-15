@@ -739,6 +739,7 @@ async function _msLoadMonthStatus(sampleIdx) {
     rows.forEach(r => {
       const day = new Date(r.check_date + 'T00:00:00').getDate();
       const rKey = `${m.year}_${m.month}_${day}_${sampleIdx}`;
+      _msHasDBData.add(`${sampleIdx}_${day}_${m.year}_${m.month}`);
       const ng = parseInt(r.ng_count) > 0;
       const filled = parseInt(r.filled_count);
       const total = parseInt(r.total_items);

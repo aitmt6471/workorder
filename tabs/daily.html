@@ -606,6 +606,54 @@ async function _dLoadResultsFromDB(equipIdx, day) {
     if (equipIdx === curEquip && day === curDay) { _dSetReadOnly(true); renderCheckTable(); dailyRenderDayPicker(); }
   } catch(e) { console.warn('결과 DB 로드 실패', e); }
 }
+// 인쇄용: 한 달 전체 결과를 설비당 1회 요청으로 일괄 로드 (날짜별 개별 요청 폭주 방지)
+async function _dLoadMonthResultsFromDB(equipIdx) {
+  if (AIT_API.MOCK || !window.currentCarId) return true;
+  if (!AIT_API.getDailyMonthResults) return false; // 구버전 api.js → 폴백 유도
+  const equip = DAILY_EQUIP[equipIdx] || {};
+  const equip_id = equip.id || equipIdx;
+  if (!equip_id) return true;
+  const m = getTabMonth('daily');
+  const yearMonth = `${m.year}-${String(m.month).padStart(2,'0')}`;
+  try {
+    const rows = await AIT_API.getDailyMonthResults(equip_id, yearMonth);
+    if (!rows || !rows.length) return true;
+    const mNow = getTabMonth('daily');
+    if (mNow.year !== m.year || mNow.month !== m.month) return true;
+    const byDay = {};
+    rows.forEach(r => {
+      const day = new Date(String(r.check_date).slice(0,10) + 'T00:00:00').getDate();
+      if (!day || isNaN(day)) return;
+      (byDay[day] = byDay[day] || []).push(r);
+    });
+    Object.keys(byDay).forEach(dayStr => {
+      const day = parseInt(dayStr, 10);
+      const cacheKey = `${equipIdx}_${day}_${m.year}_${m.month}`;
+      _dDBLoadedDays.add(cacheKey);
+      _dHasDBData.add(cacheKey);
+      const rKey = `${m.year}_${m.month}_${day}_${equipIdx}`;
+      if (!_dResults[rKey]) _dResults[rKey] = {};
+      byDay[day].forEach(r => {
+        let itemNo = r.item_no;
+        if (itemNo === undefined || itemNo === null) {
+          const found = Object.values(DAILY_ITEMS).find(it => it.id == r.item_id);
+          if (found) itemNo = found.item_no;
+        }
+        if (itemNo === undefined || itemNo === null) return;
+        const _toIso = s => s ? String(s).replace(' ','T') : null;
+        _dResults[rKey][itemNo] = {
+          result: r.result || '', remark: r.remark || '',
+          savedAt: _toIso(r.created_at||r.saved_at), modifiedAt: _toIso(r.updated_at||r.modified_at)
+        };
+      });
+      const w = byDay[day][0]?.worker || '';
+      if (w) _dWorkerCache[`${m.year}_${m.month}_${day}_${equipIdx}`] = w;
+      const v = byDay[day][0]?.verifier || '';
+      if (v) _dVerifierCache[`${m.year}_${m.month}_${day}_${equipIdx}`] = v;
+    });
+    return true;
+  } catch(e) { console.warn('월 결과 일괄 로드 실패', e); return false; }
+}
 function _dHasLocalResults(equipIdx, day) {
   const m = getTabMonth('daily');
   return _dDBLoadedDays.has(`${equipIdx}_${day}_${m.year}_${m.month}`);
@@ -1120,6 +1168,7 @@ window.addEventListener('beforeunload', () => { clearTimeout(_dSaveTimer); });
   window._dVerifierCacheObj   = _dVerifierCache;
   window._dailyLoadDay          = (equipIdx, day) => _dLoadResultsFromDB(equipIdx, day);
   window._dailyLoadMonthStatus  = (equipIdx) => _dLoadMonthStatus(equipIdx);
+  window._dailyLoadMonthResults = (equipIdx) => _dLoadMonthResultsFromDB(equipIdx);
   window._dHasDBData            = _dHasDBData;
   window._dDBLoadedDays         = _dDBLoadedDays;
   window._dailyGetDay           = () => curDay;
@@ -1180,23 +1229,26 @@ window.print_daily = async function() {
     }
   }
 
-  // DB에서 이번 달 전체 결과 로드 (미로드된 설비+날짜만)
+  // DB에서 이번 달 전체 결과 로드 (수동 클릭 없이도 모든 설비×모든 날짜를 인쇄에 표시)
   if (!AIT_API.MOCK && window.currentCarId) {
-    const _loadMS = window._dailyLoadMonthStatus;
-    const _hasDB  = window._dHasDBData;
-    const _loaded = window._dDBLoadedDays;
-    if (_loadMS) {
-      await Promise.all(allEquip.map((_, idx) => _loadMS(idx)));
+    // 1) 일괄 조회(배포 시): 설비당 1회로 대부분의 날짜를 _dResults/_dDBLoadedDays에 채움
+    if (window._dailyLoadMonthResults) {
+      await Promise.all(allEquip.map((_, idx) => window._dailyLoadMonthResults(idx)));
     }
-    if (_hasDB && _loaded && window._dailyLoadDay) {
-      const toLoad = [];
-      allEquip.forEach((_, idx) => {
-        days.forEach(day => {
-          const ck = `${idx}_${day}_${dMth.year}_${dMth.month}`;
-          if (_hasDB.has(ck) && !_loaded.has(ck)) toLoad.push([idx, day]);
-        });
-      });
-      if (toLoad.length) await Promise.all(toLoad.map(([idx, day]) => window._dailyLoadDay(idx, day)));
+    // 2) 보강: 모든 설비 × 그 달 모든 날짜(1~말일)를 직접 조회. 월 상태(month-status) 의존 제거 —
+    //    아직 안 채워진 날만 큐에 넣고 동시 실행 6개로 스로틀(요청 폭주로 인한 누락 방지).
+    //    데이터 없는 날은 _dLoadResultsFromDB가 그냥 무시. 이미 로드된 날은 _dDBLoadedDays 가드로 스킵.
+    if (window._dailyLoadDay) {
+      const _loaded = window._dDBLoadedDays;
+      const tasks = [];
+      allEquip.forEach((_, idx) => days.forEach(day => {
+        const ck = `${idx}_${day}_${dMth.year}_${dMth.month}`;
+        if (!_loaded.has(ck)) tasks.push(() => window._dailyLoadDay(idx, day));
+      }));
+      const LIMIT = 6;
+      let ti = 0;
+      const worker = async () => { while (ti < tasks.length) { const c = ti++; try { await tasks[c](); } catch(_){} } };
+      await Promise.all(Array.from({length: Math.min(LIMIT, tasks.length)}, worker));
     }
   }
 
