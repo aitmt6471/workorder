@@ -1,0 +1,1183 @@
+<!-- Q-Point (고객품질불량) -->
+<div class="tab-toolbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:15px;font-weight:900;color:#c9302d;letter-spacing:2px">Q-Point</span>
+    <div style="width:1px;height:16px;background:var(--border)"></div>
+    <span id="qp-count-badge" style="font-size:11px;font-weight:600;color:#6b7280">0건</span>
+  </div>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost btn-sm" onclick="qpOpenCurrentApproval()">결재</button>
+  <select id="qp-filter-status" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:inherit;cursor:pointer" onchange="qpRenderList()">
+    <option value="">전체</option>
+    <option value="active">진행중</option>
+    <option value="v1done">1차완료</option>
+    <option value="v2done">2차완료</option>
+    <option value="completed">완료</option>
+  </select>
+  <button id="qp-new-btn" class="btn btn-sm" style="background:#c9302d;color:#fff;display:none" onclick="qpNewForm()">＋ 새 Q-Point</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_qpoint && window.print_qpoint()">🖨 인쇄</button>
+  <button id="qp-edit-btn" class="btn btn-ghost btn-sm" onclick="qpToggleEditMode(this)">&#x270F; 편집 모드</button>
+</div>
+
+<!-- 2-panel 레이아웃 -->
+<div style="display:flex;height:calc(100vh - 100px);overflow:hidden">
+
+  <!-- 좌측 목록 -->
+  <div id="qp-list-panel" style="width:320px;min-width:280px;border-right:2px solid #e2e8f0;overflow-y:auto;background:#fff;flex-shrink:0">
+    <div id="qp-list-body">
+      <div style="padding:40px 20px;text-align:center;color:#9ca3af;font-size:12px">Q-Point가 없습니다</div>
+    </div>
+  </div>
+
+  <!-- 우측 상세 -->
+  <div id="qp-detail-panel" style="flex:1;overflow-y:auto;background:#f4f6fb;padding:16px 20px 32px">
+    <div id="qp-detail-body">
+      <div style="padding:80px 20px;text-align:center;color:#9ca3af">
+        <div style="font-size:40px;margin-bottom:14px">⚠</div>
+        <div style="font-size:13px;font-weight:600;color:#6b7280">목록에서 항목을 선택하거나 새 Q-Point를 추가하세요</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- 새 Q-Point 모달 -->
+<div class="car-modal-overlay" id="qp-new-modal">
+  <div class="car-modal" style="width:min(540px,96vw);max-height:88vh;overflow:hidden;display:flex;flex-direction:column;gap:0;padding:0">
+    <div class="car-modal-hd" style="padding:16px 20px;flex-shrink:0">
+      <h4>새 Q-Point 등록</h4>
+      <button class="btn btn-ghost btn-sm" onclick="qpCloseNewModal()">✕</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:16px 20px;display:flex;flex-direction:column;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">문서번호 <span style="color:#c9302d">*</span></label>
+          <input id="qp-f-doc-no" type="text" placeholder="예: 260430-AIT-01" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">발행일자</label>
+          <input id="qp-f-issue-date" type="date" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">내  용 (불량 제목) <span style="color:#c9302d">*</span></label>
+        <input id="qp-f-title" type="text" placeholder="예: KA4 PE OHCL HOLD RH KNOB 리턴 불량 발생" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit">
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">품  명</label>
+          <input id="qp-f-part-name" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">품  번 / 도번</label>
+          <input id="qp-f-part-no" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:monospace">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">차  종</label>
+          <input id="qp-f-car-model" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">발생 장소</label>
+          <input id="qp-f-plant" type="text" placeholder="예: 기아자동차 광명공장" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit">
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">생산 LOT</label>
+          <input id="qp-f-lot" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">발생 수량</label>
+          <input id="qp-f-qty" type="text" placeholder="예: 1 EA" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">조치 부서</label>
+        <input id="qp-f-dept" type="text" placeholder="예: 품질팀 / 생산팀" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">품질문제 발생 내용 (상세)</label>
+        <textarea id="qp-f-detail" rows="3" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 9px;font-size:12px;font-family:inherit;resize:vertical"></textarea>
+      </div>
+    </div>
+    <div class="car-add-row" style="justify-content:flex-end;gap:8px;padding:12px 20px">
+      <button class="btn btn-ghost btn-sm" onclick="qpCloseNewModal()">취소</button>
+      <button class="btn btn-sm" style="background:#c9302d;color:#fff" onclick="qpSubmitNew()">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- 유효성 점검 모달 -->
+<div class="car-modal-overlay" id="qp-validity-modal">
+  <div class="car-modal" style="width:min(560px,96vw);padding:0;overflow:hidden;display:flex;flex-direction:column;gap:0">
+    <div class="car-modal-hd" style="padding:14px 20px;flex-shrink:0">
+      <h4>유효성 점검</h4>
+      <button class="btn btn-ghost btn-sm" onclick="qpCloseValidityModal()">✕</button>
+    </div>
+    <!-- 1차/2차/3차 스텝 -->
+    <div id="qpvm-steps" style="padding:16px 20px 12px;border-bottom:1px solid var(--border);flex-shrink:0"></div>
+    <!-- 3차 요약 테이블 -->
+    <table style="width:100%;border-collapse:collapse;font-size:12px;flex-shrink:0">
+      <thead><tr style="background:#f8fafc">
+        <th style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--border);width:52px;font-weight:600;color:#6b7280;font-size:11px">차수</th>
+        <th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);width:110px;font-weight:600;color:#6b7280;font-size:11px">점검일</th>
+        <th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);width:90px;font-weight:600;color:#6b7280;font-size:11px">점검자</th>
+        <th style="padding:7px 12px;text-align:left;border-bottom:1px solid var(--border);font-weight:600;color:#6b7280;font-size:11px">점검 결과</th>
+        <th style="padding:7px 12px;text-align:center;border-bottom:1px solid var(--border);width:72px;font-weight:600;color:#6b7280;font-size:11px">선택</th>
+      </tr></thead>
+      <tbody id="qpvm-summary-body"></tbody>
+    </table>
+    <!-- 선택된 차수 입력 폼 -->
+    <div id="qpvm-form" style="padding:16px 20px;display:flex;flex-direction:column;gap:10px;border-top:2px solid var(--border);background:#f9fafb">
+      <div style="font-size:12px;font-weight:700;color:#374151" id="qpvm-title">1차 점검 등록</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">점검일</label>
+          <input id="qpvm-date" type="date" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">점검자</label>
+          <input id="qpvm-checker" type="text" placeholder="점검자 이름" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:10px;font-weight:600;color:#6b7280;display:block;margin-bottom:3px">점검 결과</label>
+        <textarea id="qpvm-result" rows="2" placeholder="점검 결과를 입력하세요" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:5px 8px;font-size:12px;font-family:inherit;resize:none"></textarea>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 20px;border-top:1px solid var(--border);flex-shrink:0">
+      <button id="qpvm-undo-btn" class="btn btn-ghost btn-sm" style="color:#ef4444" onclick="qpUndoValidity()">완료 취소</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost btn-sm" onclick="qpCloseValidityModal()">닫기</button>
+        <button class="btn btn-sm" style="background:#374151;color:#fff" onclick="qpSubmitValidity()">완료 처리</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 결재 / 서명 모달 -->
+<div class="car-modal-overlay" id="qp-approval-modal">
+  <div class="car-modal" style="width:min(720px,96vw);padding:0;overflow:hidden;display:flex;flex-direction:column;gap:0">
+    <div class="car-modal-hd" style="padding:14px 20px;flex-shrink:0">
+      <h4>결재</h4>
+      <button class="btn btn-ghost btn-sm" onclick="qpCloseApprovalModal()">✕</button>
+    </div>
+    <div id="qp-approval-body" style="padding:16px 20px"></div>
+    <div style="display:flex;justify-content:flex-end;padding:10px 20px;border-top:1px solid var(--border);flex-shrink:0">
+      <button class="btn btn-ghost btn-sm" onclick="qpCloseApprovalModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 작업자 서명 모달 -->
+<div class="car-modal-overlay" id="qp-workers-modal">
+  <div class="car-modal" style="width:min(720px,96vw);padding:0;overflow:hidden;display:flex;flex-direction:column;gap:0">
+    <div class="car-modal-hd" style="padding:14px 20px;flex-shrink:0">
+      <h4>작업자 서명</h4>
+      <button class="btn btn-ghost btn-sm" onclick="qpCloseWorkersModal()">✕</button>
+    </div>
+    <div id="qp-workers-body" style="padding:16px 20px"></div>
+    <div style="display:flex;justify-content:flex-end;padding:10px 20px;border-top:1px solid var(--border);flex-shrink:0">
+      <button class="btn btn-ghost btn-sm" onclick="qpCloseWorkersModal()">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+var LS_KEY   = 'qpoints_v1';
+var _list    = [];
+var _selId   = null;
+var _editMode = false;
+
+window.qpToggleEditMode = function(btn){
+  if(!_editMode){
+    var pw = prompt('편집 모드 비밀번호를 입력하세요');
+    if(pw !== 'ait1234'){
+      if(typeof showToast==='function') showToast('비밀번호가 올바르지 않습니다','error');
+      return;
+    }
+    _editMode = true;
+    btn.textContent = '읽기 모드';
+    btn.style.background = '#c9302d';
+    btn.style.color = '#fff';
+  } else {
+    _editMode = false;
+    btn.innerHTML = '&#x270F; 편집 모드';
+    btn.style.background = '';
+    btn.style.color = '';
+  }
+  var nb = document.getElementById('qp-new-btn');
+  if(nb) nb.style.display = _editMode ? '' : 'none';
+  if(_selId) renderDetail(_selId);
+};
+
+/* ── 상수 ── */
+var STATUS_LABEL = {active:'진행중', v1done:'1차 완료', v2done:'2차 완료', completed:'완료'};
+var STATUS_COLOR = {active:'#f97316', v1done:'#3b82f6', v2done:'#8b5cf6', completed:'#16a34a'};
+var STATUS_BG    = {active:'#fff7ed', v1done:'#eff6ff', v2done:'#f5f3ff', completed:'#f0fdf4'};
+
+/* ── 유틸 ── */
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+function today(){
+  var d=new Date();
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function compressImage(file,cb){
+  var img=new Image();
+  var url=URL.createObjectURL(file);
+  img.onload=function(){
+    var MAX=800, w=img.width, h=img.height;
+    if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+    else if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}
+    var c=document.createElement('canvas');
+    c.width=w; c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    URL.revokeObjectURL(url);
+    cb(c.toDataURL('image/jpeg',0.7));
+  };
+  img.src=url;
+}
+
+/* ── 데이터 ── */
+function load(){
+  if(typeof AIT_API!=='undefined' && !AIT_API.MOCK && window.currentCarId){
+    AIT_API.getQpointList(window.currentCarId).then(function(list){
+      _list=Array.isArray(list)?list:[];
+      try{localStorage.setItem(LS_KEY,JSON.stringify(_list));}catch(e){}
+      renderList();
+      if(_selId) renderDetail(_selId);
+    }).catch(function(){
+      try{_list=JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){_list=[];}
+      renderList();
+      if(_selId) renderDetail(_selId);
+    });
+    return;
+  }
+  try{_list=JSON.parse(localStorage.getItem(LS_KEY)||'[]');}catch(e){_list=[];}
+  renderList();
+  if(_selId) renderDetail(_selId);
+}
+
+function save(){
+  try{ localStorage.setItem(LS_KEY,JSON.stringify(_list)); }
+  catch(e){ if(typeof showToast==='function') showToast('저장 실패 (용량 초과)','error'); }
+}
+
+window._qpSyncToDb=function(){
+  if(!window.currentCarId) return Promise.reject(new Error('차종 미선택'));
+  return AIT_API.saveQpointList(window.currentCarId,_list);
+};
+
+window.qpLoad=load;
+
+function findQ(id){
+  for(var i=0;i<_list.length;i++){ if(_list[i].id===id) return _list[i]; }
+  return null;
+}
+
+function defaultValidity(){
+  return [
+    {check_no:1,date:'',result:'',checker:'',done:false},
+    {check_no:2,date:'',result:'',checker:'',done:false},
+    {check_no:3,date:'',result:'',checker:'',done:false}
+  ];
+}
+
+function defaultSigners(){
+  return [{name:'',sign_img:''},{name:'',sign_img:''},{name:'',sign_img:''}];
+}
+
+function _extractFileId(url){
+  if(!url||url.indexOf('data:')===0) return '';
+  var m=url.match(/\/d\/([^/?#\s]+)/);
+  return m?m[1]:'';
+}
+
+function _driveReplace(docType, oldImg, base64, filename, onDone){
+  var oldId=_extractFileId(oldImg);
+  var doUpload=function(){
+    AIT_API.uploadSignSimple(docType,base64,filename).then(function(r){
+      onDone(r&&r.fileId?`https://drive.google.com/thumbnail?id=${r.fileId}&sz=w400`:null);
+    }).catch(function(e){ console.warn('서명 업로드 실패',e); onDone(null); });
+  };
+  if(oldId){
+    AIT_API.deleteSignFile(oldId).then(doUpload,doUpload);
+  } else {
+    doUpload();
+  }
+}
+
+function calcStatus(q){
+  var v=q.validity||[];
+  if(v[2]&&v[2].done) return 'completed';
+  if(v[1]&&v[1].done) return 'v2done';
+  if(v[0]&&v[0].done) return 'v1done';
+  return 'active';
+}
+
+/* ── 목록 렌더 ── */
+function renderList(){
+  var body=document.getElementById('qp-list-body'); if(!body) return;
+  var badge=document.getElementById('qp-count-badge'); if(badge) badge.textContent=_list.length+'건';
+  var filterEl=document.getElementById('qp-filter-status');
+  var filterStatus=filterEl?filterEl.value:'';
+
+  var filtered=[];
+  for(var i=0;i<_list.length;i++){
+    var s=calcStatus(_list[i]);
+    if(!filterStatus||s===filterStatus) filtered.push(_list[i]);
+  }
+  filtered.sort(function(a,b){ return (b.issue_date||'').localeCompare(a.issue_date||''); });
+
+  if(!filtered.length){
+    body.innerHTML='<div style="padding:40px 16px;text-align:center;color:#9ca3af;font-size:12px">'
+      +(filterStatus?'"'+STATUS_LABEL[filterStatus]+'" 항목이 없습니다':'등록된 Q-Point가 없습니다')
+      +'</div>';
+    return;
+  }
+
+  var html='';
+  for(var j=0;j<filtered.length;j++){
+    var q=filtered[j];
+    var s=calcStatus(q);
+    var isSel=q.id===_selId;
+    var validCount=0;
+    var v=q.validity||[];
+    for(var k=0;k<v.length;k++){ if(v[k].done) validCount++; }
+    var vColor=validCount>0?STATUS_COLOR[s]:'#d1d5db';
+    html+='<div onclick="qpRenderDetail(\''+q.id+'\')" style="padding:12px 14px;border-bottom:1px solid #f0f0f0;cursor:pointer;background:'+(isSel?'#fff4f4':'#fff')+';border-left:3px solid '+(isSel?'#c9302d':'transparent')+';transition:background .15s">'
+      +'<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px">'
+      +'<span style="background:'+STATUS_BG[s]+';color:'+STATUS_COLOR[s]+';font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;white-space:nowrap;flex-shrink:0;margin-top:1px">'+STATUS_LABEL[s]+'</span>'
+      +'<span style="font-size:12px;font-weight:600;color:#111827;line-height:1.4;flex:1">'+esc(q.title||'(제목 없음)')+'</span>'
+      +'</div>'
+      +'<div style="display:flex;align-items:center;gap:8px;font-size:10px;color:#9ca3af">'
+      +'<span style="font-weight:600;color:#6b7280;font-family:monospace">'+esc(q.doc_no||'-')+'</span>'
+      +'<span>|</span>'
+      +'<span>'+esc(q.issue_date||'-')+'</span>'
+      +'<span>|</span>'
+      +'<span>'+esc(q.car_model||'-')+'</span>'
+      +'<div style="flex:1"></div>'
+      +'<span style="color:'+vColor+';font-weight:600">✓ '+validCount+'/3차</span>'
+      +'</div>'
+      +'</div>';
+  }
+  body.innerHTML=html;
+}
+
+/* ── 상세 렌더 ── */
+function renderDetail(id){
+  _selId=id;
+  renderList();
+  var q=findQ(id); if(!q) return;
+  var body=document.getElementById('qp-detail-body'); if(!body) return;
+  var s=calcStatus(q);
+  var validity=q.validity||defaultValidity();
+  var sc=STATUS_COLOR[s];
+  var sb=STATUS_BG[s];
+  var eMode=_editMode;
+
+  /* 준수사항 */
+  var actions=q.actions||[];
+  var actionsHtml='';
+  for(var ai=0;ai<actions.length;ai++){
+    actionsHtml+='<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 0;border-bottom:1px solid #f0f4f8">'
+      +'<span style="background:#c9302d;color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;flex-shrink:0;margin-top:2px">'+(ai+1)+'</span>'
+      +'<span style="font-size:12px;color:#374151;line-height:1.5;flex:1'+(eMode?';outline:none':'')+'"'+(eMode?' contenteditable="true" oninput="qpActionInput(\''+id+'\','+ai+',this)"':'')+'>'+esc(actions[ai])+'</span>'
+      +(eMode?'<button onclick="qpDeleteAction(\''+id+'\','+ai+')" style="background:none;border:none;cursor:pointer;color:#d1d5db;font-size:14px;padding:0;line-height:1;flex-shrink:0" onmouseover="this.style.color=\'#ef4444\'" onmouseout="this.style.color=\'#d1d5db\'">✕</button>':'')
+      +'</div>';
+  }
+  if(eMode) actionsHtml+='<button onclick="qpAddAction(\''+id+'\')" style="width:100%;margin-top:6px;padding:6px;border:1.5px dashed #d1d5db;background:none;border-radius:6px;color:#9ca3af;cursor:pointer;font-size:11px">＋ 준수사항 추가</button>';
+  else if(!actions.length) actionsHtml='<div style="padding:20px;text-align:center;color:#d1d5db;font-size:12px">등록된 준수사항 없음</div>';
+
+  /* 문제 사진 */
+  var photoArea='';
+  if(q.problem_photo){
+    photoArea='<img src="'+q.problem_photo+'" style="width:100%;max-height:400px;object-fit:contain;border-radius:6px;cursor:zoom-in;display:block;background:#f8fafc" onclick="if(typeof openLightbox===\'function\')openLightbox(\''+q.problem_photo+'\',\'문제 부위\')">';
+    if(eMode) photoArea+='<label style="display:inline-block;margin-top:8px;padding:4px 12px;border:1px solid var(--border);border-radius:5px;cursor:pointer;font-size:10px;color:#6b7280">사진 변경<input type="file" accept="image/*" style="display:none" onchange="qpUploadPhoto(\''+id+'\',this)"></label>';
+  } else if(eMode){
+    photoArea='<label style="width:100%;height:180px;border:2px dashed #d1d5db;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;color:#9ca3af;box-sizing:border-box">'
+      +'<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>'
+      +'<span style="font-size:12px">문제 사진 추가</span>'
+      +'<input type="file" accept="image/*" style="display:none" onchange="qpUploadPhoto(\''+id+'\',this)">'
+      +'</label>';
+  } else {
+    photoArea='<div style="height:80px;display:flex;align-items:center;justify-content:center;color:#d1d5db;font-size:12px">사진 없음</div>';
+  }
+
+  /* 전체 HTML 조립 */
+  var html='';
+
+  /* 상단 헤더 블록 */
+  html+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 4px rgba(15,23,42,.06)">'
+    +'<div style="background:#c9302d;padding:10px 16px;display:flex;align-items:center;gap:12px">'
+    +'<span style="color:#fff;font-size:20px;font-weight:900;letter-spacing:3px">Q-Point</span>'
+    +'<span style="background:rgba(255,255,255,.15);color:#fff;font-size:10px;padding:2px 8px;border-radius:4px;font-weight:600">'+STATUS_LABEL[s]+'</span>'
+    +'<div style="flex:1"></div>'
+    +(eMode?'<button onclick="qpDelete(\''+id+'\')" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.3);border-radius:4px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:600">삭제</button>':'')
+    +'</div>'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px"><tbody>'
+    +'<tr>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:11px;text-align:center;padding:7px 10px;border:1px solid #3a548a;white-space:nowrap;width:80px">내  용</td>'
+    +'<td colspan="5" style="border:1px solid #e5e7eb;padding:7px 12px;font-weight:600;color:#111827'+(eMode?';outline:none':'')+'"'+(eMode?' contenteditable="true" oninput="qpFieldInput(\''+id+'\',\'title\',this)"':'')+'>'+esc(q.title||'')+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:11px;text-align:center;padding:7px 10px;border:1px solid #3a548a;white-space:nowrap">품  명</td>'
+    +'<td style="border:1px solid #e5e7eb;padding:7px 12px;width:140px'+(eMode?';outline:none':'')+'"'+(eMode?' contenteditable="true" oninput="qpFieldInput(\''+id+'\',\'part_name\',this)"':'')+'>'+esc(q.part_name||'')+'</td>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:11px;text-align:center;padding:7px 10px;border:1px solid #3a548a;white-space:nowrap;width:60px">도  번</td>'
+    +'<td style="border:1px solid #e5e7eb;padding:7px 12px;font-family:monospace;font-size:11px;width:120px'+(eMode?';outline:none':'')+'"'+(eMode?' contenteditable="true" oninput="qpFieldInput(\''+id+'\',\'part_no\',this)"':'')+'>'+esc(q.part_no||'')+'</td>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:11px;text-align:center;padding:7px 10px;border:1px solid #3a548a;white-space:nowrap;width:60px">발행일</td>'
+    +'<td style="border:1px solid #e5e7eb;padding:7px 12px;font-family:monospace;font-size:11px'+(eMode?';outline:none':'')+'"'+(eMode?' contenteditable="true" oninput="qpFieldInput(\''+id+'\',\'issue_date\',this)"':'')+'>'+esc(q.issue_date||'')+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:11px;text-align:center;padding:7px 10px;border:1px solid #3a548a;white-space:nowrap">차  종</td>'
+    +'<td style="border:1px solid #e5e7eb;padding:7px 12px'+(eMode?';outline:none':'')+'"'+(eMode?' contenteditable="true" oninput="qpFieldInput(\''+id+'\',\'car_model\',this)"':'')+'>'+esc(q.car_model||'')+'</td>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:11px;text-align:center;padding:7px 10px;border:1px solid #3a548a;white-space:nowrap">발생장소</td>'
+    +'<td colspan="3" style="border:1px solid #e5e7eb;padding:7px 12px'+(eMode?';outline:none':'')+'"'+(eMode?' contenteditable="true" oninput="qpFieldInput(\''+id+'\',\'plant\',this)"':'')+'>'+esc(q.plant||'')+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:11px;text-align:center;padding:7px 10px;border:1px solid #3a548a;white-space:nowrap">생산LOT</td>'
+    +'<td style="border:1px solid #e5e7eb;padding:7px 12px;font-family:monospace'+(eMode?';outline:none':'')+'"'+(eMode?' contenteditable="true" oninput="qpFieldInput(\''+id+'\',\'lot_no\',this)"':'')+'>'+esc(q.lot_no||'')+'</td>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:11px;text-align:center;padding:7px 10px;border:1px solid #3a548a;white-space:nowrap">발생수량</td>'
+    +'<td style="border:1px solid #e5e7eb;padding:7px 12px'+(eMode?';outline:none':'')+'"'+(eMode?' contenteditable="true" oninput="qpFieldInput(\''+id+'\',\'qty\',this)"':'')+'>'+esc(q.qty||'')+'</td>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:11px;text-align:center;padding:7px 10px;border:1px solid #3a548a;white-space:nowrap">문서번호</td>'
+    +'<td style="border:1px solid #e5e7eb;padding:7px 12px;font-family:monospace;font-size:11px;font-weight:700;color:#c9302d">'+esc(q.doc_no||'')+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:11px;text-align:center;padding:7px 10px;border:1px solid #3a548a;white-space:nowrap">조치부서</td>'
+    +'<td colspan="5" style="border:1px solid #e5e7eb;padding:7px 12px'+(eMode?';outline:none':'')+'"'+(eMode?' contenteditable="true" oninput="qpFieldInput(\''+id+'\',\'dept\',this)"':'')+'>'+esc(q.dept||'')+'</td>'
+    +'</tr>'
+    +'</tbody></table></div>';
+
+  /* 발생내용 + 준수사항 */
+  html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">'
+    +'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.06)">'
+    +'<div style="background:#374151;color:#fff;padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:.6px">품질문제 발생 내용</div>'
+    +'<div style="padding:12px 14px;min-height:120px">'
+    +'<div'+(eMode?' contenteditable="true" oninput="qpFieldInput(\''+id+'\',\'detail\',this)"':'')+' style="font-size:12px;color:#374151;line-height:1.7;min-height:100px'+(eMode?';outline:none':'')+'">'+(q.detail?esc(q.detail):(eMode?'':'<span style="color:#d1d5db">내용 없음</span>'))+'</div>'
+    +'</div>'
+    +'<div style="padding:10px 14px;border-top:1px solid #e5e7eb;background:#f9fafb">'
+    +'<div style="font-size:10px;font-weight:600;color:#6b7280;margin-bottom:6px">문제 부위 사진</div>'
+    +photoArea
+    +'</div></div>'
+    +'<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.06)">'
+    +'<div style="background:#c9302d;color:#fff;padding:8px 14px;font-size:11px;font-weight:700;letter-spacing:.6px">준수사항 (재발방지 대책)</div>'
+    +'<div style="padding:12px 14px;min-height:120px">'
+    +actionsHtml
+    +'</div></div>'
+    +'</div>';
+
+  /* 유효성 점검 → 버튼 */
+  var doneCount=validity.filter(function(v){return v.done;}).length;
+  var vPct=Math.round(doneCount/3*100);
+  html+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;margin-bottom:14px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(15,23,42,.06)">'
+    +'<div style="background:#374151;color:#fff;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap">유효성 점검</div>'
+    +'<div style="flex:1;height:6px;background:#e5e7eb;border-radius:3px"><div style="height:100%;width:'+vPct+'%;background:'+sc+';border-radius:3px;transition:width .3s"></div></div>'
+    +'<div style="font-size:12px;font-weight:600;color:'+sc+'">'+doneCount+'/3</div>'
+    +'<button onclick="qpOpenValidityModal(\''+id+'\',0)" style="padding:5px 14px;background:#374151;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">점검 관리</button>'
+    +'</div>';
+
+  /* 작업자 서명 → 버튼 */
+  var qSigners=q.signers||defaultSigners();
+  var signedCount=qSigners.filter(function(s){return !!s.sign_img;}).length;
+  var wkPct=qSigners.length>0?Math.round(signedCount/qSigners.length*100):0;
+  html+='<div style="background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 1px 4px rgba(15,23,42,.06)">'
+    +'<div style="background:#374151;color:#fff;padding:4px 12px;border-radius:4px;font-size:11px;font-weight:700;white-space:nowrap">작업자서명</div>'
+    +'<div style="flex:1;height:6px;background:#e5e7eb;border-radius:3px"><div style="height:100%;width:'+wkPct+'%;background:#374151;border-radius:3px;transition:width .3s"></div></div>'
+    +'<div style="font-size:12px;font-weight:600;color:#374151">'+signedCount+'/'+qSigners.length+'</div>'
+    +'<button onclick="qpOpenWorkersModal(\''+id+'\')" style="padding:5px 14px;background:#374151;color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;font-weight:600">서명 관리</button>'
+    +'</div>';
+
+  body.innerHTML=html;
+}
+
+/* ── 전역 노출 ── */
+window.qpRenderList=function(){ renderList(); };
+window.qpRenderDetail=function(id){ renderDetail(id); };
+
+window.qpFieldInput=function(id,field,el){
+  var q=findQ(id); if(!q) return;
+  q[field]=el.innerText.trim();
+  save();
+  if(field==='title'||field==='issue_date'||field==='car_model') renderList();
+};
+
+window.qpActionInput=function(id,idx,el){
+  var q=findQ(id); if(!q||!q.actions) return;
+  q.actions[idx]=el.innerText.trim(); save();
+};
+
+window.qpAddAction=function(id){
+  var q=findQ(id); if(!q) return;
+  if(!q.actions) q.actions=[];
+  q.actions.push(''); save(); renderDetail(id);
+};
+
+window.qpDeleteAction=function(id,idx){
+  var q=findQ(id); if(!q||!q.actions) return;
+  q.actions.splice(idx,1); save(); renderDetail(id);
+};
+
+window.qpValidityInput=function(id,idx,field,val){
+  var q=findQ(id); if(!q) return;
+  if(!q.validity) q.validity=defaultValidity();
+  q.validity[idx][field]=val; save();
+};
+
+window.qpToggleValidity=function(id,idx){
+  var q=findQ(id); if(!q) return;
+  if(!q.validity) q.validity=defaultValidity();
+  q.validity[idx].done=!q.validity[idx].done;
+  if(q.validity[idx].done && !q.validity[idx].date) q.validity[idx].date=today();
+  save(); renderDetail(id); renderList();
+};
+
+window.qpApvInput=function(id,role,val){
+  var q=findQ(id); if(!q) return;
+  if(!q.approval) q.approval={};
+  q.approval[role]=val; save();
+};
+
+window.qpSign=function(id,role){
+  var q=findQ(id); if(!q) return;
+  if(!q.approval) q.approval={};
+  if(!q.approval[role]){ if(typeof showToast==='function') showToast('이름을 먼저 입력하세요','error'); return; }
+  q.approval[role+'_signed']=true; save(); renderDetail(id);
+};
+
+window.qpUnsign=function(id,role){
+  var q=findQ(id); if(!q) return;
+  if(!q.approval) return;
+  q.approval[role+'_signed']=false;
+  delete q.approval[role+'_sign_img'];
+  save();
+  _renderApprovalBody(q);
+  renderDetail(id);
+};
+
+window.qpOpenSign=function(id,role){
+  var q=findQ(id); if(!q) return;
+  var labels={writer:'작  성',reviewer:'검  토',approver:'승  인'};
+  var nm=(q.approval&&q.approval[role])||'';
+  if(typeof openSignModalWith==='function'){
+    openSignModalWith('Q-Point 서명 — '+(labels[role]||role), nm, function(name,base64){
+      if(!q.approval) q.approval={};
+      q.approval[role]=name;
+      q.approval[role+'_sign_img']=base64;
+      q.approval[role+'_signed']=true;
+      save();
+      _renderApprovalBody(q);
+      renderDetail(id);
+    });
+  }
+};
+
+window.qpUploadPhoto=function(id,input){
+  var q=findQ(id); if(!q) return;
+  var file=input.files[0]; if(!file) return;
+  compressImage(file,function(data){ q.problem_photo=data; save(); renderDetail(id); });
+};
+
+window.qpDelete=function(id){
+  if(!confirm('이 Q-Point를 삭제하시겠습니까?')) return;
+  var newList=[];
+  for(var i=0;i<_list.length;i++){ if(_list[i].id!==id) newList.push(_list[i]); }
+  _list=newList; save();
+  _selId=null;
+  renderList();
+  var body=document.getElementById('qp-detail-body');
+  if(body) body.innerHTML='<div style="padding:80px 20px;text-align:center;color:#9ca3af">'
+    +'<div style="font-size:40px;margin-bottom:14px">⚠</div>'
+    +'<div style="font-size:13px;font-weight:600;color:#6b7280">목록에서 항목을 선택하세요</div>'
+    +'</div>';
+};
+
+/* ── 새 Q-Point 모달 ── */
+window.qpNewForm=function(){
+  var t=today();
+  var el;
+  el=document.getElementById('qp-f-issue-date'); if(el) el.value=t;
+  var autoNo=t.replace(/-/g,'').slice(2)+'-AIT-'+String(_list.length+1).padStart(2,'0');
+  el=document.getElementById('qp-f-doc-no'); if(el) el.value=autoNo;
+  var clearIds=['qp-f-title','qp-f-part-name','qp-f-part-no','qp-f-car-model','qp-f-plant','qp-f-lot','qp-f-qty','qp-f-dept','qp-f-detail'];
+  for(var i=0;i<clearIds.length;i++){
+    el=document.getElementById(clearIds[i]); if(el) el.value='';
+  }
+  document.getElementById('qp-new-modal').classList.add('open');
+  setTimeout(function(){ var f=document.getElementById('qp-f-title'); if(f) f.focus(); }, 100);
+};
+
+window.qpCloseNewModal=function(){
+  document.getElementById('qp-new-modal').classList.remove('open');
+};
+
+window.qpSubmitNew=function(){
+  var titleEl=document.getElementById('qp-f-title');
+  var docNoEl=document.getElementById('qp-f-doc-no');
+  var title=(titleEl?titleEl.value:'').trim();
+  var docNo=(docNoEl?docNoEl.value:'').trim();
+  if(!title){ if(typeof showToast==='function') showToast('내용(불량 제목)을 입력하세요','error'); return; }
+  if(!docNo){ if(typeof showToast==='function') showToast('문서번호를 입력하세요','error'); return; }
+  function gv(eid){ var e=document.getElementById(eid); return e?e.value:''; }
+  var q={
+    id:uid(),
+    doc_no:docNo,
+    issue_date:gv('qp-f-issue-date')||today(),
+    title:title,
+    part_name:gv('qp-f-part-name'),
+    part_no:gv('qp-f-part-no'),
+    car_model:gv('qp-f-car-model'),
+    plant:gv('qp-f-plant'),
+    lot_no:gv('qp-f-lot'),
+    qty:gv('qp-f-qty'),
+    dept:gv('qp-f-dept'),
+    detail:gv('qp-f-detail'),
+    problem_photo:'',
+    actions:[],
+    validity:defaultValidity(),
+    approval:{},
+    signers:defaultSigners()
+  };
+  _list.unshift(q); save();
+  qpCloseNewModal();
+  renderList();
+  renderDetail(q.id);
+  if(typeof showToast==='function') showToast('Q-Point 등록 완료','success');
+};
+
+/* ── 유효성 점검 모달 ── */
+var _qpvmId=null, _qpvmIdx=null;
+var STATUS_COLOR_LOCAL={active:'#f97316',v1done:'#3b82f6',v2done:'#8b5cf6',completed:'#16a34a'};
+
+function _renderValiditySteps(q,selIdx){
+  var validity=q.validity||defaultValidity();
+  var s=calcStatus(q);
+  var sc=STATUS_COLOR_LOCAL[s]||'#374151';
+  var html='<div style="display:flex;align-items:center">';
+  for(var i=0;i<validity.length;i++){
+    var vv=validity[i];
+    var isDone=vv.done;
+    var isSel=i===selIdx;
+    var borderC=isDone?sc:(isSel?'#374151':'#d1d5db');
+    var bgC=isDone?sc:(isSel?'#f1f5f9':'#fff');
+    var textC=isDone?'#fff':(isSel?'#374151':'#9ca3af');
+    html+='<div style="flex:1;text-align:center">'
+      +'<div onclick="qpSelectValidityRow(\''+q.id+'\','+i+')" style="width:40px;height:40px;border-radius:50%;border:2px solid '+borderC+';background:'+bgC+';color:'+textC+';font-size:14px;font-weight:800;display:flex;align-items:center;justify-content:center;margin:0 auto 6px;cursor:pointer;transition:all .2s">'+(isDone?'✓':(i+1))+'</div>'
+      +'<div style="font-size:11px;font-weight:600;color:'+(isDone?sc:(isSel?'#374151':'#9ca3af'))+'">'+(i+1)+'차 점검</div>'
+      +(isDone&&vv.date?'<div style="font-size:10px;color:#6b7280;margin-top:2px">'+esc(vv.date)+'</div>':'')
+      +'</div>';
+    if(i<2){
+      var nextDone=validity[i+1]&&validity[i+1].done;
+      html+='<div style="height:2px;background:'+(nextDone?sc:'#e5e7eb')+';flex:0 0 40px;margin-bottom:20px;border-radius:1px"></div>';
+    }
+  }
+  html+='</div>';
+  var el=document.getElementById('qpvm-steps');
+  if(el) el.innerHTML=html;
+}
+
+function _renderValiditySummary(q,selIdx){
+  var validity=q.validity||defaultValidity();
+  var s=calcStatus(q);
+  var sc=STATUS_COLOR_LOCAL[s]||'#374151';
+  var rows='';
+  for(var i=0;i<validity.length;i++){
+    var vr=validity[i];
+    var isSel=i===selIdx;
+    rows+='<tr style="cursor:pointer;background:'+(isSel?'#f0f9ff':'#fff')+';border-left:3px solid '+(isSel?sc:'transparent')+'" onclick="qpSelectValidityRow(\''+q.id+'\','+i+')">'
+      +'<td style="padding:8px 12px;text-align:center;font-weight:700;color:'+sc+'">'+(i+1)+'차</td>'
+      +'<td style="padding:6px 10px;font-size:12px">'+(vr.date||'<span style="color:#d1d5db">-</span>')+'</td>'
+      +'<td style="padding:6px 10px;font-size:12px">'+(vr.checker||'<span style="color:#d1d5db">-</span>')+'</td>'
+      +'<td style="padding:6px 10px;font-size:12px;max-width:140px">'+(vr.result||'<span style="color:#d1d5db">-</span>')+'</td>'
+      +'<td style="padding:6px 10px;text-align:center">'
+      +'<span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:'+(vr.done?'#dcfce7':'#f3f4f6')+';color:'+(vr.done?'#16a34a':'#9ca3af')+'">'+(vr.done?'완료':'미완')+'</span>'
+      +'</td></tr>';
+  }
+  var tb=document.getElementById('qpvm-summary-body');
+  if(tb) tb.innerHTML=rows;
+}
+
+window.qpOpenValidityModal=function(id,idx){
+  _qpvmId=id; _qpvmIdx=idx;
+  var q=findQ(id); if(!q) return;
+  if(!q.validity) q.validity=defaultValidity();
+  _renderValiditySteps(q,idx);
+  _renderValiditySummary(q,idx);
+  var vr=q.validity[idx]||{};
+  document.getElementById('qpvm-title').textContent=(idx+1)+'차 점검 등록/수정';
+  document.getElementById('qpvm-date').value=vr.date||today();
+  document.getElementById('qpvm-checker').value=vr.checker||'';
+  document.getElementById('qpvm-result').value=vr.result||'';
+  var undoBtn=document.getElementById('qpvm-undo-btn');
+  if(undoBtn) undoBtn.style.display=vr.done?'':'none';
+  document.getElementById('qp-validity-modal').classList.add('open');
+};
+
+window.qpSelectValidityRow=function(id,idx){
+  _qpvmIdx=idx;
+  var q=findQ(id); if(!q) return;
+  _renderValiditySteps(q,idx);
+  _renderValiditySummary(q,idx);
+  var vr=(q.validity||defaultValidity())[idx]||{};
+  document.getElementById('qpvm-title').textContent=(idx+1)+'차 점검 등록/수정';
+  document.getElementById('qpvm-date').value=vr.date||today();
+  document.getElementById('qpvm-checker').value=vr.checker||'';
+  document.getElementById('qpvm-result').value=vr.result||'';
+  var undoBtn=document.getElementById('qpvm-undo-btn');
+  if(undoBtn) undoBtn.style.display=vr.done?'':'none';
+};
+
+window.qpCloseValidityModal=function(){
+  document.getElementById('qp-validity-modal').classList.remove('open');
+};
+
+window.qpSubmitValidity=function(){
+  var q=findQ(_qpvmId); if(!q) return;
+  if(!q.validity) q.validity=defaultValidity();
+  q.validity[_qpvmIdx].date=document.getElementById('qpvm-date').value;
+  q.validity[_qpvmIdx].checker=(document.getElementById('qpvm-checker').value||'').trim();
+  q.validity[_qpvmIdx].result=(document.getElementById('qpvm-result').value||'').trim();
+  q.validity[_qpvmIdx].done=true;
+  save();
+  _renderValiditySteps(q,_qpvmIdx);
+  _renderValiditySummary(q,_qpvmIdx);
+  var undoBtn=document.getElementById('qpvm-undo-btn');
+  if(undoBtn) undoBtn.style.display='';
+  renderDetail(_qpvmId); renderList();
+};
+
+window.qpUndoValidity=function(){
+  var q=findQ(_qpvmId); if(!q) return;
+  if(!q.validity) return;
+  q.validity[_qpvmIdx].done=false;
+  save();
+  _renderValiditySteps(q,_qpvmIdx);
+  _renderValiditySummary(q,_qpvmIdx);
+  var undoBtn=document.getElementById('qpvm-undo-btn');
+  if(undoBtn) undoBtn.style.display='none';
+  renderDetail(_qpvmId); renderList();
+};
+
+/* ── 결재/서명 모달 ── */
+var _qpApvId=null;
+
+function _renderApprovalBody(q){
+  if(!q.approval) q.approval={};
+  var apv=q.approval;
+  var roles=[{key:'writer',label:'작  성'},{key:'reviewer',label:'검  토'},{key:'approver',label:'승  인'}];
+  var html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:#f8fafc">'
+    +'<th style="padding:8px;border:1px solid var(--border);text-align:center;font-size:11px;color:#6b7280;width:52px">구분</th>';
+  for(var i=0;i<roles.length;i++){
+    html+='<th style="padding:8px;border:1px solid var(--border);text-align:center;font-size:11px;color:#1e3264;min-width:150px">'+roles[i].label+'</th>';
+  }
+  html+='</tr></thead><tbody>';
+
+  /* 이름 행 */
+  html+='<tr><td style="padding:8px;border:1px solid var(--border);text-align:center;color:#6b7280;font-size:11px;font-weight:600;white-space:nowrap">이  름</td>';
+  for(var ni=0;ni<roles.length;ni++){
+    var rk=roles[ni].key;
+    html+='<td style="padding:8px 6px;border:1px solid var(--border);text-align:center">'
+      +'<input value="'+esc(apv[rk]||'')+'" placeholder="이름" onchange="qpApvInput(\''+q.id+'\',\''+rk+'\',this.value)" style="border:1px solid var(--border);border-radius:5px;padding:4px 6px;font-size:11px;text-align:center;width:100%;font-family:inherit;box-sizing:border-box">'
+      +'</td>';
+  }
+  html+='</tr>';
+
+  /* 서명 행 */
+  html+='<tr><td style="padding:8px;border:1px solid var(--border);text-align:center;color:#6b7280;font-size:11px;font-weight:600;white-space:nowrap">서  명</td>';
+  for(var si=0;si<roles.length;si++){
+    var rk2=roles[si].key;
+    html+='<td style="padding:6px;border:1px solid var(--border);text-align:center">'
+      +'<div style="position:relative;display:inline-block">'
+      +'<canvas id="qp-apv-canvas-'+si+'" width="150" height="72" style="border:1px solid #e5e7eb;border-radius:4px;cursor:crosshair;display:block;touch-action:none;background:#fff"></canvas>'
+      +'<button onclick="qpApvClearSign(\''+q.id+'\',\''+rk2+'\')" style="position:absolute;top:2px;right:2px;background:rgba(209,213,219,.9);color:#6b7280;border:none;border-radius:3px;cursor:pointer;font-size:9px;padding:2px 5px;line-height:1.3">지우기</button>'
+      +'</div></td>';
+  }
+  html+='</tr>';
+
+  html+='</tbody></table></div>';
+  var body=document.getElementById('qp-approval-body');
+  if(body) body.innerHTML=html;
+  _initApprovalCanvases(q);
+}
+
+function _initApprovalCanvases(q){
+  var roles=['writer','reviewer','approver'];
+  if(!q.approval) q.approval={};
+  for(var ci=0;ci<roles.length;ci++){
+    (function(idx, roleKey){
+      var canvas=document.getElementById('qp-apv-canvas-'+idx);
+      if(!canvas) return;
+      var ctx=canvas.getContext('2d');
+      ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.lineJoin='round';
+      var si=q.approval[roleKey+'_sign_img'];
+      if(si){
+        var img=new Image();
+        img.onload=function(){ ctx.drawImage(img,0,0,canvas.width,canvas.height); };
+        img.src=si;
+      }
+      var drawing=false;
+      function getPos(e){
+        var rect=canvas.getBoundingClientRect();
+        var sx=canvas.width/rect.width, sy=canvas.height/rect.height;
+        var src=e.touches?e.touches[0]:e;
+        return {x:(src.clientX-rect.left)*sx, y:(src.clientY-rect.top)*sy};
+      }
+      function onStart(e){ e.preventDefault(); drawing=true; var p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
+      function onMove(e){ if(!drawing) return; e.preventDefault(); var p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); }
+      function onEnd(e){
+        if(!drawing) return; drawing=false;
+        var b64=canvas.toDataURL('image/png');
+        var oldImg=q.approval[roleKey+'_sign_img']||'';
+        q.approval[roleKey+'_sign_img']=b64;
+        q.approval[roleKey+'_signed']=true; save();
+        if(typeof AIT_API!=='undefined'&&!AIT_API.MOCK){
+          var sc=(window.currentCar||q.car_model||'').replace(/[^a-zA-Z0-9가-힣]/g,'_').slice(0,15)||'qp';
+          var df=(q.title||'').replace(/[^a-zA-Z0-9가-힣]/g,'_').slice(0,15)||'sign';
+          var rs={writer:'01',reviewer:'02',approver:'03'};
+          var fn=sc+'-'+df+'-'+(rs[roleKey]||'01')+'.png';
+          _driveReplace('qpoint',oldImg,b64,fn,function(url){
+            if(url){ q.approval[roleKey+'_sign_img']=url; save(); }
+          });
+        }
+      }
+      canvas.addEventListener('mousedown',onStart);
+      canvas.addEventListener('mousemove',onMove);
+      canvas.addEventListener('mouseup',onEnd);
+      canvas.addEventListener('mouseleave',function(e){ if(drawing) onEnd(e); });
+      canvas.addEventListener('touchstart',onStart,{passive:false});
+      canvas.addEventListener('touchmove',onMove,{passive:false});
+      canvas.addEventListener('touchend',onEnd);
+    })(ci, roles[ci]);
+  }
+}
+
+window.qpOpenApprovalModal=function(id){
+  _qpApvId=id;
+  var q=findQ(id); if(!q) return;
+  _renderApprovalBody(q);
+  document.getElementById('qp-approval-modal').classList.add('open');
+};
+
+window.qpCloseApprovalModal=function(){
+  document.getElementById('qp-approval-modal').classList.remove('open');
+};
+
+window.qpOpenCurrentApproval=function(){
+  if(_selId) qpOpenApprovalModal(_selId);
+  else if(typeof showToast==='function') showToast('Q-Point를 선택하세요','error');
+};
+
+window.qpApvClearSign=function(id, roleKey){
+  var q=findQ(id); if(!q||!q.approval) return;
+  var oldImg=q.approval[roleKey+'_sign_img']||'';
+  var oldId=_extractFileId(oldImg);
+  if(oldId&&typeof AIT_API!=='undefined'&&!AIT_API.MOCK) AIT_API.deleteSignFile(oldId).catch(function(){});
+  q.approval[roleKey+'_sign_img']='';
+  q.approval[roleKey+'_signed']=false;
+  save();
+  var roleIdx=['writer','reviewer','approver'].indexOf(roleKey);
+  var canvas=document.getElementById('qp-apv-canvas-'+roleIdx);
+  if(canvas) canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+  renderDetail(id);
+};
+
+/* ── 작업자 서명 모달 ── */
+var _qpWkId=null;
+
+function _renderWorkersBody(q){
+  if(!q.signers||!q.signers.length) q.signers=defaultSigners();
+  var signers=q.signers;
+  var html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">'
+    +'<thead><tr style="background:#f8fafc">'
+    +'<th style="padding:8px;border:1px solid var(--border);text-align:center;font-size:11px;color:#6b7280;width:52px">구분</th>';
+  for(var i=0;i<signers.length;i++){
+    html+='<th style="padding:6px 4px;border:1px solid var(--border);text-align:center;font-size:11px;color:#374151;position:relative;min-width:120px">'
+      +'작성'
+      +'<button onclick="qpDeleteSigner(\''+q.id+'\','+i+')" title="삭제" style="position:absolute;top:3px;right:3px;background:none;border:none;cursor:pointer;color:#d1d5db;font-size:11px;padding:0;line-height:1">✕</button>'
+      +'</th>';
+  }
+  html+='<th style="padding:4px;border:1px solid var(--border);text-align:center;width:40px">'
+    +'<button onclick="qpAddSigner(\''+q.id+'\')" title="작성칸 추가" style="width:100%;padding:5px 2px;background:#374151;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:13px;font-weight:700;line-height:1">＋</button>'
+    +'</th>';
+  html+='</tr></thead><tbody>';
+
+  /* 이름 행 */
+  html+='<tr><td style="padding:8px;border:1px solid var(--border);text-align:center;color:#6b7280;font-size:11px;font-weight:600;white-space:nowrap">이  름</td>';
+  for(var ni=0;ni<signers.length;ni++){
+    html+='<td style="padding:8px 6px;border:1px solid var(--border);text-align:center">'
+      +'<input value="'+esc(signers[ni].name||'')+'" placeholder="이름" onchange="qpSignerNameInput(\''+q.id+'\','+ni+',this.value)" style="border:1px solid var(--border);border-radius:5px;padding:4px 6px;font-size:11px;text-align:center;width:100%;font-family:inherit;box-sizing:border-box">'
+      +'</td>';
+  }
+  html+='<td style="border:1px solid var(--border)"></td></tr>';
+
+  /* 서명 행 */
+  html+='<tr><td style="padding:8px;border:1px solid var(--border);text-align:center;color:#6b7280;font-size:11px;font-weight:600;white-space:nowrap">서  명</td>';
+  for(var si=0;si<signers.length;si++){
+    html+='<td style="padding:6px;border:1px solid var(--border);text-align:center">'
+      +'<div style="position:relative;display:inline-block">'
+      +'<canvas id="qp-wk-canvas-'+si+'" width="150" height="72" style="border:1px solid #e5e7eb;border-radius:4px;cursor:crosshair;display:block;touch-action:none;background:#fff"></canvas>'
+      +'<button onclick="qpClearSign(\''+q.id+'\','+si+')" style="position:absolute;top:2px;right:2px;background:rgba(209,213,219,.9);color:#6b7280;border:none;border-radius:3px;cursor:pointer;font-size:9px;padding:2px 5px;line-height:1.3">지우기</button>'
+      +'</div></td>';
+  }
+  html+='<td style="border:1px solid var(--border)"></td></tr>';
+
+  html+='</tbody></table></div>';
+  var body=document.getElementById('qp-workers-body');
+  if(body) body.innerHTML=html;
+  _initWorkersCanvases(q);
+}
+
+function _initWorkersCanvases(q){
+  if(!q.signers) return;
+  for(var ci=0;ci<q.signers.length;ci++){
+    (function(idx){
+      var canvas=document.getElementById('qp-wk-canvas-'+idx);
+      if(!canvas) return;
+      var ctx=canvas.getContext('2d');
+      ctx.strokeStyle='#1a1a1a'; ctx.lineWidth=2; ctx.lineCap='round'; ctx.lineJoin='round';
+      var si=q.signers[idx].sign_img;
+      if(si){ var img=new Image(); img.onload=function(){ ctx.drawImage(img,0,0,canvas.width,canvas.height); }; img.src=si; }
+      var drawing=false;
+      function getPos(e){ var r=canvas.getBoundingClientRect(); var sx=canvas.width/r.width,sy=canvas.height/r.height; var s=e.touches?e.touches[0]:e; return {x:(s.clientX-r.left)*sx,y:(s.clientY-r.top)*sy}; }
+      function onStart(e){ e.preventDefault(); drawing=true; var p=getPos(e); ctx.beginPath(); ctx.moveTo(p.x,p.y); }
+      function onMove(e){ if(!drawing) return; e.preventDefault(); var p=getPos(e); ctx.lineTo(p.x,p.y); ctx.stroke(); }
+      function onEnd(e){
+        if(!drawing) return; drawing=false;
+        var b64=canvas.toDataURL('image/png');
+        var oldImg=q.signers[idx].sign_img||'';
+        q.signers[idx].sign_img=b64; save();
+        if(typeof AIT_API!=='undefined'&&!AIT_API.MOCK){
+          var sc=(window.currentCar||q.car_model||'').replace(/[^a-zA-Z0-9가-힣]/g,'_').slice(0,15)||'qp';
+          var df=(q.title||'').replace(/[^a-zA-Z0-9가-힣]/g,'_').slice(0,15)||'sign';
+          var fn=sc+'-'+df+'-'+String(idx+1).padStart(2,'0')+'.png';
+          _driveReplace('qpoint',oldImg,b64,fn,function(url){
+            if(url){ q.signers[idx].sign_img=url; save(); }
+          });
+        }
+      }
+      canvas.addEventListener('mousedown',onStart); canvas.addEventListener('mousemove',onMove);
+      canvas.addEventListener('mouseup',onEnd); canvas.addEventListener('mouseleave',function(e){ if(drawing) onEnd(e); });
+      canvas.addEventListener('touchstart',onStart,{passive:false}); canvas.addEventListener('touchmove',onMove,{passive:false}); canvas.addEventListener('touchend',onEnd);
+    })(ci);
+  }
+}
+
+window.qpOpenWorkersModal=function(id){
+  _qpWkId=id;
+  var q=findQ(id); if(!q) return;
+  _renderWorkersBody(q);
+  document.getElementById('qp-workers-modal').classList.add('open');
+};
+
+window.qpCloseWorkersModal=function(){
+  document.getElementById('qp-workers-modal').classList.remove('open');
+};
+
+window.qpAddSigner=function(id){
+  var q=findQ(id); if(!q) return;
+  if(!q.signers||!q.signers.length) q.signers=defaultSigners();
+  q.signers.push({name:'',sign_img:''});
+  save();
+  _renderWorkersBody(q);
+};
+
+window.qpDeleteSigner=function(id,idx){
+  var q=findQ(id); if(!q||!q.signers) return;
+  if(q.signers.length<=1){ if(typeof showToast==='function') showToast('최소 1개 이상 필요합니다','error'); return; }
+  q.signers.splice(idx,1);
+  save();
+  _renderWorkersBody(q);
+};
+
+window.qpSignerNameInput=function(id,idx,val){
+  var q=findQ(id); if(!q||!q.signers) return;
+  q.signers[idx].name=val; save();
+};
+
+window.qpClearSign=function(id,idx){
+  var q=findQ(id); if(!q||!q.signers) return;
+  var oldImg=q.signers[idx].sign_img||'';
+  var oldId=_extractFileId(oldImg);
+  if(oldId&&typeof AIT_API!=='undefined'&&!AIT_API.MOCK) AIT_API.deleteSignFile(oldId).catch(function(){});
+  q.signers[idx].sign_img=''; save();
+  var canvas=document.getElementById('qp-wk-canvas-'+idx);
+  if(canvas) canvas.getContext('2d').clearRect(0,0,canvas.width,canvas.height);
+  renderDetail(id);
+};
+
+/* ── 개정 등록 ── */
+window.qpRevise=function(){
+  var carName=typeof getCurrentCar==='function'?getCurrentCar():(window.currentCar||'');
+  var rd=typeof getRevDataFor==='function'?getRevDataFor('qpoint',carName):{rev:0,history:[]};
+  var newRev=rd.rev+1;
+  var desc=prompt('개정 내용을 입력하세요\nRev.'+rd.rev+' → Rev.'+newRev);
+  if(desc===null) return;
+  var d=new Date();
+  var ds=d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');
+  rd.rev=newRev;
+  rd.history.unshift({rev:newRev,date:ds,user:'',desc:desc||'내용 변경',docs:'Q-Point'});
+  if(typeof saveRevDataFor==='function') saveRevDataFor('qpoint',carName,rd);
+  if(typeof updateAllRevDisplays==='function') updateAllRevDisplays();
+  if(typeof AIT_API!=='undefined'&&!AIT_API.MOCK&&window.currentCarId){
+    AIT_API.addRevision(window.currentCarId,'qpoint',{rev_date:ds,note:desc||'내용 변경',author:''})
+      .catch(function(e){console.warn('개정이력 DB 저장 실패',e);});
+  }
+  alert('✅ Rev.'+newRev+' 개정 완료\n개정일: '+ds);
+};
+
+/* ── 초기화 ── */
+load();
+
+})();
+
+window.print_qpoint = async function() {
+  const car = document.getElementById('car-sel')?.options[document.getElementById('car-sel')?.selectedIndex]?.text || '';
+
+  var list = [];
+  try { list = JSON.parse(localStorage.getItem('qpoints_v1') || '[]'); } catch(e) {}
+
+  const filterStatus = document.getElementById('qp-filter-status')?.value || '';
+  const STATUS_LABEL = {active:'진행중', v1done:'1차 완료', v2done:'2차 완료', completed:'완료'};
+  const STATUS_COLOR = {active:'#f97316', v1done:'#3b82f6', v2done:'#8b5cf6', completed:'#16a34a'};
+
+  function calcStatus(q) {
+    var v = q.validity || [];
+    if (v[2] && v[2].done) return 'completed';
+    if (v[1] && v[1].done) return 'v2done';
+    if (v[0] && v[0].done) return 'v1done';
+    return 'active';
+  }
+
+  if (filterStatus) list = list.filter(q => calcStatus(q) === filterStatus);
+  if (!list.length) { alert('출력할 Q-Point가 없습니다.'); return; }
+
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+
+  const pagesHtml = list.map((q, qi) => {
+    const isLast = qi === list.length - 1;
+    const s = calcStatus(q);
+    const sc = STATUS_COLOR[s] || '#374151';
+    const sl = STATUS_LABEL[s] || '';
+    const validity = q.validity || [];
+    const actions = q.actions || [];
+
+    const validityRows = validity.map((v, i) => `
+<tr>
+  <td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;font-weight:700;color:${sc};width:48px">${i+1}차</td>
+  <td style="padding:5px 8px;border:1px solid #e5e7eb;width:100px">${esc(v.date || '-')}</td>
+  <td style="padding:5px 8px;border:1px solid #e5e7eb;width:80px">${esc(v.checker || '-')}</td>
+  <td style="padding:5px 8px;border:1px solid #e5e7eb">${esc(v.result || '-')}</td>
+  <td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;width:56px">
+    <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${v.done?'#dcfce7':'#f3f4f6'};color:${v.done?'#16a34a':'#9ca3af'}">${v.done?'완료':'미완'}</span>
+  </td>
+</tr>`).join('');
+
+    const photosHtml = (q.photos || []).length ? `
+<div style="margin-top:8px">
+  <div style="font-size:9px;font-weight:700;color:#6b7280;margin-bottom:4px">문제 사진</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">
+    ${(q.photos||[]).slice(0,3).map(p => `<img src="${p}" style="max-height:100px;max-width:150px;object-fit:contain;border:1px solid #d1d5db;border-radius:4px">`).join('')}
+  </div>
+</div>` : (q.problem_photo ? `
+<div style="margin-top:8px">
+  <div style="font-size:9px;font-weight:700;color:#6b7280;margin-bottom:4px">문제 사진</div>
+  <img src="${q.problem_photo}" style="max-height:120px;max-width:200px;object-fit:contain;border:1px solid #d1d5db;border-radius:4px">
+</div>` : '');
+
+    return `<div style="${isLast ? '' : 'page-break-after:always'}">
+<table style="border:1.5px solid #1e3264;margin-bottom:4px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="width:70px;border-right:1px solid #7a90b8;padding:3px;text-align:center;vertical-align:middle">
+      <img src="${logoUrl}" style="height:28px;object-fit:contain" onerror="this.style.display='none'">
+    </td>
+    <td style="text-align:center;font-size:18px;font-weight:900;letter-spacing:6px;color:#c9302d;padding:5px 0">Q - P o i n t</td>
+    <td style="width:160px;border-left:1px solid #7a90b8;padding:6px 10px;text-align:center;vertical-align:middle">
+      <span style="background:${sc};color:#fff;font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px">${sl}</span>
+    </td>
+  </tr>
+</table>
+<table style="border:1px solid #7a90b8;margin-bottom:6px;font-size:10px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">문서번호</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;font-weight:700;color:#c9302d;font-family:monospace">${esc(q.doc_no||'')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">발행일</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${esc(q.issue_date||'')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">차종</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-weight:700">${esc(q.car_model||car)}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">조치부서</td>
+    <td style="padding:3px 8px;color:#1e3264">${esc(q.dept||'')}</td>
+  </tr>
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">내용</td>
+    <td colspan="7" style="padding:3px 8px;font-weight:600;color:#111827">${esc(q.title||'')}</td>
+  </tr>
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">품명</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${esc(q.part_name||'')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">도번</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-family:monospace">${esc(q.part_no||'')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">발생장소</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${esc(q.plant||'')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">발생수량</td>
+    <td style="padding:3px 8px;color:#1e3264">${esc(q.qty||'')}</td>
+  </tr>
+</table>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+  <div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+    <div style="background:#374151;color:#fff;padding:6px 10px;font-size:10px;font-weight:700">품질문제 발생 내용</div>
+    <div style="padding:8px 10px;font-size:10px;color:#374151;line-height:1.6;min-height:60px">${esc(q.detail||'내용 없음')}</div>
+    ${photosHtml}
+  </div>
+  <div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+    <div style="background:#c9302d;color:#fff;padding:6px 10px;font-size:10px;font-weight:700">준수사항 (재발방지 대책)</div>
+    <div style="padding:8px 10px;min-height:60px">
+      ${actions.length ? actions.map((a, ai) => `<div style="display:flex;gap:6px;padding:3px 0;border-bottom:1px solid #f0f4f8"><span style="background:#c9302d;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;flex-shrink:0;margin-top:2px">${ai+1}</span><span style="font-size:10px;color:#374151;line-height:1.5">${esc(a)}</span></div>`).join('') : '<div style="font-size:10px;color:#9ca3af;padding:8px 0">등록된 준수사항 없음</div>'}
+    </div>
+  </div>
+</div>
+<div style="border:1px solid #e2e8f0;border-radius:6px;overflow:hidden">
+  <div style="background:#374151;color:#fff;padding:6px 10px;font-size:10px;font-weight:700">유효성 점검</div>
+  <table style="width:100%;border-collapse:collapse;font-size:10px">
+    <thead>
+      <tr style="background:#f8fafc">
+        <th style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;width:48px;font-size:10px;color:#6b7280">차수</th>
+        <th style="padding:5px 8px;border:1px solid #e5e7eb;text-align:left;width:100px;font-size:10px;color:#6b7280">점검일</th>
+        <th style="padding:5px 8px;border:1px solid #e5e7eb;text-align:left;width:80px;font-size:10px;color:#6b7280">점검자</th>
+        <th style="padding:5px 8px;border:1px solid #e5e7eb;text-align:left;font-size:10px;color:#6b7280">점검 결과</th>
+        <th style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center;width:56px;font-size:10px;color:#6b7280">완료</th>
+      </tr>
+    </thead>
+    <tbody>${validityRows}</tbody>
+  </table>
+</div>
+</div>`;
+  }).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<title>Q-Point ${car}</title>
+<style>
+@page{size:A4 landscape;margin:7mm 9mm}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;color:#111827}
+table{border-collapse:collapse;width:100%}
+</style></head>
+<body>
+<div id="pset" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e3264;color:#fff;padding:6px 14px;display:flex;align-items:center;gap:10px;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.4)"><b style="margin-right:4px">🖨 인쇄 설정</b><label>여백 <select id="pm" style="font-size:11px;padding:2px 5px;border-radius:4px;color:#111"><option value="3mm">3mm 최소</option><option value="6mm">6mm 좁게</option><option value="10mm" selected>10mm 보통</option><option value="14mm">14mm 넓게</option><option value="18mm">18mm</option></select></label><label style="margin-left:6px">배율 <select id="ps" style="font-size:11px;padding:2px 5px;border-radius:4px;color:#111"><option value="100">100%</option><option value="95" selected>95%</option><option value="90">90%</option><option value="85">85%</option><option value="80">80%</option><option value="75">75%</option></select></label><button onclick="(function(){var m=document.getElementById('pm').value,s=parseInt(document.getElementById('ps').value,10),st=document.createElement('style');st.textContent='@page{size:A4 landscape;margin:'+m+'}body{zoom:'+(s/100)+'}';document.head.appendChild(st);document.getElementById('pset').style.display='none';document.getElementById('pss').style.display='none';setTimeout(function(){window.print();},200);})()" style="margin-left:8px;padding:4px 14px;background:#fff;color:#1e3264;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">인쇄</button><span style="margin-left:8px;font-size:10px;opacity:.65">※ 설정 바는 인쇄에서 제외됩니다</span></div><div id="pss" style="height:42px"></div>
+${pagesHtml}
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=1120,height=820');
+  if (!win) { alert('팝업 차단을 해제해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
+};
+</script>

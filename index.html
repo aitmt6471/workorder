@@ -1,296 +1,487 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="ko">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>근태계</title>
-    <meta name="description" content="근태 관리 시스템">
-
-    <!-- Google Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>공정문서 관리시스템</title>
+  <link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+<script>
+  (function() {
+    const token = localStorage.getItem('ait_token');
+    const exp   = parseInt(localStorage.getItem('ait_token_exp') || '0');
+    if (!token || exp <= Date.now()) {
+      localStorage.removeItem('ait_token');
+      localStorage.removeItem('ait_token_exp');
+      localStorage.removeItem('ait_user');
+      window.location.replace('login.html');
+    }
+  })();
+</script>
 </head>
-
 <body>
-    <div class="background-shapes">
-        <div class="shape shape-1"></div>
-        <div class="shape shape-2"></div>
-        <div class="shape shape-3"></div>
+
+<div class="app-layout">
+
+  <!-- ── 좌측 사이드바 ── -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <img src="ait-logo.png" alt="AIT" class="sidebar-logo-img">
+      <div class="sidebar-logo-text">공정문서<br>관리시스템</div>
     </div>
 
-    <main class="container">
-        <header class="header">
-            <div class="header-content">
-                <img src="ait-logo.png" alt="AIT Logo" class="logo">
-                <h1>근태계</h1>
-            </div>
-            <p id="headerDescription">정확한 근태 관리를 위해 특이사항을 입력해 주세요.</p>
+    <div class="sidebar-car">
+      <label class="sidebar-car-label">아이템 선택</label>
+      <select class="sidebar-sel" id="car-sel" onchange="onCarChange(this)"></select>
+    </div>
 
-            <!-- 탭 네비게이션 -->
-            <div class="tabs">
-                <button type="button" class="tab-btn active" data-tab="submit">신청</button>
-                <button type="button" class="tab-btn" data-tab="lookup">조회</button>
-            </div>
-        </header>
+    <nav class="sidebar-nav">
+      <div class="nav-item active" data-tab="cp" onclick="showTab('cp',this)">
+        <span class="nav-icon">📋</span>
+        <span class="nav-label">CP (관리계획서)</span>
+      </div>
+      <div class="nav-item" data-tab="ws" onclick="showTab('ws',this)">
+        <span class="nav-icon">📄</span>
+        <span class="nav-label">작업표준서</span>
+      </div>
+      <div class="nav-item" data-tab="daily" onclick="showTab('daily',this)">
+        <span class="nav-icon">🔧</span>
+        <span class="nav-label">설비일상점검표</span>
+      </div>
+      <div class="nav-item" data-tab="imf" onclick="showTab('imf',this)">
+        <span class="nav-icon">🔍</span>
+        <span class="nav-label">초중종물</span>
+      </div>
+      <div class="nav-item" data-tab="ms" onclick="showTab('ms',this)">
+        <span class="nav-icon">🎯</span>
+        <span class="nav-label">마스터샘플</span>
+      </div>
+      <div class="nav-item" data-tab="spec" onclick="showTab('spec',this)">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">사양표</span>
+      </div>
+      <div class="nav-item" data-tab="insp" onclick="showTab('insp',this)">
+        <span class="nav-icon">📐</span>
+        <span class="nav-label">공정검사기준서</span>
+      </div>
+      <div class="nav-item" data-tab="qpoint" onclick="showTab('qpoint',this)">
+        <span class="nav-icon">⚠</span>
+        <span class="nav-label">Q-Point</span>
+      </div>
+    </nav>
 
-        <!-- 신청 섹션 -->
-        <div id="submitSection" class="tab-content active">
-            <form id="attendanceForm" class="attendance-form">
-                <div class="form-group">
-                    <label for="department">소속</label>
-                    <div class="select-wrapper">
-                        <select id="department" name="department" required>
-                            <option value="" disabled selected>선택해 주세요</option>
-                            <option value="생산관리팀">생산관리팀</option>
-                            <option value="품질관리팀">품질관리팀</option>
-                            <option value="SCM팀">SCM팀</option>
-                            <option value="사출기술팀">사출기술팀</option>
-                            <option value="영업물류팀">영업물류팀</option>
-                            <option value="미화">미화</option>
-                        </select>
-                    </div>
-                </div>
+    <div class="sidebar-user" style="padding:10px 12px;border-top:1px solid var(--border)">
+      <div id="sidebar-user-name" style="font-size:12px;font-weight:600;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">
+        <span id="sidebar-user-role" style="font-size:10px;background:#eff6ff;color:#2563eb;border-radius:4px;padding:1px 6px;font-weight:600"></span>
+        <button onclick="(function(){localStorage.removeItem('ait_token');localStorage.removeItem('ait_token_exp');localStorage.removeItem('ait_user');window.location.replace('login.html');})()" style="font-size:10px;color:#94a3b8;background:none;border:none;cursor:pointer;padding:0">로그아웃</button>
+      </div>
+    </div>
 
-                <div class="form-group">
-                    <label for="name">성명</label>
-                    <input type="text" id="name" name="name" placeholder="홍길동" required>
-                </div>
+    <div class="sidebar-footer">
+      <button class="btn btn-sm sidebar-btn" onclick="openCarModal()">⚙ 아이템관리</button>
+      <button id="btn-settings" class="btn btn-sm sidebar-btn" onclick="openSettingsModal()">⚙ 설정</button>
+    </div>
+    <div id="sidebar-reset-btn" style="display:none;padding:8px 12px;border-top:1px solid var(--border)">
+      <button class="btn btn-sm sidebar-btn" onclick="(function(){if(typeof getMyRole==='function'&&getMyRole()!=='admin'){alert('관리자 권한이 필요합니다.');return;}resetAllData();})()" style="width:100%;color:#f87171;border-color:rgba(248,113,113,.4)">🗑 전체 초기화</button>
+    </div>
+  </aside>
 
-                <div class="form-group">
-                    <label for="position">직위</label>
-                    <div class="select-wrapper">
-                        <select id="position" name="position" required>
-                            <option value="사원">사원</option>
-                            <option value="주임">주임</option>
-                            <option value="대리">대리</option>
-                            <option value="과장">과장</option>
-                            <option value="차장">차장</option>
-                            <option value="부장">부장</option>
-                        </select>
-                    </div>
-                </div>
+  <!-- ── 메인 콘텐츠 ── -->
+  <main class="main-content">
+    <div id="pane-cp" class="pane active"></div>
+    <div id="pane-ws" class="pane"></div>
+    <div id="pane-daily" class="pane"></div>
+    <div id="pane-imf" class="pane"></div>
+    <div id="pane-ms" class="pane"></div>
+    <div id="pane-spec" class="pane"></div>
+    <div id="pane-insp" class="pane"></div>
+    <div id="pane-qpoint" class="pane"></div>
+  </main>
 
-                <div class="form-group">
-                    <label for="startDate">근태 발생 일자</label>
-                    <input type="date" id="startDate" name="startDate" required>
-                </div>
+</div>
 
-                <div class="form-group">
-                    <label>시작 시간</label>
-                    <div class="time-input-wrapper">
-                        <div class="select-wrapper time-select">
-                            <select id="startHour" name="startHour" required>
-                                <option value="">시</option>
-                            </select>
-                        </div>
-                        <span class="time-separator">:</span>
-                        <div class="select-wrapper time-select">
-                            <select id="startMinute" name="startMinute" required>
-                                <option value="">분</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+<!-- ── 라이트박스 모달 ── -->
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+  <div class="lightbox-box" id="lightbox-box"></div>
+  <div class="lightbox-caption" id="lightbox-caption"></div>
+  <div style="color:rgba(255,255,255,.45);font-size:13px">클릭하거나 ESC를 눌러 닫기</div>
+</div>
 
-                <div class="form-group">
-                    <label for="endDate">근태 종료 일자</label>
-                    <input type="date" id="endDate" name="endDate" required>
-                </div>
+<!-- ── 차종 관리 모달 ── -->
+<div class="car-modal-overlay" id="car-modal">
+  <div class="car-modal">
+    <div class="car-modal-hd">
+      <h4>아이템 관리</h4>
+      <button class="btn btn-ghost btn-sm" onclick="closeCarModal()">✕</button>
+    </div>
+    <div class="car-list" id="car-list"></div>
+    <div class="car-add-row">
+      <input id="car-add-input" type="text" placeholder="새 아이템명 입력 (예: SP2 ROOM)"
+             onkeydown="if(event.key==='Enter')addCar()">
+      <button class="btn btn-primary btn-sm" onclick="addCar()">＋ 추가</button>
+    </div>
+  </div>
+</div>
 
-                <div class="form-group">
-                    <label>종료 시간</label>
-                    <div class="time-input-wrapper">
-                        <div class="select-wrapper time-select">
-                            <select id="endHour" name="endHour" required>
-                                <option value="">시</option>
-                            </select>
-                        </div>
-                        <span class="time-separator">:</span>
-                        <div class="select-wrapper time-select">
-                            <select id="endMinute" name="endMinute" required>
-                                <option value="">분</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+<!-- ── 품번/품명 모달 ── -->
+<div class="car-modal-overlay" id="part-modal">
+  <div class="car-modal" style="width:380px;max-width:96vw">
+    <div class="car-modal-hd">
+      <h4>품번 / 품명 등록</h4>
+      <button class="btn btn-ghost btn-sm" onclick="closePartModal()">✕</button>
+    </div>
+    <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#6b7280;font-weight:600">차종</label>
+        <input id="part-modal-carmodel" type="text" placeholder="차종 입력 (예: GN7 FL)" style="border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;font-family:inherit">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#6b7280;font-weight:600">품번</label>
+        <input id="part-modal-partno" type="text" placeholder="품번 입력" style="border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;font-family:inherit">
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <label style="font-size:11px;color:#6b7280;font-weight:600">품명</label>
+        <input id="part-modal-partname" type="text" placeholder="품명 입력" style="border:1px solid var(--border);border-radius:6px;padding:7px 10px;font-size:13px;font-family:inherit" onkeydown="if(event.key==='Enter')savePartModal()">
+      </div>
+    </div>
+    <div class="car-add-row" style="justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="closePartModal()">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="savePartModal()">저장</button>
+    </div>
+  </div>
+</div>
 
-                <div class="form-group">
-                    <label for="type">근태구분</label>
-                    <div class="select-wrapper">
-                        <select id="type" name="type" required>
-                            <option value="" disabled selected>선택해 주세요</option>
-                            <option value="잔업">잔업</option>
-                            <option value="특근">특근</option>
-                            <option value="야간">야간</option>
-                            <option value="결근">결근</option>
-                            <option value="조퇴">조퇴</option>
-                            <option value="지각">지각</option>
-                            <option value="외출">외출</option>
-                            <option value="연차">연차</option>
-                            <option value="반차">반차</option>
-                            <option value="경조">경조</option>
-                            <option value="조출">조출</option>
-                            <option value="근태누락">근태누락</option>
-                            <option value="휴직">휴직</option>
-                            <option value="자진퇴사">자진퇴사</option>
-                            <option value="권고사직">권고사직</option>
-                            <option value="취소">취소</option>
-                        </select>
-                    </div>
-                </div>
+<!-- ── CFT 모달 ── -->
+<div class="car-modal-overlay" id="cft-modal">
+  <div class="car-modal" style="width:520px;max-width:96vw">
+    <div class="car-modal-hd">
+      <h4>상호 기능원 (CFT)</h4>
+      <button class="btn btn-ghost btn-sm" onclick="closeCftModal()">✕</button>
+    </div>
+    <div style="padding:12px 16px;display:flex;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto" id="cft-list"></div>
+    <div class="car-add-row" style="flex-direction:column;gap:6px">
+      <div style="display:flex;gap:6px">
+        <input id="cft-role-input" type="text" placeholder="역할 (예: 설계개발)" style="flex:1;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+        <input id="cft-name-input" type="text" placeholder="이름 (예: 홍길동 책임)" style="flex:2;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit" onkeydown="if(event.key==='Enter')addCftMember()">
+        <button class="btn btn-primary btn-sm" onclick="addCftMember()">＋ 추가</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-                <div class="form-group">
-                    <label for="description">사유 및 상세 내용</label>
-                    <textarea id="description" name="description" rows="4" placeholder="상세 사유를 입력해 주세요."
-                        required></textarea>
-                </div>
+<!-- ── 개정이력 모달 ── -->
+<div class="rev-modal-overlay" id="rev-modal">
+  <div class="rev-modal">
+    <div class="rev-modal-hd">
+      <div>
+        <div class="rev-modal-title">개정 이력</div>
+        <div class="rev-modal-sub" id="rev-modal-car"></div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeRevModal()">✕</button>
+    </div>
+    <div class="rev-modal-body">
+      <table class="rev-tbl">
+        <thead>
+          <tr>
+            <th style="width:72px">개정번호</th>
+            <th style="width:72px">표시Rev.</th>
+            <th style="width:88px">개정일</th>
+            <th>개정 내용</th>
+            <th style="width:90px">작성자</th>
+            <th style="width:90px">검토자</th>
+            <th style="width:90px">승인자</th>
+            <th style="width:40px"></th>
+          </tr>
+        </thead>
+        <tbody id="rev-modal-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
-                <button type="submit" class="submit-btn">
-                    <span class="btn-text">제출하기</span>
-                    <span class="loader" style="display: none;"></span>
-                </button>
-            </form>
+<!-- ── 서명 모달 ── -->
+<div class="rev-modal-overlay" id="sign-modal" style="z-index:3100">
+  <div class="rev-modal" style="max-width:430px">
+    <div class="rev-modal-hd">
+      <div class="rev-modal-title" id="sign-modal-title">서명</div>
+      <button class="btn btn-ghost btn-sm" onclick="closeSignModal()">✕</button>
+    </div>
+    <div class="rev-modal-body" style="padding:20px">
+      <div style="margin-bottom:14px">
+        <label style="font-size:12px;color:var(--text2);display:block;margin-bottom:5px">이름</label>
+        <input id="sign-name-input" type="text" placeholder="이름 입력"
+          style="width:100%;padding:9px 12px;border:1px solid #d1d5db;border-radius:6px;font-size:14px;box-sizing:border-box;outline:none;font-family:inherit">
+      </div>
+      <div style="font-size:12px;color:var(--text2);margin-bottom:6px">서명 (아래에 직접 그려주세요)</div>
+      <div style="border:1.5px solid #d1d5db;border-radius:8px;background:#fff;overflow:hidden">
+        <canvas id="sign-canvas" width="390" height="160"
+          style="display:block;width:100%;touch-action:none;cursor:crosshair"></canvas>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;justify-content:flex-end">
+        <button onclick="signClear()"
+          style="padding:8px 16px;border:1px solid #d1d5db;background:#fff;border-radius:6px;cursor:pointer;font-size:13px;color:#374151">지우기</button>
+        <button class="sign-save-btn" onclick="signSave()"
+          style="padding:8px 22px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">저장</button>
+      </div>
+    </div>
+  </div>
+</div>
 
-            <div id="notification" class="notification hidden">
-                <p id="notificationMessage"></p>
-            </div>
+<!-- ── CP 항목 추가 모달 ── -->
+<div class="car-modal-overlay" id="cp-add-modal">
+  <div class="car-modal" style="width:580px;max-width:96vw">
+    <div class="car-modal-hd">
+      <h4>CP 항목 추가</h4>
+      <button class="btn btn-ghost btn-sm" onclick="closeCpAddModal()">✕</button>
+    </div>
+    <div style="padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:72vh;overflow-y:auto">
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">공정 그룹 선택</label>
+        <select id="cpa-group" onchange="onCpaGroupChange(this)" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit"></select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">공정번호</label>
+        <input id="cpa-proc-no" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">공정명</label>
+        <input id="cpa-proc-name" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">설비명</label>
+        <input id="cpa-equip" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">MAIN/SUB</label>
+        <select id="cpa-mainsub" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>MAIN</option><option>SUB</option><option>외주</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">특별특성</label>
+        <input id="cpa-special" type="text" placeholder="—" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">F/PF</label>
+        <input id="cpa-fpf" type="text" placeholder="—" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">구분</label>
+        <select id="cpa-cat" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>제품</option><option>공정</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">관리항목 <span style="color:var(--red)">*</span></label>
+        <input id="cpa-item" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">규격/관리기준</label>
+        <input id="cpa-spec" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">확인방법</label>
+        <select id="cpa-method" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>육안</option><option>지시값기록</option><option>측정기</option><option>다이얼게이지</option><option>전하량측정기</option><option>에어건</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">주기</label>
+        <select id="cpa-cycle" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>전수</option><option>시업 시</option><option>1회/주</option><option>1개월</option><option>LOT별</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">관리방안</label>
+        <select id="cpa-plan" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>작업표준서</option><option>설비일상점검표</option><option>QC기준서</option><option>FMEA</option><option>SOP</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">관리주체</label>
+        <select id="cpa-owner" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+          <option>생산</option><option>품질</option><option>설비</option>
+        </select>
+      </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">이상조치</label>
+        <input id="cpa-action" type="text" placeholder="부적합 격리/관리자 통보" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+      <div style="grid-column:1/-1">
+        <label style="font-size:11px;color:var(--text3);font-weight:600;display:block;margin-bottom:3px">비고</label>
+        <input id="cpa-note" type="text" style="width:100%;border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit">
+      </div>
+    </div>
+    <div class="car-add-row" style="justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="closeCpAddModal()">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="submitCpAddModal()">추가</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ── 설정 모달 ── -->
+<div class="car-modal-overlay" id="settings-modal">
+  <div class="car-modal" style="width:380px;max-width:96vw">
+    <div class="car-modal-hd">
+      <h4>설정</h4>
+      <button class="btn btn-ghost btn-sm" onclick="closeSettingsModal()">✕</button>
+    </div>
+    <div style="padding:16px 18px;display:flex;flex-direction:column;gap:16px">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#1e3264;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #e5e7eb">편집 모드 비밀번호 변경</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <label style="font-size:11px;color:#6b7280;font-weight:600;display:block;margin-bottom:4px">새 비밀번호</label>
+            <input id="settings-new-pw" type="password" placeholder="새 비밀번호 입력"
+              style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"
+              onfocus="this.style.borderColor='#1e3264'" onblur="this.style.borderColor='#d1d5db'">
+          </div>
+          <div>
+            <label style="font-size:11px;color:#6b7280;font-weight:600;display:block;margin-bottom:4px">비밀번호 확인</label>
+            <input id="settings-new-pw2" type="password" placeholder="새 비밀번호 재입력"
+              style="width:100%;border:1px solid #d1d5db;border-radius:6px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"
+              onfocus="this.style.borderColor='#1e3264'" onblur="this.style.borderColor='#d1d5db'"
+              onkeydown="if(event.key==='Enter')saveSettingsPw()">
+          </div>
         </div>
+      </div>
+    </div>
+    <div style="padding:12px 18px;background:#f9fafb;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost btn-sm" onclick="closeSettingsModal()">취소</button>
+      <button class="btn btn-primary btn-sm" onclick="saveSettingsPw()">저장</button>
+    </div>
+  </div>
+</div>
 
-        <!-- 조회 섹션 -->
-        <div id="lookupSection" class="tab-content hidden">
-            <form id="lookupForm" class="lookup-form">
-                <div class="lookup-inputs">
-                    <div class="form-group">
-                        <label for="lookupDepartment">소속</label>
-                        <div class="select-wrapper">
-                            <select id="lookupDepartment" name="lookupDepartment" required>
-                                <option value="" disabled selected>선택해 주세요</option>
-                                <option value="생산관리팀">생산관리팀</option>
-                                <option value="품질관리팀">품질관리팀</option>
-                                <option value="SCM팀">SCM팀</option>
-                                <option value="사출기술팀">사출기술팀</option>
-                                <option value="영업물류팀">영업물류팀</option>
-                                <option value="미화">미화</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-group">
-                        <label for="lookupName">성명</label>
-                        <input type="text" id="lookupName" name="lookupName" placeholder="홍길동" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="lookupStartDate">시작일</label>
-                        <input type="date" id="lookupStartDate" name="lookupStartDate">
-                    </div>
-                    <div class="form-group">
-                        <label for="lookupEndDate">종료일</label>
-                        <input type="date" id="lookupEndDate" name="lookupEndDate">
-                    </div>
-                    <button type="submit" class="lookup-btn">
-                        <span class="btn-text">조회</span>
-                        <span class="loader" style="display: none;"></span>
-                    </button>
-                </div>
-            </form>
+<script src="js/api.js?v=20260615a"></script>
+<script src="js/cp.js?v=20260611a"></script>
+<script src="js/main.js?v=20260611b"></script>
+<script src="js/ws.js?v=20260523a"></script>
+<script src="js/print_cp_gentex.js?v=20260528a"></script>
 
-            <!-- 통계 카드 -->
-            <div class="stats-container hidden" id="statsContainer">
-                <div class="stats-cards">
-                    <div class="stat-card">
-                        <div class="stat-icon">📅</div>
-                        <div class="stat-content">
-                            <h3>연차 사용</h3>
-                            <div class="stat-value-wrapper">
-                                <span class="stat-value" id="annualLeaveCount">0</span>
-                                <span class="stat-label">회</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">⏰</div>
-                        <div class="stat-content">
-                            <h3>반차 사용</h3>
-                            <div class="stat-value-wrapper">
-                                <span class="stat-value" id="halfLeaveCount">0</span>
-                                <span class="stat-label">회</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+<!-- 탭 콘텐츠 fetch 로드 -->
+<script>
+const TABS = ['cp','ws','daily','imf','ms','spec','insp','qpoint'];
+const loaded = {};
+async function loadTab(id) {
+  if (loaded[id]) return;
+  try {
+    const res = await fetch(`tabs/${id}.html?v=${Date.now()}`);
+    const html = await res.text();
+    const pane = document.getElementById('pane-' + id);
+    pane.innerHTML = '';
+    const frag = document.createRange().createContextualFragment(html);
+    pane.appendChild(frag);
+    if (id === 'cp') initCpEventListeners();
+    loaded[id] = true;
+    if (typeof loadCarContent === 'function') loadCarContent(id);
+    updateMonthLabel(id);
+    updateRevDisplay(id);
+  } catch(e) {
+    console.warn('탭 로드 실패:', id, e);
+  }
+}
+document.addEventListener('DOMContentLoaded', async () => {
+  await initCars();
+  if (typeof applyRoleUI === 'function') applyRoleUI();
+  loadTab('cp');
+});
+const _origShowTab = window.showTab;
+window.showTab = function(id, el) {
+  const editPane = document.querySelector('.pane.active.edit-mode');
+  if (editPane) {
+    const curId = editPane.id.replace('pane-', '');
+    if (curId === id) { _origShowTab(id, el); loadTab(id); return; }
+    const ans = confirm('편집 중인 내용이 있습니다.\n\n[확인] 저장하고 이동\n[취소] 이동 취소');
+    if (!ans) return;
+    if (typeof saveDocument === 'function') saveDocument(curId);
+  }
+  _origShowTab(id, el);
+  loadTab(id);
+};
 
-            <!-- 조회 결과 테이블 -->
-            <div class="table-container hidden" id="tableContainer">
-                <h3 class="table-title">근태 신청 내역</h3>
-                <div class="table-wrapper">
-                    <table class="records-table">
-                        <thead>
-                            <tr>
-                                <th>날짜</th>
-                                <th>근태구분</th>
+/* ── 라이트박스 ── */
+window.openLightbox = function(src, caption) {
+  var box = document.getElementById('lightbox-box');
+  var cap = document.getElementById('lightbox-caption');
+  if (!box) return;
+  box.innerHTML = '<img src="' + src + '" style="width:100%;height:100%;object-fit:contain;display:block">';
+  if (cap) cap.textContent = caption || '';
+  document.getElementById('lightbox').classList.add('open');
+  document.body.style.overflow = 'hidden';
+};
+window.closeLightbox = function() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.body.style.overflow = '';
+};
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') window.closeLightbox();
+});
+</script>
 
+<!-- ── Toast 컨테이너 ── -->
+<div id="toast-container"></div>
 
-                                <th>검토상태</th>
-                                <th>승인상태</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recordsTableBody">
-                            <!-- 조회 결과가 여기에 표시됩니다 -->
-                        </tbody>
-                    </table>
-                </div>
-                <p class="no-records hidden" id="noRecords">조회된 근태 기록이 없습니다.</p>
-            </div>
-        </div>
+<!-- ── 저장 중 indicator (헤더 우측 삽입 대상) ── -->
+<div id="saving-indicator">저장 중...</div>
 
-        <!-- 제출 확인 모달 -->
-        <div id="confirmModal" class="modal hidden">
-            <div class="modal-content">
-                <h2>제출 내용 확인</h2>
-                <p class="modal-description">아래 내용이 맞는지 확인해 주세요.</p>
-                <div class="confirm-details">
-                    <div class="detail-row">
-                        <span class="detail-label">소속:</span>
-                        <span class="detail-value" id="confirmDepartment"></span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">이름:</span>
-                        <span class="detail-value" id="confirmName"></span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">근태 발생일자:</span>
-                        <span class="detail-value" id="confirmStartDate"></span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">시작 시간:</span>
-                        <span class="detail-value" id="confirmStartTime"></span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">근태 종료일자:</span>
-                        <span class="detail-value" id="confirmEndDate"></span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">종료 시간:</span>
-                        <span class="detail-value" id="confirmEndTime"></span>
-                    </div>
-                    <div class="detail-row">
-                        <span class="detail-label">근태구분:</span>
-                        <span class="detail-value" id="confirmType"></span>
-                    </div>
-                </div>
-                <div class="modal-actions">
-                    <button type="button" class="modal-btn cancel-btn" id="cancelSubmit">취소</button>
-                    <button type="button" class="modal-btn confirm-btn" id="confirmSubmit">확인</button>
-                </div>
-            </div>
-        </div>
-    </main>
+<!-- ── 미입력/스펙이탈 경고 모달 ── -->
+<div id="spec-warn-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:10000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.3);width:min(480px,92vw);overflow:hidden">
+    <div style="background:#fef3c7;padding:16px 20px;display:flex;align-items:center;gap:12px;border-bottom:2px solid #fcd34d">
+      <span style="font-size:26px;line-height:1">&#x26A0;&#xFE0F;</span>
+      <h4 style="font-size:15px;font-weight:700;color:#92400e;margin:0;flex:1">확인 필요</h4>
+      <button onclick="document.getElementById('spec-warn-modal').style.display='none'" style="background:none;border:none;font-size:20px;cursor:pointer;color:#a16207;line-height:1">&#x2715;</button>
+    </div>
+    <div style="padding:20px 22px">
+      <p style="font-size:14px;color:#1f2937;line-height:1.8;margin:0 0 12px">
+        미입력 또는 스펙 범위에 벗어나는 값이 있습니다.<br>
+        <strong>다시 확인해주세요.</strong><br>
+        지속발생시 관리자에게 전달해 조치받으세요.
+      </p>
+      <div id="spec-warn-detail" style="display:none;background:#fafafa;border:1px solid #e5e7eb;border-radius:6px;padding:8px 12px;max-height:160px;overflow-y:auto"></div>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid #e5e7eb;display:flex;justify-content:flex-end;gap:8px">
+      <button id="spec-warn-cancel-btn" style="padding:8px 18px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">닫고 확인하기</button>
+      <button id="spec-warn-save-btn" style="padding:8px 18px;background:#d97706;color:#fff;border:none;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer">그래도 저장</button>
+    </div>
+  </div>
+</div>
+<script>
+window._showSpecWarnModal = function(issues, onSave) {
+  var modal = document.getElementById('spec-warn-modal');
+  var detail = document.getElementById('spec-warn-detail');
+  var cancelBtn = document.getElementById('spec-warn-cancel-btn');
+  var saveBtn = document.getElementById('spec-warn-save-btn');
+  if (!modal) return;
+  if (issues && issues.length > 0) {
+    detail.innerHTML = issues.map(function(iss) {
+      var typeLabel = iss.type === 'empty'
+        ? '<span style="color:#dc2626;font-weight:700;font-size:11px;background:#fee2e2;padding:1px 6px;border-radius:3px">미입력</span>'
+        : '<span style="color:#d97706;font-weight:700;font-size:11px;background:#fef3c7;padding:1px 6px;border-radius:3px">스펙이탈</span>';
+      var extra = (iss.type === 'outofspec' && iss.val)
+        ? '<span style="color:#6b7280;font-size:11px;margin-left:4px">(입력: ' + iss.val + ' / 기준: ' + (iss.std||'') + ')</span>'
+        : '';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #f0f0f0;font-size:12px">'
+        + typeLabel + '<span style="flex:1;color:#374151">' + (iss.name||'') + '</span>' + extra + '</div>';
+    }).join('');
+    detail.style.display = '';
+  } else {
+    detail.style.display = 'none';
+  }
+  modal.style.display = 'flex';
+  var close = function() { modal.style.display = 'none'; };
+  cancelBtn.onclick = close;
+  saveBtn.onclick = async function() {
+    close();
+    if (typeof onSave === 'function') await onSave();
+  };
+  modal.onclick = function(e) { if (e.target === modal) close(); };
+};
+</script>
 
-    <script src="script.js?v=20251231115600"></script>
 </body>
-
 </html>

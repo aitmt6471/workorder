@@ -1,0 +1,603 @@
+<!-- 공정검사기준서 -->
+<div class="tab-toolbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">공정검사기준서</span>
+    <div style="width:1px;height:16px;background:var(--border)"></div>
+    <span id="insp-rev-badge" style="font-size:13px;font-weight:700;color:#111827">Rev. 0</span>
+    <span id="insp-rev-date" style="font-size:13px;color:#374151">개정일: -</span>
+    <button class="btn btn-ghost btn-sm" onclick="openRevModal('insp')">이력</button>
+  </div>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('insp')">저장</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_insp && window.print_insp()">🖨 인쇄</button>
+  <button id="insp-edit-btn" class="btn btn-ghost btn-sm" onclick="toggleTabEditMode('insp',this)">&#x270F; 편집 모드</button>
+</div>
+
+<!-- 공정 탭 네비 -->
+<div class="process-nav" id="insp-proc-nav" style="min-height:42px"></div>
+
+<!-- 메인 콘텐츠 -->
+<div id="insp-main" style="overflow-y:auto;height:calc(100vh - 148px);background:#f4f6fb">
+  <div id="insp-content" style="padding:16px 20px 32px">
+    <div style="padding:80px 20px;text-align:center;color:#9ca3af">
+      <div style="font-size:40px;margin-bottom:14px">&#x1F4CB;</div>
+      <div style="font-size:14px;font-weight:600;color:#6b7280">로딩 중...</div>
+    </div>
+  </div>
+</div>
+
+<!-- 검사항목 추가 모달 -->
+<div id="insp-item-modal" style="display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.45);align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:12px;width:420px;max-width:95vw;box-shadow:0 8px 40px rgba(0,0,0,.2);overflow:hidden">
+    <div style="background:#1e3264;padding:14px 18px;display:flex;align-items:center;justify-content:space-between">
+      <span style="color:#fff;font-weight:700;font-size:14px">검사항목 추가</span>
+    </div>
+    <div style="padding:20px 18px">
+      <label style="display:block;font-size:12px;font-weight:600;color:#374151;margin-bottom:6px">항목명</label>
+      <input id="insp-item-input" type="text" placeholder="예: 바디커버 후크 설체결"
+        style="width:100%;border:1px solid #d1d5db;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"
+        onfocus="this.style.borderColor='#1e3264'"
+        onblur="this.style.borderColor='#d1d5db'"
+        onkeydown="if(event.key==='Enter')inspAddItemConfirm();if(event.key==='Escape')inspAddItemCancel()">
+    </div>
+    <div style="padding:12px 18px;background:#f9fafb;display:flex;justify-content:flex-end;gap:8px;border-top:1px solid #e5e7eb">
+      <button onclick="inspAddItemCancel()"
+        style="border:1px solid #d1d5db;background:#fff;border-radius:6px;padding:8px 20px;font-size:13px;cursor:pointer;font-family:inherit">취소</button>
+      <button onclick="inspAddItemConfirm()"
+        style="border:none;background:#1e3264;color:#fff;border-radius:6px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit">추가</button>
+    </div>
+  </div>
+</div>
+
+<!-- CP 공정 선택 모달 -->
+<div class="car-modal-overlay" id="insp-cp-picker">
+  <div class="car-modal" style="width:min(480px,96vw);max-height:70vh;overflow:hidden;display:flex;flex-direction:column;padding:0">
+    <div class="car-modal-hd" style="padding:14px 18px">
+      <div>
+        <div style="font-size:14px;font-weight:700">CP에서 공정 선택</div>
+        <div style="font-size:11px;color:#6b7280;margin-top:2px">공정을 클릭하면 자동으로 추가됩니다</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('insp-cp-picker').classList.remove('open')">&#x2715;</button>
+    </div>
+    <div id="insp-cp-picker-body" style="overflow-y:auto;flex:1;padding:8px 12px 16px"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ── 상태 ── */
+var _editMode = false;
+var _carKey   = '';
+var _doc      = null;
+var _procId   = null;
+
+/* ── 유틸 ── */
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
+
+function carName(){
+  var s=document.getElementById('car-sel');
+  if(!s) return '';
+  return (s.options[s.selectedIndex]||{}).text||'';
+}
+
+function carKey(){
+  var s=document.getElementById('car-sel');
+  return s?s.value:'';
+}
+
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+
+function compressImg(file,cb){
+  var img=new Image();
+  var url=URL.createObjectURL(file);
+  img.onload=function(){
+    var MAX=700, w=img.width, h=img.height;
+    if(w>MAX){h=Math.round(h*MAX/w);w=MAX;}
+    else if(h>MAX){w=Math.round(w*MAX/h);h=MAX;}
+    var c=document.createElement('canvas');
+    c.width=w; c.height=h;
+    c.getContext('2d').drawImage(img,0,0,w,h);
+    URL.revokeObjectURL(url);
+    cb(c.toDataURL('image/jpeg',0.65));
+  };
+  img.src=url;
+}
+
+/* ── 데이터 ── */
+function _emptyDoc(){ return {part_no:'',part_name:'',procs:[]}; }
+
+/* CP 메타에서 품번/품명 동기화 */
+function _fillPartFromCp(){
+  if(!_doc) return;
+  var cn=carName();
+  var meta=(typeof _cpMetaGet==='function' && cn)?_cpMetaGet(cn):{};
+  if(!meta.partno && !meta.partname){
+    var pnoEl=document.querySelector('#pane-cp #cp-meta-partno');
+    var pnmEl=document.querySelector('#pane-cp #cp-meta-partname');
+    meta={partno:(pnoEl?pnoEl.textContent.trim():''),partname:(pnmEl?pnmEl.textContent.trim():'')};
+  }
+  if(meta.partno)   _doc.part_no  =meta.partno;
+  if(meta.partname) _doc.part_name=meta.partname;
+}
+
+function loadDoc(){
+  _carKey=carKey();
+  if(!_carKey){ _doc=null; render(); return; }
+
+  // 로딩 중 표시
+  var el=document.getElementById('insp-content');
+  if(el) el.innerHTML='<div style="padding:80px 20px;text-align:center;color:#9ca3af">'
+    +'<div style="font-size:40px;margin-bottom:14px">&#x1F4CB;</div>'
+    +'<div style="font-size:14px;font-weight:600;color:#6b7280">로딩 중...</div>'
+    +'</div>';
+
+  if(typeof AIT_API!=='undefined' && !AIT_API.MOCK && window.currentCarId){
+    Promise.all([
+      AIT_API.getInspDoc(window.currentCarId),
+      AIT_API.getRevisions(window.currentCarId,'insp').catch(function(){return[];})
+    ]).then(function(results){
+      var res=results[0], revRows=results[1]||[];
+      _doc=res||_emptyDoc();
+      _fillPartFromCp();
+      if(_procId===null && _doc.procs&&_doc.procs.length) _procId=_doc.procs[0].id;
+      if(revRows.length){
+        var rd={rev:0,history:[]};
+        revRows.forEach(function(r){
+          var rv=parseInt(r.rev)||0;
+          if(rv>rd.rev) rd.rev=rv;
+          rd.history.push({rev:rv,date:r.rev_date||'',user:r.author||'',desc:r.note||'',rev_display:r.rev_display||''});
+        });
+        rd.history.sort(function(a,b){return b.rev-a.rev;});
+        if(typeof saveRevDataFor==='function') saveRevDataFor('insp',carName(),rd);
+        if(typeof updateRevDisplay==='function') updateRevDisplay('insp');
+      }
+      render();
+    }).catch(function(){
+      _doc=_emptyDoc();
+      _fillPartFromCp();
+      render();
+    });
+    return;
+  }
+  _doc=_emptyDoc();
+  _fillPartFromCp();
+  render();
+}
+
+/* CP에서 품번/품명 변경 시 외부 호출용 */
+window._inspRefreshPart=function(){
+  if(!_doc) return;
+  _fillPartFromCp();
+  renderContent();
+};
+
+/* ── 사진 높이 동적 계산 ── */
+function calcPhotoH(){
+  var main=document.getElementById('insp-main');
+  if(!main) return 200;
+  var mainH=main.clientHeight;
+  var rows=2; // 항상 2행 기준으로 높이 계산
+  var reserved=212+(rows-1)*12; // 헤더테이블+마진+검사포인트바+패딩+행간격
+  var perRow=(mainH-reserved)/rows;
+  return Math.max(80,Math.floor(perRow-64)); // 항목제목(30)+설명여유(34)
+}
+
+/* ── 렌더 ── */
+function render(){
+  renderNav();
+  renderContent();
+}
+
+function renderNav(){
+  var nav=document.getElementById('insp-proc-nav');
+  if(!nav) return;
+  if(!_doc){
+    nav.innerHTML='<div style="color:#9ca3af;font-size:12px;padding:8px 4px">아이템을 선택하세요</div>';
+    return;
+  }
+  if(!_doc.procs.length){
+    nav.innerHTML='<div style="color:#9ca3af;font-size:12px;padding:8px 4px">'
+      +(_editMode?'편집 모드에서 공정을 추가하세요':'공정 없음')+'</div>'
+      +(_editMode?'<button class="proc-btn" style="border-style:dashed;color:#3b82f6" onclick="inspAddProc()">+ 공정 추가</button>':'');
+    return;
+  }
+  var html='';
+  _doc.procs.forEach(function(p){
+    var act=p.id===_procId;
+    html+='<button class="proc-btn'+(act?' active':'')+'" onclick="inspSelProc(\''+p.id+'\')">'+esc(p.proc_no)+'</button>';
+  });
+  if(_editMode) html+='<button class="proc-btn" style="border-style:dashed;color:#3b82f6;margin-left:6px" onclick="inspAddProc()">+</button>';
+  nav.innerHTML=html;
+}
+
+function renderContent(){
+  var el=document.getElementById('insp-content');
+  if(!el) return;
+
+  if(!_doc){
+    el.innerHTML='<div style="padding:80px 20px;text-align:center;color:#9ca3af">'
+      +'<div style="font-size:40px;margin-bottom:14px">&#x1F4CB;</div>'
+      +'<div style="font-size:14px;font-weight:600;color:#6b7280">아이템을 선택하세요</div>'
+      +'</div>';
+    return;
+  }
+  if(!_doc.procs.length){
+    el.innerHTML='<div style="padding:70px 20px;text-align:center;color:#9ca3af">'
+      +'<div style="font-size:36px;margin-bottom:12px">&#x1F4C4;</div>'
+      +'<div style="font-size:13px;font-weight:600;color:#6b7280">등록된 공정이 없습니다</div>'
+      +(_editMode?'<button onclick="inspAddProc()" style="margin-top:18px;padding:9px 22px;background:#1e3264;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">+ 공정 추가</button>':'')
+      +'</div>';
+    return;
+  }
+
+  var proc=null;
+  for(var pi=0;pi<_doc.procs.length;pi++){ if(_doc.procs[pi].id===_procId){proc=_doc.procs[pi];break;} }
+  if(!proc){ proc=_doc.procs[0]; }
+  _procId=proc.id;
+
+  var cn=carName();
+  var eMode=_editMode;
+
+  var delProcBtn=eMode?'<button onclick="inspDeleteProc(\''+proc.id+'\')" style="background:none;border:1px solid #fca5a5;color:#ef4444;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:11px">공정 삭제</button>':'';
+
+  var html='<div style="background:#fff;border:1px solid #9aaabf;border-radius:6px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 4px rgba(15,23,42,.06)">'
+    +'<table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">'
+    +'<colgroup><col style="width:58px"><col><col style="width:68px"><col><col style="width:68px"><col></colgroup>'
+    +'<tbody>'
+    +'<tr>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:10px;text-align:center;padding:6px 3px;border:1px solid #3a548a;vertical-align:middle">차  종</td>'
+    +'<td style="border:1px solid #c8d3e0;padding:6px 8px;font-weight:700;color:#1e3264;vertical-align:middle"'+(eMode?' contenteditable="true" oninput="inspHdrInput(this,\'car_models\')"':'')+'>'+esc(proc.car_models||cn)+'</td>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:10px;text-align:center;padding:6px 3px;border:1px solid #3a548a;vertical-align:middle">품  번</td>'
+    +'<td colspan="3" style="border:1px solid #c8d3e0;padding:6px 8px;font-family:monospace;font-size:11px;vertical-align:middle"'+(eMode?' contenteditable="true" oninput="inspHdrInput(this,\'part_no\')"':'')+'>'+esc(proc.part_no||_doc.part_no)+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:10px;text-align:center;padding:6px 3px;border:1px solid #3a548a;vertical-align:middle">품  명</td>'
+    +'<td style="border:1px solid #c8d3e0;padding:6px 8px;font-weight:600;vertical-align:middle"'+(eMode?' contenteditable="true" oninput="inspHdrInput(this,\'part_name\')"':'')+'>'+esc(proc.part_name||_doc.part_name)+'</td>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:10px;text-align:center;padding:6px 3px;border:1px solid #3a548a;vertical-align:middle">공정번호</td>'
+    +'<td style="border:1px solid #c8d3e0;padding:6px 8px;font-weight:700;color:#1e3264;vertical-align:middle"'+(eMode?' contenteditable="true" oninput="inspHdrInput(this,\'proc_no\')"':'')+'>'+esc(proc.proc_no)+'</td>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:10px;text-align:center;padding:6px 3px;border:1px solid #3a548a;vertical-align:middle">공정명</td>'
+    +'<td style="border:1px solid #c8d3e0;padding:6px 8px;font-weight:600;vertical-align:middle"'+(eMode?' contenteditable="true" oninput="inspHdrInput(this,\'proc_name\')"':'')+'>'+esc(proc.proc_name)+'</td>'
+    +'</tr>'
+    +'<tr>'
+    +'<td style="background:#1e3264;color:#fff;font-weight:600;font-size:10px;text-align:center;padding:6px 3px;border:1px solid #3a548a;vertical-align:middle">구  분</td>'
+    +'<td style="border:1px solid #c8d3e0;padding:6px 8px;vertical-align:middle"'+(eMode?' contenteditable="true" oninput="inspHdrInput(this,\'proc_type\')"':'')+'>'+esc(proc.proc_type||'일반공정')+'</td>'
+    +'<td colspan="4" style="border:1px solid #c8d3e0;padding:4px 10px;text-align:right;vertical-align:middle">'+delProcBtn+'</td>'
+    +'</tr>'
+    +'</tbody></table></div>';
+
+  html+='<div style="background:#1e3264;color:#fff;padding:9px 16px;border-radius:4px 4px 0 0;font-weight:700;font-size:13px;display:flex;align-items:center;gap:10px">'
+    +'<span>'+esc(proc.proc_no)+(proc.proc_name?' ('+esc(proc.proc_name)+')':'')+'  검사 포인트</span>'
+    +'<div style="flex:1"></div>'
+    +(eMode?'<button onclick="inspAddItem(\''+proc.id+'\')" style="background:rgba(255,255,255,.15);color:#fff;border:1px solid rgba(255,255,255,.35);border-radius:4px;padding:3px 12px;cursor:pointer;font-size:11px;font-weight:600">+ 검사항목 추가</button>':'')
+    +'</div>';
+
+  html+='<div style="background:#fff;border:1px solid #c8d3e0;border-top:none;padding:14px;border-radius:0 0 6px 6px;margin-bottom:14px;box-shadow:0 1px 4px rgba(15,23,42,.06)">';
+
+  var items=proc.items||[];
+  var photoH=calcPhotoH();
+  var phStr=photoH+'px';
+  if(!items.length){
+    html+='<div style="padding:32px;text-align:center;color:#9ca3af;font-size:12px">'
+      +(eMode?'위 [+ 검사항목 추가] 버튼으로 항목을 등록하세요':'등록된 검사항목이 없습니다')
+      +'</div>';
+  } else {
+    html+='<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px">';
+    items.forEach(function(item){
+      var delBtn=eMode?'<button onclick="event.stopPropagation();inspDeleteItem(\''+proc.id+'\',\''+item.id+'\')" style="position:absolute;top:6px;right:6px;background:#ef4444;color:#fff;border:none;border-radius:50%;width:20px;height:20px;font-size:11px;cursor:pointer;z-index:3;line-height:20px;padding:0;font-weight:700">x</button>':'';
+      var photoHtml=item.photo
+        ?'<img src="'+item.photo+'" style="width:100%;height:'+phStr+';object-fit:contain;background:#f3f4f6;display:block;cursor:zoom-in" onclick="typeof openLightbox===\'function\'&&openLightbox(\''+item.photo+'\',\''+esc(item.name||'')+'\')">'
+        :'<div style="width:100%;height:'+phStr+';background:#f3f4f6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#9ca3af">'
+          +'<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>'
+          +'<span style="font-size:11px">사진 없음</span></div>';
+      var photoWrap=eMode
+        ?'<label style="display:block;position:relative;cursor:pointer">'+photoHtml
+          +'<div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0);transition:background .2s" onmouseover="this.style.background=\'rgba(0,0,0,.4)\';this.querySelector(\'span\').style.opacity=\'1\'" onmouseout="this.style.background=\'rgba(0,0,0,0)\';this.querySelector(\'span\').style.opacity=\'0\'">'
+          +'<span style="color:#fff;font-size:11px;font-weight:700;opacity:0;background:rgba(0,0,0,.5);padding:4px 10px;border-radius:4px;transition:opacity .2s">사진 변경</span></div>'
+          +'<input type="file" accept="image/*" style="display:none" onchange="inspUploadPhoto(\''+proc.id+'\',\''+item.id+'\',this)"></label>'
+        :photoHtml;
+      var descHtml=(item.description||eMode)
+        ?'<div style="padding:8px 10px;font-size:15px;color:#4b5563;min-height:32px;border-top:1px solid #e5e7eb;line-height:1.5;outline:none;display:flex;align-items:center;justify-content:center;text-align:center"'+(eMode?' contenteditable="true" oninput="inspItemInput(\''+proc.id+'\',\''+item.id+'\',this,\'description\')"':'')+'>'+(item.description||'')+'</div>'
+        :'';
+      html+='<div style="border:1px solid #c8d3e0;border-radius:6px;overflow:hidden;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.06)">'
+        +delBtn
+        +'<div style="background:#374151;color:#fff;padding:7px 10px;font-size:15px;font-weight:700;line-height:1.4;min-height:32px;outline:none;display:flex;align-items:center;justify-content:center;text-align:center"'+(eMode?' contenteditable="true" oninput="inspItemInput(\''+proc.id+'\',\''+item.id+'\',this,\'name\')"':'')+'>'+esc(item.name||'항목명')+'</div>'
+        +photoWrap
+        +descHtml
+        +'</div>';
+    });
+    html+='</div>';
+  }
+  html+='</div>';
+
+  el.innerHTML=html;
+}
+
+/* ── main.js 연동 ── */
+window.inspSetEditable=function(on){
+  _editMode=on;
+  // 편집 모드 진입 시 _doc가 없으면 빈 doc으로 초기화해 편집 버튼 표시
+  if(on && !_doc) _doc=_emptyDoc();
+  render();
+};
+
+window.inspSaveDocData=function(){
+  // localStorage 사용 안 함 — 메모리 내 _doc 유지
+};
+
+window._inspSyncToDb=function(){
+  if(!_doc||!window.currentCarId) return Promise.reject(new Error('데이터 없음'));
+  return AIT_API.saveInspDoc(window.currentCarId,_doc);
+};
+
+// print_insp가 _doc에 접근할 수 있도록 참조 노출
+window._inspDocRef=function(){ return _doc; };
+
+window.inspLoadDoc=loadDoc;
+
+/* ── 공정 관리 ── */
+window.inspSelProc=function(id){ _procId=id; renderNav(); renderContent(); };
+
+window.inspAddProc=function(){
+  if(!_doc) return;
+  var cpRows=document.querySelectorAll('#cp-tbody tr.cp-child');
+  if(cpRows.length){
+    var seen={}, list=[];
+    for(var i=0;i<cpRows.length;i++){
+      var tr=cpRows[i];
+      var no=(tr.cells[0]?tr.cells[0].textContent.trim():'');
+      var nm=(tr.cells[2]?tr.cells[2].textContent.trim():'');
+      if(no && !seen[no]){ seen[no]=true; list.push({proc_no:no,proc_name:nm}); }
+    }
+    if(list.length){ _showCpPicker(list); return; }
+  }
+  /* CP 미로드시 수동 입력 */
+  var no=prompt('공정번호 입력 (예: 1공정)'); if(!no) return;
+  var nm=prompt('공정명 입력 (예: 바디+라이트가이드 조립)')||'';
+  _createProc(no.trim(),nm.trim());
+};
+
+function _showCpPicker(list){
+  var body=document.getElementById('insp-cp-picker-body');
+  if(!body) return;
+  var existing={};
+  (_doc.procs||[]).forEach(function(p){ existing[p.proc_no]=true; });
+  var html='';
+  list.forEach(function(item,idx){
+    var done=existing[item.proc_no];
+    html+='<div data-idx="'+idx+'"'+(done?' data-done="1"':'')
+      +' style="display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:6px;'
+      +'cursor:'+(done?'default':'pointer')+';background:'+(done?'#f3f4f6':'#fff')+';'
+      +'border:1px solid '+(done?'#e5e7eb':'#c8d3e0')+';margin-bottom:6px;opacity:'+(done?'0.5':'1')+'">'
+      +'<span style="background:#1e3264;color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:4px;white-space:nowrap;flex-shrink:0">'+esc(item.proc_no)+'</span>'
+      +'<span style="font-size:12px;font-weight:600;color:#374151;flex:1">'+esc(item.proc_name)+'</span>'
+      +(done?'<span style="font-size:10px;color:#9ca3af">추가됨</span>':'')
+      +'</div>';
+  });
+  body.innerHTML=html||'<div style="padding:20px;text-align:center;color:#9ca3af;font-size:12px">CP에 공정 데이터가 없습니다</div>';
+
+  // onclick 문자열 조합 대신 addEventListener — proc_no/proc_name 특수문자 무관하게 안전
+  body.querySelectorAll('[data-idx]:not([data-done])').forEach(function(el){
+    var item=list[parseInt(el.dataset.idx,10)];
+    el.addEventListener('mouseover',function(){ this.style.background='#eff6ff'; this.style.borderColor='#3b82f6'; });
+    el.addEventListener('mouseout', function(){ this.style.background='#fff';    this.style.borderColor='#c8d3e0'; });
+    el.addEventListener('click',function(){
+      document.getElementById('insp-cp-picker').classList.remove('open');
+      _createProc(item.proc_no,item.proc_name);
+    });
+  });
+
+  document.getElementById('insp-cp-picker').classList.add('open');
+}
+
+window.inspPickProc=function(no,nm){
+  document.getElementById('insp-cp-picker').classList.remove('open');
+  _createProc(no,nm);
+};
+
+function _createProc(no,nm){
+  var p={id:uid(),proc_no:no,proc_name:nm,proc_type:'일반공정',
+    car_models:carName(),part_no:_doc.part_no,part_name:_doc.part_name,items:[]};
+  _doc.procs.push(p); _procId=p.id; render();
+}
+
+window.inspDeleteProc=function(id){
+  if(!confirm('이 공정을 삭제하시겠습니까?')) return;
+  _doc.procs=_doc.procs.filter(function(p){return p.id!==id;});
+  _procId=_doc.procs.length?_doc.procs[0].id:null;
+  render();
+};
+
+/* ── 검사항목 관리 ── */
+var _addItemProcId=null;
+
+window.inspAddItem=function(procId){
+  _addItemProcId=procId;
+  var modal=document.getElementById('insp-item-modal');
+  var input=document.getElementById('insp-item-input');
+  if(!modal||!input) return;
+  input.value='';
+  modal.style.display='flex';
+  setTimeout(function(){ input.focus(); },50);
+};
+
+window.inspAddItemConfirm=function(){
+  var input=document.getElementById('insp-item-input');
+  var nm=(input?input.value:'').trim();
+  if(!nm){ if(input){ input.style.borderColor='#ef4444'; setTimeout(function(){ input.style.borderColor='#d1d5db'; },1000); } return; }
+  document.getElementById('insp-item-modal').style.display='none';
+  var proc=null;
+  for(var i=0;i<_doc.procs.length;i++){if(_doc.procs[i].id===_addItemProcId){proc=_doc.procs[i];break;}}
+  if(!proc) return;
+  proc.items.push({id:uid(),name:nm,description:'',photo:'',sort_order:proc.items.length});
+  renderContent();
+};
+
+window.inspAddItemCancel=function(){
+  document.getElementById('insp-item-modal').style.display='none';
+};
+
+window.inspDeleteItem=function(procId,itemId){
+  var proc=null;
+  for(var i=0;i<_doc.procs.length;i++){if(_doc.procs[i].id===procId){proc=_doc.procs[i];break;}}
+  if(!proc||!confirm('검사항목을 삭제하시겠습니까?')) return;
+  proc.items=proc.items.filter(function(it){return it.id!==itemId;});
+  renderContent();
+};
+
+window.inspUploadPhoto=function(procId,itemId,input){
+  var proc=null;
+  for(var i=0;i<_doc.procs.length;i++){if(_doc.procs[i].id===procId){proc=_doc.procs[i];break;}}
+  if(!proc) return;
+  var item=null;
+  for(var j=0;j<proc.items.length;j++){if(proc.items[j].id===itemId){item=proc.items[j];break;}}
+  if(!item) return;
+  var file=input.files[0]; if(!file) return;
+  compressImg(file,function(data){ item.photo=data; renderContent(); });
+};
+
+window.inspHdrInput=function(el,field){
+  var proc=null;
+  for(var i=0;i<_doc.procs.length;i++){if(_doc.procs[i].id===_procId){proc=_doc.procs[i];break;}}
+  if(!proc) return;
+  proc[field]=el.innerText.trim();
+  if(field==='part_no'||field==='part_name') _doc[field]=el.innerText.trim();
+};
+
+window.inspItemInput=function(procId,itemId,el,field){
+  var proc=null;
+  for(var i=0;i<_doc.procs.length;i++){if(_doc.procs[i].id===procId){proc=_doc.procs[i];break;}}
+  if(!proc) return;
+  var item=null;
+  for(var j=0;j<proc.items.length;j++){if(proc.items[j].id===itemId){item=proc.items[j];break;}}
+  if(!item) return;
+  item[field]=el.innerText.trim();
+};
+
+/* ── 초기화 ── */
+loadDoc();
+
+})();
+
+window.print_insp = async function() {
+  const carKey = document.getElementById('car-sel')?.value || '';
+  const car    = document.getElementById('car-sel')?.options[document.getElementById('car-sel')?.selectedIndex]?.text || '';
+  const rev    = document.getElementById('insp-rev-badge')?.textContent.trim() || '';
+  const revDate= document.getElementById('insp-rev-date')?.textContent.trim() || '';
+  const revNum = parseInt((rev || '').replace(/[^0-9]/g, '')) || 0;
+
+  // localStorage 대신 메모리 내 _doc 참조
+  const doc = window._inspDocRef ? window._inspDocRef() : null;
+  if (!doc || !doc.procs || !doc.procs.length) { alert('공정검사기준서 데이터가 없습니다.'); return; }
+
+  let authorSignUrl = '', authorName = '';
+  let reviewerSignUrl = '', reviewerName = '';
+  let approverSignUrl = '', approverName = '';
+  try {
+    const signs = await AIT_API.getRevisionSigns(window.currentCarId, 'insp');
+    const sigMap = {};
+    const maxSignRev = signs.length ? Math.max(...signs.map(s => parseInt(s.rev) || 0)) : revNum;
+    signs.filter(s => parseInt(s.rev) === maxSignRev).forEach(s => { sigMap[s.role] = s; });
+    const driveUrl = fid => (fid && typeof AIT_API.driveUrl === 'function') ? AIT_API.driveUrl(fid) : '';
+    authorSignUrl   = driveUrl(sigMap.author?.sign_file_id);   authorName   = sigMap.author?.signer_name   || '';
+    reviewerSignUrl = driveUrl(sigMap.reviewer?.sign_file_id); reviewerName = sigMap.reviewer?.signer_name || '';
+    approverSignUrl = driveUrl(sigMap.approver?.sign_file_id); approverName = sigMap.approver?.signer_name || '';
+  } catch(e) { console.warn('서명 로드 실패', e); }
+
+  const _signCell = (imgUrl, name) => {
+    const img = imgUrl ? `<img src="${imgUrl}" style="max-height:30px;max-width:56px;object-fit:contain;display:block;margin:0 auto" onerror="this.style.display='none'">` : '';
+    return (img || name) ? `<div style="font-size:8px;color:#374151;margin-bottom:2px">${name}</div>${img}` : '';
+  };
+
+  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+
+  function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  const headerHtml = `
+<table style="border:1.5px solid #1e3264;margin-bottom:4px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="width:70px;border-right:1px solid #7a90b8;padding:3px;text-align:center;vertical-align:middle">
+      <img src="${logoUrl}" style="height:28px;object-fit:contain" onerror="this.style.display='none'">
+    </td>
+    <td style="text-align:center;font-size:18px;font-weight:900;letter-spacing:6px;color:#1e3264;padding:5px 0">공 정 검 사 기 준 서</td>
+    <td style="width:190px;border-left:1px solid #7a90b8;padding:0">
+      <table style="width:100%;height:100%;border-collapse:collapse">
+        <tr>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">작성</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;border-right:1px solid rgba(255,255,255,.3);width:33%">검토</td>
+          <td style="background:#1e3264;color:#fff;font-size:8px;font-weight:700;text-align:center;padding:2px;width:34%">승인</td>
+        </tr>
+        <tr>
+          <td style="height:40px;border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(authorSignUrl, authorName)}</td>
+          <td style="border-right:1px solid #7a90b8;border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(reviewerSignUrl, reviewerName)}</td>
+          <td style="border-top:1px solid #7a90b8;text-align:center;vertical-align:middle;padding:2px">${_signCell(approverSignUrl, approverName)}</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>`;
+
+  const pagesHtml = doc.procs.map((proc, pi) => {
+    const isLast = pi === doc.procs.length - 1;
+    const items = proc.items || [];
+
+    const procMetaHtml = `
+<table style="border:1px solid #7a90b8;margin-bottom:6px;font-size:10px;width:100%;border-collapse:collapse">
+  <tr>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">차종</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;font-weight:700;color:#1e3264">${esc(proc.car_models || car)}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">품번</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-family:monospace">${esc(proc.part_no || doc.part_no || '')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">품명</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-weight:600">${esc(proc.part_name || doc.part_name || '')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">공정번호</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264;font-weight:700">${esc(proc.proc_no || '')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">공정명</td>
+    <td style="padding:3px 8px;border-right:1px solid #b8c4d8;color:#1e3264">${esc(proc.proc_name || '')}</td>
+    <td style="background:#1e3264;color:#fff;padding:3px 7px;white-space:nowrap;font-weight:700">구분</td>
+    <td style="padding:3px 8px;color:#1e3264">${esc(proc.proc_type || '일반공정')}</td>
+  </tr>
+</table>`;
+
+    const itemsGridHtml = items.length ? `
+<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;margin-bottom:8px">
+  ${items.map(item => `
+  <div style="border:1px solid #c8d3e0;border-radius:6px;overflow:hidden">
+    <div style="background:#374151;color:#fff;padding:6px 8px;font-size:10px;font-weight:700;min-height:28px;text-align:center">${esc(item.name || '항목명')}</div>
+    ${item.photo ? `<img src="${item.photo}" style="width:100%;max-height:160px;object-fit:contain;background:#f3f4f6;display:block">` : `<div style="width:100%;height:120px;background:#f3f4f6;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:10px">사진 없음</div>`}
+    ${item.description ? `<div style="padding:5px 8px;font-size:9px;color:#4b5563;border-top:1px solid #e5e7eb;line-height:1.5;text-align:center">${esc(item.description)}</div>` : ''}
+  </div>`).join('')}
+</div>` : `<div style="padding:20px;text-align:center;color:#9ca3af;font-size:11px;border:1px solid #e2e8f0;margin-bottom:8px">등록된 검사항목이 없습니다</div>`;
+
+    return `<div style="${isLast ? '' : 'page-break-after:always'}">
+${headerHtml}
+${procMetaHtml}
+<div style="background:#1e3264;color:#fff;padding:7px 12px;border-radius:4px 4px 0 0;font-weight:700;font-size:12px;margin-bottom:0">
+  ${esc(proc.proc_no)}${proc.proc_name ? ' (' + esc(proc.proc_name) + ')' : ''}  검사 포인트
+</div>
+<div style="border:1px solid #c8d3e0;border-top:none;padding:10px;border-radius:0 0 6px 6px;margin-bottom:4px">
+${itemsGridHtml}
+</div>
+</div>`;
+  }).join('\n');
+
+  const html = `<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8">
+<title>공정검사기준서 ${car}</title>
+<style>
+@page{size:A4 landscape;margin:7mm 9mm}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;color:#111827}
+table{border-collapse:collapse;width:100%}
+</style></head>
+<body>
+<div id="pset" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e3264;color:#fff;padding:6px 14px;display:flex;align-items:center;gap:10px;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.4)"><b style="margin-right:4px">🖨 인쇄 설정</b><label>여백 <select id="pm" style="font-size:11px;padding:2px 5px;border-radius:4px;color:#111"><option value="3mm">3mm 최소</option><option value="6mm">6mm 좁게</option><option value="10mm" selected>10mm 보통</option><option value="14mm">14mm 넓게</option><option value="18mm">18mm</option></select></label><label style="margin-left:6px">배율 <select id="ps" style="font-size:11px;padding:2px 5px;border-radius:4px;color:#111"><option value="100">100%</option><option value="95" selected>95%</option><option value="90">90%</option><option value="85">85%</option><option value="80">80%</option><option value="75">75%</option></select></label><button onclick="(function(){var m=document.getElementById('pm').value,s=parseInt(document.getElementById('ps').value,10),st=document.createElement('style');st.textContent='@page{size:A4 landscape;margin:'+m+'}body{zoom:'+(s/100)+'}';document.head.appendChild(st);document.getElementById('pset').style.display='none';document.getElementById('pss').style.display='none';setTimeout(function(){window.print();},200);})()" style="margin-left:8px;padding:4px 14px;background:#fff;color:#1e3264;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">인쇄</button><span style="margin-left:8px;font-size:10px;opacity:.65">※ 설정 바는 인쇄에서 제외됩니다</span></div><div id="pss" style="height:42px"></div>
+${pagesHtml}
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=1120,height=820');
+  if (!win) { alert('팝업 차단을 해제해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
+};

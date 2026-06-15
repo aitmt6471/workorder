@@ -1,0 +1,568 @@
+<!-- CP 탭 -->
+<div class="tab-toolbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">관리계획서</span>
+    <div style="width:1px;height:16px;background:var(--border)"></div>
+    <span id="cp-rev-badge" style="font-size:13px;font-weight:700;color:#111827">Rev. 0</span>
+    <span id="cp-rev-date" style="font-size:13px;color:#374151">개정일: -</span>
+    <button class="btn btn-ghost btn-sm" onclick="openRevModal('cp')">이력</button>
+  </div>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost btn-sm" onclick="cpExpandAll(true)">&#x25BC; 펼치기</button>
+  <button class="btn btn-ghost btn-sm" onclick="cpExpandAll(false)">&#x25B2; 접기</button>
+  <button class="btn btn-ghost btn-sm" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}cpResetToDefault();})()" style="color:#ef4444;border-color:rgba(239,68,68,.4)">&#x21BA; CP 초기화</button>
+  <button class="btn btn-ghost btn-sm edit-only" onclick="(function(){var pw=prompt('비밀번호를 입력하세요');if(pw!=='ait1234'){alert('비밀번호가 올바르지 않습니다.');return;}deleteEmptyCpRows();})()" style="color:#ef4444;border-color:rgba(239,68,68,.4)">&#x1F5D1; 빈 행 삭제</button>
+  <button class="btn btn-ghost btn-sm edit-only" onclick="addCpRow()">&#xFF0B; 항목 추가</button>
+  <button class="btn btn-ghost btn-sm edit-only" onclick="saveDocument('cp')">저장</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_cp && window.print_cp()">🖨 인쇄</button>
+  <button class="btn btn-ghost btn-sm" onclick="window.print_cp_gentex && window.print_cp_gentex()" style="color:#0f766e;border-color:rgba(15,118,110,.4)">🖨 영문인쇄</button>
+  <button class="btn btn-ghost btn-sm" id="cp-edit-btn" onclick="toggleTabEditMode('cp', this)">&#x270F; 편집 모드</button>
+</div>
+
+<!-- ── CP 메타 바 ── -->
+<div id="cp-meta-bar" style="background:#f8faff;border-bottom:2px solid #dce6f7;padding:7px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px">
+  <!-- 읽기모드: 단계 텍스트 -->
+  <span id="cp-stage-view" style="font-weight:700;color:#1e3264;font-size:12px;background:#edf3ff;border-radius:6px;padding:3px 10px"></span>
+  <!-- 편집모드: 라디오 -->
+  <div class="edit-only" style="display:flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--border);border-radius:6px;padding:3px 10px">
+    <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;font-weight:600">
+      <input type="radio" name="cp-stage" id="cp-stage-start" value="시작" style="accent-color:#1e3264" onchange="saveCpMetaOnChange()"> 시작
+    </label>
+    <span style="color:#d1d5db;margin:0 2px">|</span>
+    <label style="display:flex;align-items:center;gap:3px;cursor:pointer;font-size:11px;font-weight:600">
+      <input type="radio" name="cp-stage" id="cp-stage-mass" value="양산" style="accent-color:#1e3264" onchange="saveCpMetaOnChange()"> 양산
+    </label>
+  </div>
+  <span style="color:#d1d5db">|</span>
+  <span style="font-size:11px;color:#6b7280">라인명</span>
+  <span id="cp-meta-linename" contenteditable="false" oninput="saveCpMetaOnChange()"
+    style="font-weight:700;color:#1e3264;font-size:12px;min-width:20px;display:inline-block"></span>
+  <span style="color:#d1d5db">|</span>
+  <span style="font-size:11px;color:#6b7280">차종</span>
+  <span id="cp-meta-model" style="font-weight:700;color:#1e3264;font-size:12px"></span>
+  <span style="color:#d1d5db">|</span>
+  <span style="font-size:11px;color:#6b7280">품번</span>
+  <span id="cp-meta-partno" style="font-weight:700;color:#1e3264;font-size:12px;padding:1px 3px"></span>
+  <span style="color:#d1d5db">|</span>
+  <span style="font-size:11px;color:#6b7280">품명</span>
+  <span id="cp-meta-partname" style="font-weight:700;color:#1e3264;font-size:12px;padding:1px 3px"></span>
+  <button class="edit-only" onclick="openPartModal()" style="background:#fff;border:1px solid #d1d5db;border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;color:#6b7280;line-height:1.6">수정</button>
+  <div style="width:100%;display:flex;align-items:flex-start;gap:6px;padding-top:4px;border-top:1px solid #dce6f7;margin-top:2px">
+    <span style="font-size:11px;color:#6b7280;white-space:nowrap;padding-top:1px">CFT</span>
+    <span id="cp-cft-inline" style="font-size:11px;color:#374151;flex:1;line-height:1.6"></span>
+    <button class="edit-only" onclick="openCftModal()" style="background:#fff;border:1px solid #d1d5db;border-radius:4px;padding:1px 7px;font-size:11px;cursor:pointer;color:#6b7280;line-height:1.6;white-space:nowrap">수정</button>
+  </div>
+</div>
+
+<div style="padding:0 4px 16px">
+  <table id="cp-table" class="data-tbl" style="table-layout:fixed;width:100%">
+    <colgroup>
+      <col style="width:4.5%">   <!-- 공정번호 -->
+      <col style="width:7.5%">   <!-- 공정흐름도 -->
+      <col style="width:8%">     <!-- 공정명 -->
+      <col style="width:8%">     <!-- 설비명 -->
+      <col style="width:4%">     <!-- 특별특성 -->
+      <col style="width:3.5%">   <!-- F/PF -->
+      <col style="width:4.5%">   <!-- 관리항목구분 -->
+      <col style="width:10%">    <!-- 관리항목 -->
+      <col>                       <!-- 규격/관리기준 (flex) -->
+      <col style="width:6%">     <!-- 확인방법 -->
+      <col style="width:4%">     <!-- 주기 -->
+      <col style="width:8%">     <!-- 관리방안 -->
+      <col style="width:4.5%">   <!-- 관리주체 -->
+      <col style="width:9%">     <!-- 이상조치 -->
+      <col style="width:6%">     <!-- 비고 -->
+      <col class="edit-only" style="width:3%">  <!-- 삭제버튼 -->
+    </colgroup>
+    <thead>
+      <tr style="background:#1e3264;color:#fff;text-align:center;vertical-align:middle">
+        <th rowspan="2">공정번호</th>
+        <th style="font-size:10px;padding:2px 4px;border-bottom:1px solid rgba(255,255,255,.25)">공정흐름도</th>
+        <th rowspan="2">공정명</th>
+        <th rowspan="2">설비명</th>
+        <th rowspan="2">특별특성</th>
+        <th rowspan="2">F/PF</th>
+        <th rowspan="2">구분</th>
+        <th rowspan="2">관리항목</th>
+        <th rowspan="2">규격/관리기준</th>
+        <th rowspan="2">확인방법</th>
+        <th rowspan="2">주기</th>
+        <th rowspan="2">관리방안</th>
+        <th rowspan="2">관리주체</th>
+        <th rowspan="2">이상조치</th>
+        <th rowspan="2">비고</th>
+        <th class="edit-only" rowspan="2"></th>
+      </tr>
+      <tr style="background:#1e3264;color:#fff;text-align:center;vertical-align:middle">
+        <th style="padding:2px 0;font-size:9px">
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;justify-items:center">
+            <span>SUB</span><span>MAIN</span><span>외주</span>
+          </div>
+        </th>
+      </tr>
+    </thead>
+    <tbody id="cp-tbody">
+    </tbody>
+  </table>
+</div>
+
+<script>
+window.print_cp = async function() {
+  const paneEl   = document.getElementById('pane-cp');
+  const carSel   = document.getElementById('car-sel');
+  const carName  = carSel?.options[carSel?.selectedIndex]?.text || '';
+  const carId    = window.currentCarId;
+  const cpMeta   = typeof _cpMetaGet === 'function' ? (_cpMetaGet(carName) || {}) : {};
+
+  const stage    = paneEl?.querySelector('#cp-stage-view')?.textContent.trim()    || cpMeta.stage    || '시작';
+  const linename = paneEl?.querySelector('#cp-meta-linename')?.textContent.trim() || cpMeta.linename || '';
+  const carmodel = paneEl?.querySelector('#cp-meta-model')?.textContent.trim()    || carName;
+  const partno   = paneEl?.querySelector('#cp-meta-partno')?.textContent.trim()   || cpMeta.partno   || '';
+  const partname = paneEl?.querySelector('#cp-meta-partname')?.textContent.trim() || cpMeta.partname || '';
+  const revBadge = paneEl?.querySelector('#cp-rev-badge')?.textContent || '';
+  const revNum   = parseInt(revBadge.replace(/[^0-9]/g, '')) || 0;
+
+  const cftText = paneEl?.querySelector('#cp-cft-inline')?.textContent.trim() || '';
+
+  // ── DB 페치 ──────────────────────────────────────────
+  const [revisions, signs, cpRowsRaw, cpMetaDb] = await Promise.all([
+    AIT_API.getRevisions(carId, 'cp').catch(() => []),
+    AIT_API.getRevisionSigns(carId, 'cp').catch(() => []),
+    AIT_API.getCpRows(carId).catch(() => []),
+    AIT_API.getCpMeta(carId).catch(() => null)
+  ]);
+  const cpRows = (cpRowsRaw || []).filter(r => !r.is_deleted);
+
+  // CFT 배열 (DB 메타 우선, 캐시 fallback)
+  let cftArr = [];
+  try {
+    const cftSrc = cpMetaDb?.cft || cpMeta.cft;
+    cftArr = typeof cftSrc === 'string' ? JSON.parse(cftSrc) : (cftSrc || []);
+  } catch(e) {}
+
+  // 서명 맵: { rev → { author, reviewer, approver } }
+  const sigsByRev = {};
+  (signs || []).forEach(s => {
+    const rv = String(s.rev);
+    if (!sigsByRev[rv]) sigsByRev[rv] = {};
+    sigsByRev[rv][s.role] = s;
+  });
+  // 가장 최신 서명 rev를 결재란에 사용
+  const signedRevNums = Object.keys(sigsByRev).map(Number).filter(n => !isNaN(n));
+  const maxSignedRev = signedRevNums.length ? Math.max(...signedRevNums) : revNum;
+  const latestSigns = sigsByRev[String(maxSignedRev)] || sigsByRev[String(revNum)] || {};
+
+  const dUrl  = fid => (fid && typeof AIT_API.driveUrl === 'function') ? AIT_API.driveUrl(fid) : '';
+  const safe  = v   => (!v || v === 'null') ? '' : String(v);
+  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+
+  // ════════════════════════════════════════════════════
+  // 갑지 (A4 세로)
+  // ════════════════════════════════════════════════════
+  const stageBox = (label, val) =>
+    `<span style="display:inline-flex;align-items:center;gap:3px;margin-right:12px">
+       <span style="display:inline-block;width:10px;height:10px;border:1pt solid #000;text-align:center;line-height:10px;font-size:7pt">${stage===val?'■':''}</span>${label}
+     </span>`;
+
+  const signCell = sg => {
+    const img = sg?.sign_file_id
+      ? `<img src="${dUrl(sg.sign_file_id)}" style="max-height:28px;max-width:52px;object-fit:contain;display:block;margin:2px auto" onerror="this.style.display='none'">`
+      : '';
+    return `<div style="font-size:7pt;text-align:center;color:#374151">${sg?.signer_name||''}</div>${img}`;
+  };
+
+  const cftHtml = cftArr.length
+    ? cftArr.map(c=>`<div style="font-size:6pt;line-height:1.6">${safe(c.dept)} : ${safe(c.name)} ${safe(c.title)}</div>`).join('')
+    : (cftText ? `<div style="font-size:6pt">${cftText}</div>` : '');
+
+  // 개정이력 행 (오름차순: 최초→최신)
+  const revsSorted = [...(revisions||[])].sort((a,b)=>(a.rev||0)-(b.rev||0));
+  let revRows = revsSorted.map(r => {
+    const sg = sigsByRev[String(r.rev||0)] || {};
+    return `<tr>
+      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${r.rev_display || (r.rev===0||!r.rev?'-':r.rev)}</td>
+      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${safe(r.rev_date).substring(0,10)}</td>
+      <td style="border:0.5pt solid #000;padding:2px 8px;text-align:left">${safe(r.note)}</td>
+      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${sg.author?.signer_name||safe(r.author)}</td>
+      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${sg.reviewer?.signer_name||safe(r.reviewer)}</td>
+      <td style="border:0.5pt solid #000;padding:2px 4px;text-align:center">${sg.approver?.signer_name||safe(r.approver)}</td>
+    </tr>`;
+  });
+  while (revRows.length < 8) revRows.push(`<tr>
+    <td style="border:0.5pt solid #000;padding:3px">&nbsp;</td>
+    <td style="border:0.5pt solid #000"></td><td style="border:0.5pt solid #000"></td>
+    <td style="border:0.5pt solid #000"></td><td style="border:0.5pt solid #000"></td>
+    <td style="border:0.5pt solid #000"></td></tr>`);
+
+  const coverHtml = `
+<div style="width:210mm;min-height:297mm;padding:12mm 14mm;box-sizing:border-box;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:7pt;position:relative;page-break-after:always">
+  <table style="border-collapse:collapse;width:100%;margin-bottom:8px">
+    <tr>
+      <td style="width:72px;border:1pt solid #7a90b8;padding:4px;text-align:center;vertical-align:middle">
+        <img src="${logoUrl}" style="height:26px;object-fit:contain" onerror="this.style.display='none'">
+      </td>
+      <td style="border-top:1pt solid #7a90b8;border-bottom:1pt solid #7a90b8;text-align:center;font-size:16pt;font-weight:900;letter-spacing:6px;color:#1e3264;padding:6px">
+        관 리 계 획 서
+        <div style="font-size:8pt;font-weight:400;letter-spacing:2px;color:#6b7280;margin-top:2px">Control Plan</div>
+      </td>
+      <td style="width:160px;border:1pt solid #7a90b8;padding:0;vertical-align:top">
+        <table style="border-collapse:collapse;width:100%;height:100%">
+          <tr><td colspan="3" style="padding:2px 5px;font-size:6pt;color:#6b7280;border-bottom:0.5pt solid #d1d5db">관리계획서 번호</td></tr>
+          <tr><td colspan="3" style="padding:2px 5px;font-size:6pt;border-bottom:0.5pt solid #d1d5db">&nbsp;</td></tr>
+          <tr>
+            <td style="background:#1e3264;color:#fff;padding:2px;font-size:6pt;text-align:center;border-right:0.5pt solid rgba(255,255,255,.3);width:33%">작성</td>
+            <td style="background:#1e3264;color:#fff;padding:2px;font-size:6pt;text-align:center;border-right:0.5pt solid rgba(255,255,255,.3);width:33%">검토</td>
+            <td style="background:#1e3264;color:#fff;padding:2px;font-size:6pt;text-align:center;width:34%">승인</td>
+          </tr>
+          <tr>
+            <td style="padding:3px;border-right:0.5pt solid #d1d5db;border-top:0.5pt solid #d1d5db;text-align:center;vertical-align:middle;height:44px">${signCell(latestSigns.author)}</td>
+            <td style="padding:3px;border-right:0.5pt solid #d1d5db;border-top:0.5pt solid #d1d5db;text-align:center;vertical-align:middle">${signCell(latestSigns.reviewer)}</td>
+            <td style="padding:3px;border-top:0.5pt solid #d1d5db;text-align:center;vertical-align:middle">${signCell(latestSigns.approver)}</td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+
+  <table style="border-collapse:collapse;width:100%;margin-bottom:8px">
+    <colgroup><col style="width:12%"><col style="width:22%"><col style="width:12%"><col style="width:22%"><col style="width:12%"><col></colgroup>
+    <tr>
+      <td style="border:0.5pt solid #000;background:#FFFF99;font-weight:700;padding:3px 5px;text-align:center">단&nbsp;&nbsp;&nbsp;계</td>
+      <td colspan="5" style="border:0.5pt solid #000;padding:3px 10px">
+        ${stageBox('시작','시작')}${stageBox('양산','양산')}
+      </td>
+    </tr>
+    <tr>
+      <td style="border:0.5pt solid #000;background:#FFFF99;font-weight:700;padding:3px 5px;text-align:center">차&nbsp;&nbsp;&nbsp;종</td>
+      <td style="border:0.5pt solid #000;padding:3px 8px">${carmodel}</td>
+      <td style="border:0.5pt solid #000;background:#FFFF99;font-weight:700;padding:3px 5px;text-align:center">품&nbsp;&nbsp;&nbsp;명</td>
+      <td style="border:0.5pt solid #000;padding:3px 8px">${partname}</td>
+      <td style="border:0.5pt solid #000;background:#FFFF99;font-weight:700;padding:3px 5px;text-align:center">품&nbsp;&nbsp;&nbsp;번</td>
+      <td style="border:0.5pt solid #000;padding:3px 8px">${partno}</td>
+    </tr>
+    <tr>
+      <td style="border:0.5pt solid #000;background:#FFFF99;font-weight:700;padding:3px 5px;text-align:center">라인명</td>
+      <td style="border:0.5pt solid #000;padding:3px 8px">${linename}</td>
+      <td style="border:0.5pt solid #000;background:#FFFF99;font-weight:700;padding:3px 5px;text-align:center;font-size:6pt">상호기능원<br>(CFT)</td>
+      <td colspan="3" style="border:0.5pt solid #000;padding:3px 8px">${cftHtml}</td>
+    </tr>
+    <tr>
+      <td style="border:0.5pt solid #000;background:#FFFF99;font-weight:700;padding:3px 5px;text-align:center">업체코드</td>
+      <td style="border:0.5pt solid #000;padding:3px 8px">#AIT</td>
+      <td style="border:0.5pt solid #000;background:#FFFF99;font-weight:700;padding:3px 5px;text-align:center;font-size:6pt">고객기술승인</td>
+      <td style="border:0.5pt solid #000;padding:3px 8px"></td>
+      <td style="border:0.5pt solid #000;background:#FFFF99;font-weight:700;padding:3px 5px;text-align:center">기타승인</td>
+      <td style="border:0.5pt solid #000;padding:3px 8px"></td>
+    </tr>
+  </table>
+
+  <div style="font-weight:700;font-size:7.5pt;margin:8px 0 3px;color:#1e3264">▶ 개정 이력</div>
+  <table style="border-collapse:collapse;width:100%">
+    <colgroup><col style="width:8%"><col style="width:14%"><col><col style="width:10%"><col style="width:10%"><col style="width:10%"></colgroup>
+    <tr>
+      <th style="border:0.5pt solid #000;background:#FFFF99;padding:3px;text-align:center">개정번호</th>
+      <th style="border:0.5pt solid #000;background:#FFFF99;padding:3px;text-align:center">개정일자</th>
+      <th style="border:0.5pt solid #000;background:#FFFF99;padding:3px;text-align:center">개 정 사 유</th>
+      <th style="border:0.5pt solid #000;background:#FFFF99;padding:3px;text-align:center">작&nbsp;성</th>
+      <th style="border:0.5pt solid #000;background:#FFFF99;padding:3px;text-align:center">검&nbsp;토</th>
+      <th style="border:0.5pt solid #000;background:#FFFF99;padding:3px;text-align:center">승&nbsp;인</th>
+    </tr>
+    ${revRows.join('')}
+  </table>
+  <div style="position:absolute;bottom:12mm;right:14mm;font-size:6pt;color:#9ca3af">보존년한 : 영구</div>
+</div>`;
+
+  // ════════════════════════════════════════════════════
+  // 본문 (A4 가로) — DB rows → rowspan 그룹핑
+  // ════════════════════════════════════════════════════
+  cpRows.sort((a,b)=>{
+    const pa=parseFloat(a.proc_no)||0, pb=parseFloat(b.proc_no)||0;
+    return pa!==pb ? pa-pb : (a.sort_order||0)-(b.sort_order||0);
+  });
+
+  const procGroups=[];
+  let curProc=null;
+  for(const row of cpRows){
+    if(row.proc_no!==curProc){ procGroups.push({proc_no:row.proc_no,rows:[],equipGroups:[]}); curProc=row.proc_no; }
+    procGroups[procGroups.length-1].rows.push(row);
+  }
+  for(const pg of procGroups){
+    let curEq=Symbol();
+    for(const row of pg.rows){
+      const eq=safe(row.equip_name);
+      if(eq!==curEq){ pg.equipGroups.push({equip:eq,rows:[]}); curEq=eq; }
+      pg.equipGroups[pg.equipGroups.length-1].rows.push(row);
+    }
+  }
+
+  const B='border:0.5pt solid #000;';
+  const tableRows=[];
+  for(const pg of procGroups){
+    const total=pg.rows.length;
+    let pDone=false, itemNo=1;
+    for(const eg of pg.equipGroups){
+      const eqRS=eg.rows.length; let eDone=false;
+      for(const row of eg.rows){
+        let h='<tr>';
+        if(!pDone){
+          const pname = safe(row.proc_name);
+          const isInsp = pname.includes('수입검사') || pname.includes('출하검사');
+          const subSym  = !isInsp && row.flow_sub ? '◇' : '';
+          const mainSym = isInsp ? '◇' : (row.flow_main ? (row.flow_outsource ? '△' : '○') : '');
+          const outSym  = !isInsp && row.flow_outsource && !row.flow_main ? '△' : '';
+          h+=`<td rowspan="${total}" style="${B}text-align:center;font-weight:700;font-size:6.5pt;vertical-align:middle">${safe(row.proc_no)}</td>`;
+          h+=`<td rowspan="${total}" style="${B}text-align:center;font-size:9pt;vertical-align:middle">${subSym}</td>`;
+          h+=`<td rowspan="${total}" style="${B}text-align:center;font-size:9pt;vertical-align:middle">${mainSym}</td>`;
+          h+=`<td rowspan="${total}" style="${B}text-align:center;font-size:9pt;vertical-align:middle">${outSym}</td>`;
+          h+=`<td rowspan="${total}" style="${B}text-align:left;padding:1px 3px;font-size:5.5pt;vertical-align:middle">${pname}</td>`;
+          pDone=true;
+        }
+        if(!eDone){
+          h+=`<td rowspan="${eqRS}" style="${B}text-align:left;padding:1px 3px;font-size:5.5pt;vertical-align:middle">${safe(row.equip_name)}</td>`;
+          eDone=true;
+        }
+        const cat=safe(row.ctrl_category), item=safe(row.ctrl_item);
+        const owner=safe(row.owner);
+        const fpfRaw=safe(row.char_general)||safe(row.fpf)||'';
+        const fpfMark=(fpfRaw==='1'||fpfRaw==='true'||fpfRaw==='Y')?'●':
+                      (fpfRaw&&fpfRaw!=='-'&&fpfRaw!=='—'&&fpfRaw!=='null')?fpfRaw:'';
+        h+=`<td style="${B}text-align:center;font-size:5.5pt;vertical-align:middle">${itemNo}</td>`;
+        h+=`<td style="${B}text-align:left;padding:1px 3px;font-size:5.5pt;vertical-align:middle">${cat==='제품'?item:''}</td>`;
+        h+=`<td style="${B}text-align:left;padding:1px 3px;font-size:5.5pt;vertical-align:middle">${cat==='공정'?item:''}</td>`;
+        h+=`<td style="${B}text-align:center;font-size:8pt;vertical-align:middle">${fpfMark}</td>`;
+        h+=`<td style="${B}text-align:left;padding:1px 3px;font-size:5.5pt;vertical-align:middle">${safe(row.standard)}</td>`;
+        h+=`<td style="${B}text-align:center;font-size:5.5pt;vertical-align:middle">${safe(row.tool)}</td>`;
+        h+=`<td style="${B}text-align:center;font-size:5.5pt;vertical-align:middle">${safe(row.sample_freq)}</td>`;
+        h+=`<td style="${B}text-align:center;font-size:5.5pt;vertical-align:middle">${safe(row.ctrl_method)}</td>`;
+        h+=`<td style="${B}text-align:center;font-size:9pt;vertical-align:middle">${owner.includes('생산')?'●':''}</td>`;
+        h+=`<td style="${B}text-align:center;font-size:9pt;vertical-align:middle">${owner.includes('자재')?'●':''}</td>`;
+        h+=`<td style="${B}text-align:center;font-size:9pt;vertical-align:middle">${owner.includes('품질')?'●':''}</td>`;
+        h+=`<td style="${B}text-align:left;padding:1px 3px;font-size:5.5pt;vertical-align:middle">${safe(row.reaction_plan)}</td>`;
+        h+=`<td style="${B}text-align:left;padding:1px 3px;font-size:5.5pt;vertical-align:middle">${safe(row.linked_doc)}</td>`;
+        h+='</tr>';
+        tableRows.push(h); itemNo++;
+      }
+    }
+  }
+
+  // ── 본문 헤더용 통합 개정이력 구조 (10.png 단일 테이블 방식) ──
+  const nRevData = Math.max(revsSorted.length, 6);
+  const bodyRevData = [...revsSorted];
+  while (bodyRevData.length < nRevData) bodyRevData.push(null);
+  // 단계·서명 셀 rowspan = 차종헤더행(1) + 개정이력행(nRevData) — CFT는 행 안에 포함
+  const hdrRowspan = nRevData + 1;
+
+  // 시작/양산 선택 표시 (원형 마커)
+  const stageCircle = (label, val) =>
+    `<div style="display:flex;align-items:center;gap:2px;margin:1px 0">
+       <span style="display:inline-block;width:9px;height:9px;border-radius:50%;border:0.8pt solid #000;background:${stage===val?'#000':'transparent'};flex-shrink:0"></span>
+       <span style="font-size:5pt">${label}</span>
+     </div>`;
+
+  // 개정이력 td 셀만 생성 (tr 없이)
+  const mkRevCells = r => {
+    if (!r) return `<td style="${B}padding:2px">&nbsp;</td><td style="${B}"></td><td style="${B}"></td><td style="${B}"></td><td style="${B}"></td><td style="${B}"></td>`;
+    const sg = sigsByRev[String(r.rev||0)] || {};
+    return `<td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${r.rev_display||(r.rev===0?'0':r.rev||'-')}</td>
+      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${safe(r.rev_date).substring(0,10)}</td>
+      <td style="${B}text-align:left;padding:1px 4px;font-size:5pt">${safe(r.note)}</td>
+      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.author?.signer_name||safe(r.author)}</td>
+      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.reviewer?.signer_name||safe(r.reviewer)}</td>
+      <td style="${B}text-align:center;padding:1px 2px;font-size:5pt">${sg.approver?.signer_name||safe(r.approver)}</td>`;
+  };
+
+  // 각 행: 왼쪽 메타 셀 + 오른쪽 개정이력 셀
+  // i=0: 부품명/품명, i=1: 부번/품번, i=2: 상호기능원(CFT, rowspan으로 나머지 행 합치기), i=3+: 메타 셀 없음(CFT span)
+  const cftRowspan = Math.max(1, nRevData - 2);
+  const bodyRevTrs = bodyRevData.map((r, i) => {
+    let metaCells = '';
+    if (i === 0) {
+      metaCells = `<td style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">부품명/품명</td>
+        <td style="${B}font-size:5.5pt;padding:2px 4px">${partname}</td>`;
+    } else if (i === 1) {
+      metaCells = `<td style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">부번/품번</td>
+        <td style="${B}font-size:5.5pt;padding:2px 4px">${partno}</td>`;
+    } else if (i === 2) {
+      metaCells = `<td rowspan="${cftRowspan}" style="${B}background:#FFFF99;font-weight:700;font-size:4.5pt;text-align:center;padding:2px;line-height:1.3;vertical-align:middle">상호기능원<br>(CFT)</td>
+        <td rowspan="${cftRowspan}" style="${B}font-size:4pt;padding:3px 5px;vertical-align:top;line-height:1.6">${cftHtml||''}</td>`;
+    }
+    // i >= 3: 메타 셀 없음 — CFT rowspan이 커버
+    return `<tr>${metaCells}${mkRevCells(r)}</tr>`;
+  });
+
+  const latestRev = revsSorted.length ? revsSorted[revsSorted.length - 1] : null;
+
+  // 본문 헤더 결재란 전용 — 서명 이미지·이름이 칸 크기에 맞춰 자동 축소 (14.png 양식)
+  // 헤더(작성/검토/승인) + 서명 영역이 블록 바닥까지 채워지는 1열 (빈칸 없이 세로 합침)
+  const signCol = (sg, label, last) => {
+    const img = sg?.sign_file_id
+      ? `<img src="${dUrl(sg.sign_file_id)}" style="flex:1 1 auto;min-height:0;width:auto;height:auto;max-width:94%;max-height:100%;object-fit:contain" onerror="this.style.display='none'">`
+      : '';
+    const name = sg?.signer_name
+      ? `<div style="flex:0 0 auto;font-size:5.5pt;line-height:1.2;text-align:center;color:#111;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%">${sg.signer_name}</div>`
+      : '';
+    return `<div style="flex:1 1 0;min-width:0;display:flex;flex-direction:column;${last?'':'border-right:0.5pt solid #000;'}">
+        <div style="flex:0 0 auto;background:#fff;color:#000;font-weight:700;text-align:center;padding:1px;font-size:5.5pt;border-bottom:0.5pt solid #000;overflow:hidden">${label}</div>
+        <div style="flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:1px">${name}${img}</div>
+      </div>`;
+  };
+
+  const bodyHtml = `
+<div style="padding:8mm 10mm;font-family:'Malgun Gothic','맑은 고딕',sans-serif;font-size:7pt">
+
+  <!-- ▶ 제목 -->
+  <div style="text-align:center;font-size:12pt;font-weight:900;letter-spacing:4px;padding:3px 0;border:0.5pt solid #000;border-bottom:none">
+    관 리 계 획 서 &nbsp;(Control Plan)
+  </div>
+
+  <!-- ▶ 단일 통합 헤더 테이블 (10.png 구조) -->
+  <table style="border-collapse:collapse;width:100%;border:0.5pt solid #000;border-top:none;margin-bottom:2px">
+    <colgroup>
+      <col style="width:4%">    <!-- 단계 label -->
+      <col style="width:8%">    <!-- 차종/부품명/부번 label -->
+      <col style="width:11%">   <!-- 차종/부품명/부번 value -->
+      <col style="width:3.5%">  <!-- NO -->
+      <col style="width:9%">    <!-- 개정일자 -->
+      <col>                     <!-- 개정사유 (flex) -->
+      <col style="width:7%">    <!-- 작성 -->
+      <col style="width:7%">    <!-- 검토 -->
+      <col style="width:7%">    <!-- 승인 -->
+      <col style="width:22%">   <!-- 제정일자+결재 -->
+    </colgroup>
+
+    <!-- 행1: 단계(rowspan전체) | 차종 | 개정이력 헤더 | 서명(rowspan전체) -->
+    <tr>
+      <td rowspan="${hdrRowspan}" style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;vertical-align:middle;padding:3px 2px">
+        단<br>계
+        <div style="margin-top:6px">
+          ${stageCircle('시작','시작')}
+          ${stageCircle('양산','양산')}
+        </div>
+      </td>
+      <td style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">차&nbsp;&nbsp;종</td>
+      <td style="${B}font-size:5.5pt;padding:2px 4px">${carmodel}</td>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">NO</th>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">개 정 일 자</th>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">개 정 사 유</th>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">작성</th>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">검토</th>
+      <th style="${B}background:#FFFF99;font-size:5pt;padding:2px;text-align:center">승인</th>
+      <td rowspan="${hdrRowspan}" style="${B}padding:0;position:relative">
+        <!-- 절대배치 flex 컨테이너: 헤더 블록 전체 높이를 꽉 채움 (빈칸 없음) -->
+        <div style="position:absolute;top:0;left:0;right:0;bottom:0;display:flex;flex-direction:column;overflow:hidden">
+          <!-- 제정일자 행 (14.png: 빨간 글씨, 좌측 정렬) -->
+          <div style="flex:0 0 auto;border-bottom:0.5pt solid #000;padding:1px 6px;font-size:5.5pt;font-weight:700;color:#c00000;text-align:left;white-space:nowrap;overflow:hidden">
+            제정일자 : ${revsSorted.length ? safe(revsSorted[0].rev_date).substring(0,10) : ''}
+          </div>
+          <!-- 결재 라벨 + 작성/검토/승인 (바닥까지 세로로 합쳐진 칸) -->
+          <div style="flex:1 1 auto;min-height:0;display:flex">
+            <div style="flex:0 0 13%;border-right:0.5pt solid #000;display:flex;align-items:center;justify-content:center;text-align:center;font-size:6.5pt;font-weight:700;letter-spacing:2px;line-height:1.5">결<br>재</div>
+            ${signCol(latestSigns.author||(latestRev?{signer_name:safe(latestRev.author)}:null),'작&nbsp;성',false)}
+            ${signCol(latestSigns.reviewer||(latestRev?{signer_name:safe(latestRev.reviewer)}:null),'검&nbsp;토',false)}
+            ${signCol(latestSigns.approver||(latestRev?{signer_name:safe(latestRev.approver)}:null),'승&nbsp;인',true)}
+          </div>
+        </div>
+      </td>
+    </tr>
+
+    <!-- 행2+: 부품명/부번/CFT/빈셀 + 개정이력 데이터 -->
+    ${bodyRevTrs.join('')}
+  </table>
+
+  <!-- 업체코드 / 고객기술승인 / 관리기준 행 -->
+  <table style="border-collapse:collapse;width:100%;margin-bottom:0">
+    <tr>
+      <td style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px;width:8%">업체코드</td>
+      <td style="${B}font-size:5.5pt;text-align:center;padding:2px;width:7%">#4498</td>
+      <td style="${B}background:#FFFF99;font-weight:700;font-size:4.8pt;text-align:center;padding:2px;width:14%">고객 기술 승인/일자(요구시)</td>
+      <td style="${B}font-size:5.5pt;padding:2px;width:9%"></td>
+      <td style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px;width:7%">대상여부</td>
+      <td colspan="2" style="${B}background:#FFFF99;font-weight:700;font-size:5.5pt;text-align:center;padding:2px">관 &nbsp; 리 &nbsp; 기 &nbsp; 준</td>
+      <td style="${B}background:#FFFF99;font-weight:700;font-size:4.8pt;text-align:center;padding:2px;width:13%">기타 승인/일자(요구시)</td>
+    </tr>
+  </table>
+
+  <!-- CP 테이블 -->
+  <table style="border-collapse:collapse;width:100%">
+    <colgroup>
+      <col style="width:3%"><col style="width:2%"><col style="width:2%"><col style="width:2%">
+      <col style="width:8%"><col style="width:7%"><col style="width:2%">
+      <col style="width:7%"><col style="width:7%"><col style="width:2.5%">
+      <col style="width:10%"><col style="width:5.5%"><col style="width:4%"><col style="width:7%">
+      <col style="width:2.5%"><col style="width:2.5%"><col style="width:2.5%">
+      <col style="width:9%"><col style="width:5%">
+    </colgroup>
+    <thead>
+      <tr style="background:#FFFF99;text-align:center;vertical-align:middle">
+        <th rowspan="2" style="${B}padding:2px;font-size:6pt">공정<br>번호</th>
+        <th colspan="3" style="${B}padding:2px;font-size:6pt">공정흐름도</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:6pt">공 정 명</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:6pt">설 비 명</th>
+        <th colspan="3" style="${B}padding:2px;font-size:6pt">관 리 항 목</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:5.5pt">F/PF<br>특별<br>특성</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:6pt">규&nbsp;&nbsp;&nbsp;&nbsp;격</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:6pt">확인방법</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:6pt">주기</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:6pt">관리방안</th>
+        <th colspan="3" style="${B}padding:2px;font-size:6pt">관리분담</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:5.5pt">이상발생<br>조치사항</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:6pt">비고</th>
+      </tr>
+      <tr style="background:#FFFF99;text-align:center;vertical-align:middle">
+        <th style="${B}padding:2px;font-size:6pt">SUB</th><th style="${B}padding:2px;font-size:6pt">MAIN</th><th style="${B}padding:2px;font-size:6pt">외주</th>
+        <th style="${B}padding:2px;font-size:6pt">NO</th><th style="${B}padding:2px;font-size:6pt">제&nbsp;품</th><th style="${B}padding:2px;font-size:6pt">공&nbsp;정</th>
+        <th style="${B}padding:2px;font-size:6pt">생산</th><th style="${B}padding:2px;font-size:6pt">자재</th><th style="${B}padding:2px;font-size:6pt">품질</th>
+      </tr>
+    </thead>
+    <tbody>${tableRows.join('')}</tbody>
+  </table>
+</div>`;
+
+  // ── 팝업 오픈 ─────────────────────────────────────────
+  const html = `<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>관리계획서 ${carName}</title>
+<style>
+@page :first { size: A4 portrait;  margin: 0; }
+@page         { size: A4 landscape; margin: 0; }
+* { box-sizing:border-box; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+body { font-family:'Malgun Gothic','맑은 고딕',sans-serif; margin:0; background:#f0f0f0; }
+#pset { position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e3264;color:#fff;
+  padding:6px 14px;display:flex;align-items:center;gap:10px;font-size:11px;box-shadow:0 2px 8px rgba(0,0,0,.4); }
+#pset select { font-size:11px;padding:2px 5px;border-radius:4px;color:#111; }
+#pset button { padding:4px 14px;background:#4ade80;color:#0f172a;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer; }
+.ps { height:42px; }
+@media print {
+  #pset,.ps { display:none!important; }
+  body { background:#fff; }
+}
+</style>
+</head>
+<body>
+<div id="pset">
+  <b>🖨 관리계획서 인쇄</b>
+  <label>본문 배율
+    <select id="scl" onchange="document.getElementById('body-wrap').style.zoom=(this.value/100)">
+      <option value="100">100%</option><option value="95" selected>95%</option>
+      <option value="90">90%</option><option value="85">85%</option><option value="80">80%</option>
+    </select>
+  </label>
+  <button onclick="window.print()">인쇄</button>
+  <span style="font-size:10px;opacity:.65">※ 이 바는 인쇄에서 제외됩니다</span>
+</div>
+<div class="ps"></div>
+
+${coverHtml}
+<div id="body-wrap" style="zoom:.95">${bodyHtml}</div>
+
+</body>
+</html>`;
+
+  const win = window.open('', '_blank', 'width=1200,height=900');
+  if (!win) { alert('팝업 차단을 해제해주세요.'); return; }
+  win.document.write(html);
+  win.document.close();
+};
+</script>
