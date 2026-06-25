@@ -157,7 +157,20 @@ const VAPID_PUBLIC='BLimlNDe_M60ZFhJ-rUIp3ohwrJEmCNk7EVv8vyehWXkapqOMI6bnvKo2MXg
 function _b64ToU8(s){ const pad='='.repeat((4-s.length%4)%4); const b=(s+pad).replace(/-/g,'+').replace(/_/g,'/'); const raw=atob(b); return Uint8Array.from([...raw].map(c=>c.charCodeAt(0))); }
 async function enablePush(){
   try{
-    if(!('serviceWorker' in navigator) || !('PushManager' in window)){ alert('이 기기/브라우저는 푸시를 지원하지 않습니다.'); return; }
+    const ua=navigator.userAgent||'';
+    const isIOS=/iPad|iPhone|iPod/.test(ua);
+    const iOSChrome=isIOS && /CriOS|FxiOS|EdgiOS|OPiOS/.test(ua);
+    const standalone=(window.navigator.standalone===true)||(window.matchMedia&&matchMedia('(display-mode: standalone)').matches);
+    if(!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)){
+      if(iOSChrome){
+        alert('아이폰은 크롬에서 알림이 지원되지 않아요.\n\n① 이 주소를 "Safari"로 다시 열기\n② Safari 하단 공유(□↑) → "홈 화면에 추가"\n③ 홈 화면 아이콘으로 열어 "🔔 알림 켜기"\n\n(iOS는 Safari로 설치한 앱에서만 알림 가능, iOS 16.4+)');
+      } else if(isIOS && !standalone){
+        alert('아이폰은 Safari 탭에서는 알림을 켤 수 없어요.\n\n① Safari 하단 공유(□↑) → "홈 화면에 추가"\n② 홈 화면 아이콘으로 다시 열기\n③ 그 화면에서 "🔔 알림 켜기"\n\n(iOS 16.4 이상 필요)');
+      } else {
+        alert('이 기기/브라우저는 푸시를 지원하지 않습니다.');
+      }
+      return;
+    }
     const perm=await Notification.requestPermission();
     if(perm!=='granted'){ alert('알림 권한이 허용되지 않았습니다.'); return; }
     const reg=await navigator.serviceWorker.ready;
