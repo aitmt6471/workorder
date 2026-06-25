@@ -153,6 +153,7 @@ const AIT_API = (() => {
     deleteShipRequestItem: (item_id, request_id)    => _del('ait/spec/ship-request/item', { item_id, request_id }),
     getShipLines:          ()                       => _get('ait/spec/ship-lines'),
     getPartLocations:      (parts)                  => _get('ait/spec/part-locations', { parts: (parts || []).join(',') }),
+    savePushSubscription:  (data)                   => _post('ait/spec/push-subscribe', data),
 
     /* ── 작업표준서 ────────────────────────────── */
     getWsProcesses:   (carId)   => _get('ait/ws/processes', { carId }),
@@ -392,6 +393,7 @@ const AIT_API = (() => {
     deleteShipRequestItem: (item_id, request_id)    => _real.deleteShipRequestItem(item_id, request_id),
     getShipLines:          ()                       => _real.getShipLines(),
     getPartLocations:      (parts)                  => _real.getPartLocations(parts),
+    savePushSubscription:  (data)                   => _real.savePushSubscription(data),
     numCircle
   };
 })();

@@ -2,8 +2,16 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>출고요청 현황 — 자재팀</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1e3264">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="출고요청">
 <style>
   *{box-sizing:border-box;font-family:'Malgun Gothic','맑은 고딕',-apple-system,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
@@ -41,6 +49,16 @@
   .ptbl thead th{background:#1e3264;color:#fff;position:sticky;top:0;z-index:6;border-color:#e5e7eb}
   .box-tag{display:inline-block;font-size:13px;color:#1d4ed8;font-weight:800;margin-top:3px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:1px 7px}
   .cell-time{font-size:11px;color:#64748b;font-weight:600;margin-top:3px;white-space:nowrap}
+  /* 타임 슬롯 탭바 + 단일 슬롯 표 */
+  .slotbar{display:flex;gap:6px;padding:8px;flex-wrap:wrap;background:#eef2f7;position:sticky;top:0;z-index:7}
+  .slotbtn{flex:1;min-width:64px;padding:11px 6px;border:1.5px solid #cbd5e1;border-radius:9px;background:#fff;color:#64748b;font-weight:800;font-size:15px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px}
+  .slotn{font-size:12px;background:rgba(0,0,0,.08);border-radius:999px;padding:0 6px;min-width:18px;line-height:18px}
+  .slotbtn.on .slotn{background:rgba(255,255,255,.28)}
+  .ptbl2{width:100%;border-collapse:separate;border-spacing:0;background:#fff;font-size:16px}
+  .ptbl2 th,.ptbl2 td{border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:9px 8px;text-align:center;vertical-align:top}
+  .ptbl2 thead th{background:#1e3264;color:#fff;font-size:15px}
+  .ptbl2 .pcol2{text-align:left;cursor:pointer}
+  .ptbl2 .pno2{font-family:ui-monospace,monospace;font-weight:800;color:#1e3264;font-size:18px}
   .ptbl .box-tag{font-size:12px;margin-top:3px}
   .ptbl thead th.nocol{left:0;z-index:7}
   .ptbl thead th.pcol-h{left:42px;z-index:7;text-align:left}
@@ -105,6 +123,7 @@
     <span class="pill" id="sum">-</span>
     <div style="flex:1"></div>
     <label><input type="checkbox" id="f-auto" checked> 자동새로고침</label>
+    <button id="btn-push" onclick="enablePush()" style="font-size:15px;padding:6px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.12);color:#fff;font-weight:700;cursor:pointer">🔔 알림 켜기</button>
     <button onclick="reload()" style="font-size:17px;padding:6px 14px;border-radius:6px;border:none;background:#16a34a;color:#fff;font-weight:700;cursor:pointer">새로고침</button>
   </div>
   <div id="tabs">
@@ -133,6 +152,30 @@
 <script src="js/api.js"></script>
 <script>
 'use strict';
+if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+const VAPID_PUBLIC='BLimlNDe_M60ZFhJ-rUIp3ohwrJEmCNk7EVv8vyehWXkapqOMI6bnvKo2MXgrqnzt1otM41XumWWZFthT8JUNbE';
+function _b64ToU8(s){ const pad='='.repeat((4-s.length%4)%4); const b=(s+pad).replace(/-/g,'+').replace(/_/g,'/'); const raw=atob(b); return Uint8Array.from([...raw].map(c=>c.charCodeAt(0))); }
+async function enablePush(){
+  try{
+    if(!('serviceWorker' in navigator) || !('PushManager' in window)){ alert('이 기기/브라우저는 푸시를 지원하지 않습니다.'); return; }
+    const perm=await Notification.requestPermission();
+    if(perm!=='granted'){ alert('알림 권한이 허용되지 않았습니다.'); return; }
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub){ sub=await reg.pushManager.subscribe({userVisibleOnly:true, applicationServerKey:_b64ToU8(VAPID_PUBLIC)}); }
+    const j=sub.toJSON();
+    await AIT_API.savePushSubscription({ endpoint:j.endpoint, keys:j.keys, ua:navigator.userAgent });
+    const b=document.getElementById('btn-push'); if(b){ b.textContent='🔔 알림 켜짐'; b.style.background='rgba(34,197,94,.85)'; b.style.borderColor='transparent'; }
+    toast('알림이 켜졌습니다');
+  }catch(e){ alert('알림 설정 실패: '+(e&&e.message||e)); }
+}
+async function _refreshPushBtn(){
+  try{
+    if(!('serviceWorker' in navigator)||Notification.permission!=='granted') return;
+    const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.getSubscription();
+    if(sub){ const b=document.getElementById('btn-push'); if(b){ b.textContent='🔔 알림 켜짐'; b.style.background='rgba(34,197,94,.85)'; b.style.borderColor='transparent'; } }
+  }catch(_){}
+}
 const TS_LABEL={A:'A(09-11)',B:'B(11-13)',C:'C(14-16)',D:'D(16-18)'};
 // 타임슬롯별 색상: h=헤더/강조, t=셀 배경 틴트, c=수량 글자색
 const SLOT_COLORS={
@@ -143,7 +186,7 @@ const SLOT_COLORS={
   '기타':{h:'#64748b',t:'#f8fafc',c:'#475569'}
 };
 const ST={requested:{t:'요청',bg:'#e5e7eb',c:'#374151'},confirmed:{t:'확인',bg:'#dbeafe',c:'#1e40af'},done:{t:'완료',bg:'#dcfce7',c:'#166534'}};
-let _timer=null, _busy=false, _rows=[], _tab='part', _locMap={};
+let _timer=null, _busy=false, _rows=[], _tab='part', _locMap={}, _slot='';
 function fmtQty(n){ n=Math.round(Number(n)*1000)/1000; return n.toLocaleString('en-US',{maximumFractionDigits:3}); }
 function esc1(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 function locTag(pn){ const o=_locMap[pn]; return (o&&o.loc)?`<div class="loc-tag">📍 ${o.loc}</div>`:''; }
@@ -304,65 +347,68 @@ function renderOverview(results, meta){
   </div>`;
 }
 
-function renderPart(rows){
+function renderPart(rows, keep){
   const wrap=document.getElementById('content');
   const ORDER=['A','B','C','D'];
   const slotSet=new Set();
   rows.forEach(r=>slotSet.add((r.time_slot||'').toUpperCase()||'기타'));
-  // A/B/C/D 4개 컬럼은 항상 표시 + 그 외 슬롯(기타 등)이 있으면 뒤에 추가
   const slots=ORDER.concat([...slotSet].filter(s=>!ORDER.includes(s)).sort());
-  const parts={}, porder=[];
+  // 슬롯별 → 부품 집계
+  const agg={};
   rows.forEach(r=>{
-    const key=r.sub_part_no;
-    if(!parts[key]){ parts[key]={pn:key,nm:r.part_name||'',line:r.line_name||'',slots:{},total:0}; porder.push(key); }
     const sl=(r.time_slot||'').toUpperCase()||'기타';
-    if(!parts[key].slots[sl]) parts[key].slots[sl]={qty:0,items:[],ts:''};
-    const q=Number(r.total_qty)||0;
-    parts[key].slots[sl].qty+=q;
-    parts[key].slots[sl].items.push({id:r.item_id,status:r.status});
-    if(r.created_at && r.created_at>parts[key].slots[sl].ts) parts[key].slots[sl].ts=r.created_at;
-    parts[key].total+=q;
+    if(!agg[sl]) agg[sl]={};
+    const k=r.sub_part_no;
+    if(!agg[sl][k]) agg[sl][k]={pn:k,nm:r.part_name||'',qty:0,items:[],ts:''};
+    const c=agg[sl][k];
+    c.qty+=Number(r.total_qty)||0;
+    c.items.push({id:r.item_id,status:r.status});
+    if(r.created_at && r.created_at>c.ts) c.ts=r.created_at;
   });
-  document.getElementById('sum').textContent=porder.length?`부품 ${porder.length}종`:'부품 0종';
-  if(!porder.length){ wrap.innerHTML='<div class="empty">해당 라인/날짜의 출고요청이 없습니다</div>'; return; }
-  porder.sort((a,b)=>String(a).localeCompare(String(b)));
+  if(!rows.length){ document.getElementById('sum').textContent='부품 0종'; wrap.innerHTML='<div class="empty">해당 라인/날짜의 출고요청이 없습니다</div>'; return; }
+  const cntOf=s=>agg[s]?Object.keys(agg[s]).length:0;
+  // 데이터 로드 시 현재 슬롯이 비어있으면 데이터 있는 슬롯으로 이동. 단 사용자가 직접 클릭(keep)한 경우는 유지
+  if(!_slot || !slots.includes(_slot) || (!keep && !cntOf(_slot))){ _slot=slots.find(cntOf)||_slot||'A'; }
   const sc=s=>SLOT_COLORS[s]||SLOT_COLORS['기타'];
-  let html='<div style="overflow:auto"><table class="ptbl"><thead><tr>'
-    + '<th class="nocol">NO.</th>'
-    + '<th class="pcol-h">부품</th>'
-    + '<th>라인명</th>'
-    + slots.map(s=>{const col=sc(s);return `<th style="background:${col.h}">${TS_LABEL[s]||s}</th>`;}).join('')
-    + '<th>합계</th></tr></thead><tbody>';
-  porder.forEach((k,idx)=>{
-    const p=parts[k];
-    html+=`<tr><td class="nocol numcell">${idx+1}</td>`
-      + `<td class="pcol pn-click" onclick="openPartModal('${esc1(p.pn)}')">${p.pn}<div class="pnm">${p.nm}</div>${locTag(p.pn)}</td>`
-      + `<td class="linecol">${p.line||''}</td>`;
-    slots.forEach(s=>{
-      const col=sc(s), c=p.slots[s];
-      if(!c||!c.qty){ html+=`<td style="background:${col.t}"></td>`; return; }
-      const ids=c.items.map(i=>i.id).join(',');
-      const allConf=c.items.every(i=>i.status==='confirmed'||i.status==='done');
-      const allDone=c.items.every(i=>i.status==='done');
+  // 타임 슬롯 탭바
+  const bar='<div class="slotbar">'+slots.map(s=>{
+    const on=s===_slot, col=sc(s), n=cntOf(s);
+    return `<button class="slotbtn${on?' on':''}" onclick="setSlot('${s}')" style="${on?`background:${col.h};border-color:${col.h};color:#fff`:''}">${TS_LABEL[s]||s}${n?`<span class="slotn">${n}</span>`:''}</button>`;
+  }).join('')+'</div>';
+  const parts=agg[_slot]?Object.values(agg[_slot]):[];
+  parts.sort((a,b)=>String(a.pn).localeCompare(String(b.pn),undefined,{numeric:true}));
+  document.getElementById('sum').textContent=parts.length?`${TS_LABEL[_slot]||_slot} · ${parts.length}종`:'부품 0종';
+  let body;
+  if(!parts.length){ body='<div class="empty">해당 타임 출고요청이 없습니다</div>'; }
+  else{
+    const col=sc(_slot);
+    body=`<div style="overflow:auto"><table class="ptbl2"><thead><tr><th style="text-align:left">부품</th><th style="background:${col.h};min-width:110px">출고수량</th><th style="min-width:96px">처리</th></tr></thead><tbody>`;
+    parts.forEach(p=>{
+      const ids=p.items.map(i=>i.id).join(',');
+      const allConf=p.items.every(i=>i.status==='confirmed'||i.status==='done');
+      const allDone=p.items.every(i=>i.status==='done');
       const confT=allConf?'requested':'confirmed';
       const doneT=allDone?'confirmed':'done';
       const bg=allDone?'#dcfce7':col.t;
       const qc=allDone?'#166534':(allConf?'#1d4ed8':col.c);
-      html+=`<td style="background:${bg}">
-        <div class="qty" style="color:${qc}">${fmtQty(c.qty)}</div>
-        ${boxTag(k,c.qty)}
-        ${c.ts?`<div class="cell-time">🕒 ${fmtDTShort(c.ts)}</div>`:''}
-        <div class="cellbtns">
+      body+=`<tr>
+        <td class="pcol2 pn-click" onclick="openPartModal('${esc1(p.pn)}')"><span class="pno2">${p.pn}</span><div class="pnm">${p.nm}</div>${locTag(p.pn)}</td>
+        <td style="background:${bg}">
+          <div class="qty" style="color:${qc}">${fmtQty(p.qty)}</div>
+          ${boxTag(p.pn,p.qty)}
+          ${p.ts?`<div class="cell-time">🕒 ${fmtDTShort(p.ts)}</div>`:''}
+        </td>
+        <td><div class="cellbtns">
           <button onclick="setStatusBulk('${ids}','${confT}')" style="background:${allConf?'#dbeafe':'#fff'};color:${allConf?'#1e40af':'#94a3b8'};font-weight:${allConf?'800':'600'}">확인${allConf?' ✓':''}</button>
           <button onclick="setStatusBulk('${ids}','${doneT}')" style="background:${allDone?'#dcfce7':'#fff'};color:${allDone?'#166534':'#94a3b8'};font-weight:${allDone?'800':'600'}">완료${allDone?' ✓':''}</button>
-        </div>
-      </td>`;
+        </div></td>
+      </tr>`;
     });
-    html+=`<td class="totcol">${fmtQty(p.total)}</td></tr>`;
-  });
-  html+='</tbody></table></div>';
-  wrap.innerHTML=html;
+    body+='</tbody></table></div>';
+  }
+  wrap.innerHTML=bar+body;
 }
+function setSlot(s){ _slot=s; renderPart(_rows, true); }
 
 async function setStatusBulk(ids,status){
   if(_busy) return; _busy=true;
@@ -451,6 +497,7 @@ async function loadLines(){
   const d=new Date();
   document.getElementById('f-date').value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   loadLines().finally(reload);
+  _refreshPushBtn();
   _timer=setInterval(tick, 30000);
 })();
 </script>
