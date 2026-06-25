@@ -144,6 +144,16 @@ const AIT_API = (() => {
     uploadSpecPhoto:  (data)           => _post('ait/spec/photos', data, 30000).then(r => Array.isArray(r) ? r[0] : r),
     deleteSpecPhoto:  (data)           => _del('ait/spec/photos', data),
 
+    /* ── 출고요청 ──────────────────────────────── */
+    createShipRequest:     (payload)                => _post('ait/spec/ship-request', payload, 30000),
+    createShipRequestPart: (payload)                => _post('ait/spec/ship-request/part', payload, 30000),
+    getShipRequests:       (lineName, date, status) => _get('ait/spec/ship-requests', status ? { lineName, date, status } : { lineName, date }),
+    updateShipRequestItem: (item_id, status)        => _post('ait/spec/ship-request/item-status', { item_id, status }),
+    cancelShipRequest:     (request_id)             => _del('ait/spec/ship-request/cancel', { request_id }),
+    deleteShipRequestItem: (item_id, request_id)    => _del('ait/spec/ship-request/item', { item_id, request_id }),
+    getShipLines:          ()                       => _get('ait/spec/ship-lines'),
+    getPartLocations:      (parts)                  => _get('ait/spec/part-locations', { parts: (parts || []).join(',') }),
+
     /* ── 작업표준서 ────────────────────────────── */
     getWsProcesses:   (carId)   => _get('ait/ws/processes', { carId }),
     getWsSteps:       (carId)   => _get('ait/ws/steps', { carId }),
@@ -373,6 +383,15 @@ const AIT_API = (() => {
     getSpecPhotos:      (cdItem)         => _real.getSpecPhotos(cdItem),
     uploadSpecPhoto:    (data)           => _real.uploadSpecPhoto(data),
     deleteSpecPhoto:    (data)           => _real.deleteSpecPhoto(data),
+    /* 출고요청 */
+    createShipRequest:     (payload)                => _real.createShipRequest(payload),
+    createShipRequestPart: (payload)                => _real.createShipRequestPart(payload),
+    getShipRequests:       (lineName, date, status) => _real.getShipRequests(lineName, date, status),
+    updateShipRequestItem: (item_id, status)        => _real.updateShipRequestItem(item_id, status),
+    cancelShipRequest:     (request_id)             => _real.cancelShipRequest(request_id),
+    deleteShipRequestItem: (item_id, request_id)    => _real.deleteShipRequestItem(item_id, request_id),
+    getShipLines:          ()                       => _real.getShipLines(),
+    getPartLocations:      (parts)                  => _real.getPartLocations(parts),
     numCircle
   };
 })();

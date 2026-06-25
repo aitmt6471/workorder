@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>출고요청 현황 — 자재팀</title>
+<style>
+  *{box-sizing:border-box;font-family:'Malgun Gothic','맑은 고딕',-apple-system,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{margin:0;background:#eef2f7;color:#0f172a;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+  #hdr{flex-shrink:0;z-index:10;background:linear-gradient(180deg,#274680,#1e3264);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 2px 10px rgba(15,23,42,.28)}
+  #hdr h1{font-size:19px;margin:0;font-weight:800;letter-spacing:.5px;white-space:nowrap}
+  #hdr select,#hdr input[type=date]{font-size:16px;padding:7px 9px;border-radius:9px;border:1px solid #c9d4e8;background:#fff;color:#0f172a;min-height:40px}
+  #hdr label{font-size:14px;display:flex;align-items:center;gap:5px;color:#dbe4f6}
+  .pill{background:rgba(255,255,255,.18);padding:5px 12px;border-radius:999px;font-size:15px;font-weight:700;white-space:nowrap}
+  #content{flex:1;overflow:auto;padding:8px 6px 72px;-webkit-overflow-scrolling:touch}
+  .req-card{border:1px solid #dce3ee;border-radius:12px;margin:10px 8px;overflow:hidden;background:#fff;box-shadow:0 2px 7px rgba(15,23,42,.08)}
+  .req-hdr{background:linear-gradient(180deg,#274680,#1e3264);color:#fff;padding:10px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .req-hdr .cd{font-family:ui-monospace,monospace;font-size:20px;font-weight:800;letter-spacing:.3px}
+  .badge{padding:3px 11px;border-radius:999px;font-size:15px;font-weight:800;line-height:1.35}
+  .items{padding:10px;display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:10px;background:#f1f5f9}
+  .item{background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+  .item .ph{position:relative;height:110px;background:#f3f4f6}
+  .item .ph img{width:100%;height:100%;object-fit:contain;background:#f8fafc}
+  .item .ph .noimg{display:flex;align-items:center;justify-content:center;height:100%;color:#cbd5e1;font-size:34px}
+  .item .bd{padding:7px 10px}
+  .item .pn{font-family:ui-monospace,monospace;font-size:17px;color:#1e3264;font-weight:800}
+  .item .nm{font-size:14px;color:#64748b;line-height:1.3;height:36px;overflow:hidden;margin:2px 0}
+  .item .qt{font-size:15px;color:#475569;margin:4px 0}
+  .item .qt strong{font-size:19px;color:#15803d;font-weight:800}
+  .seg{display:flex;gap:4px;margin-top:6px}
+  .seg button{flex:1;min-height:40px;padding:6px 0;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;cursor:pointer;background:#fff;color:#94a3b8;font-weight:700}
+  .empty{padding:50px 20px;text-align:center;color:#94a3b8;font-size:19px}
+  #toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#0f172a;color:#fff;padding:11px 20px;border-radius:10px;font-size:16px;opacity:0;transition:opacity .25s;z-index:50;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.32)}
+  #toast.show{opacity:.96}
+  #tabs{flex-shrink:0;z-index:9;display:flex;gap:4px;background:#fff;border-bottom:2px solid #e2e8f0;padding:0 8px}
+  #tabs button{flex:1;font-size:16px;font-weight:800;padding:13px 10px;border:none;background:none;cursor:pointer;color:#94a3b8;border-bottom:3px solid transparent;margin-bottom:-2px}
+  #tabs button.on{color:#1e3264;border-bottom-color:#1e3264}
+  .ptbl{width:100%;border-collapse:separate;border-spacing:0;background:#fff;font-size:16px}
+  .ptbl th,.ptbl td{border-bottom:1px solid #e5e7eb;border-right:1px solid #e5e7eb;padding:7px 8px;text-align:center;vertical-align:top}
+  .ptbl thead th{background:#1e3264;color:#fff;position:sticky;top:0;z-index:6;border-color:#e5e7eb}
+  .box-tag{display:inline-block;font-size:13px;color:#1d4ed8;font-weight:800;margin-top:3px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:1px 7px}
+  .cell-time{font-size:11px;color:#64748b;font-weight:600;margin-top:3px;white-space:nowrap}
+  .ptbl .box-tag{font-size:12px;margin-top:3px}
+  .ptbl thead th.nocol{left:0;z-index:7}
+  .ptbl thead th.pcol-h{left:42px;z-index:7;text-align:left}
+  .ptbl .nocol{position:sticky;left:0;width:42px;min-width:42px;z-index:5}
+  .ptbl tbody td.nocol{background:#fff;color:#64748b;font-weight:800;font-size:15px;vertical-align:middle}
+  .ptbl tbody tr:nth-child(even) td.nocol{background:#f8fafc}
+  .ptbl .pcol{text-align:left;font-family:ui-monospace,monospace;font-weight:800;color:#1e3264;font-size:17px;white-space:nowrap;position:sticky;left:42px;background:#fff;z-index:5;box-shadow:3px 0 5px rgba(15,23,42,.07)}
+  .ptbl tbody tr:nth-child(even) .pcol{background:#f8fafc}
+  .ptbl .pnm{font-size:12px;color:#64748b;font-family:'Malgun Gothic','맑은 고딕';font-weight:400;white-space:normal;max-width:200px;line-height:1.25;margin-top:1px}
+  .ptbl .linecol{font-weight:700;color:#1e3264;white-space:nowrap;font-size:15px;vertical-align:middle}
+  .ptbl .qty{font-size:21px;font-weight:800}
+  .ptbl .totcol{background:#eef4ff;font-weight:800;font-size:21px;color:#1e3264}
+  .cellbtns{display:flex;gap:3px;margin-top:5px;justify-content:center}
+  .cellbtns button{min-height:32px;padding:4px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;cursor:pointer;background:#fff;color:#94a3b8;font-weight:700}
+  @media (max-width:640px){
+    #hdr{padding:9px 11px;gap:8px}
+    #hdr h1{font-size:16px}
+    #hdr label{font-size:12px}
+    #hdr select,#hdr input[type=date]{font-size:15px;min-height:38px}
+    .pill{font-size:13px;padding:4px 10px}
+    #tabs button{font-size:15px;padding:12px 6px}
+    .items{grid-template-columns:repeat(auto-fill,minmax(46%,1fr));gap:8px;padding:8px}
+    .req-card{margin:8px 6px}
+    .req-hdr .cd{font-size:18px}
+    .ptbl .pnm{max-width:118px}
+  }
+  /* 클릭 가능한 부품 + 적재위치 태그 */
+  .pn-click{cursor:pointer}
+  .pn-click:active{opacity:.6}
+  .loc-tag{display:inline-block;font-size:13px;color:#b45309;font-weight:800;margin-top:3px;background:#fff7ed;border:1px solid #fed7aa;border-radius:6px;padding:1px 7px}
+  .ptbl .loc-tag{font-size:12px;margin-top:2px}
+  /* 부품 상세 모달 */
+  #pmodal{display:none;position:fixed;inset:0;z-index:100;background:rgba(15,23,42,.62);align-items:center;justify-content:center;padding:16px}
+  #pmodal.open{display:flex}
+  .pmodal-box{background:#fff;border-radius:16px;width:100%;max-width:430px;max-height:90vh;overflow:auto;position:relative;box-shadow:0 24px 64px rgba(0,0,0,.45)}
+  .pmodal-hd{background:#1e3264;color:#fff;font-weight:800;font-size:18px;letter-spacing:1px;padding:13px 16px}
+  .pmodal-x{position:absolute;top:9px;right:9px;z-index:2;width:38px;height:38px;border:none;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:19px;cursor:pointer;line-height:1}
+  .pmodal-ph{height:270px;background:#f1f5f9;display:flex;align-items:center;justify-content:center}
+  .pmodal-ph img{width:100%;height:100%;object-fit:contain}
+  .pmodal-ph .noimg{color:#cbd5e1;font-size:66px}
+  .pmodal-bd{padding:16px 18px 20px}
+  .pm-pn{font-family:ui-monospace,monospace;font-size:25px;font-weight:800;color:#1e3264;word-break:break-all}
+  .pm-nm{font-size:16px;color:#475569;margin:5px 0 14px;line-height:1.4}
+  .pm-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:11px 0;border-top:1px solid #eef2f7;font-size:16px;color:#64748b}
+  .pm-row b{font-size:21px;color:#0f172a;font-weight:800;text-align:right}
+  .pm-loc{color:#b45309;font-family:ui-monospace,monospace;letter-spacing:.5px}
+  .pm-loc.none{color:#94a3b8;font-weight:700;font-size:15px;font-family:inherit}
+</style>
+</head>
+<body>
+  <div id="hdr">
+    <h1>📦 출고요청 현황</h1>
+    <label>라인
+      <select id="f-line" onchange="reload()">
+        <option value="OC">OC</option>
+        <option value="RC">RC</option>
+        <option value="TWO BALL">TWO BALL</option>
+        <option value="FP">FP</option>
+      </select>
+    </label>
+    <label>날짜 <input type="date" id="f-date" onchange="reload()"></label>
+    <span class="pill" id="sum">-</span>
+    <div style="flex:1"></div>
+    <label><input type="checkbox" id="f-auto" checked> 자동새로고침</label>
+    <button onclick="reload()" style="font-size:17px;padding:6px 14px;border-radius:6px;border:none;background:#16a34a;color:#fff;font-weight:700;cursor:pointer">새로고침</button>
+  </div>
+  <div id="tabs">
+    <button data-t="product" onclick="setTab('product')">완제품 기준</button>
+    <button data-t="part" class="on" onclick="setTab('part')">부품 기준</button>
+    <button data-t="all" onclick="setTab('all')">전체 현황</button>
+  </div>
+  <div id="content"><div class="empty">불러오는 중...</div></div>
+  <div id="toast"></div>
+  <div id="pmodal" onclick="if(event.target===this)closePartModal()">
+    <div class="pmodal-box">
+      <button class="pmodal-x" onclick="closePartModal()">✕</button>
+      <div class="pmodal-hd">부품정보</div>
+      <div class="pmodal-ph" id="pm-ph"></div>
+      <div class="pmodal-bd">
+        <div class="pm-pn" id="pm-pn"></div>
+        <div class="pm-nm" id="pm-nm"></div>
+        <div class="pm-row"><span>출고수량</span><b id="pm-qt"></b></div>
+        <div class="pm-row"><span>📦 필요 박스</span><b id="pm-box"></b></div>
+        <div class="pm-row"><span>📍 적재위치</span><b class="pm-loc" id="pm-loc"></b></div>
+        <div class="pm-row"><span>🕒 요청 일시</span><b id="pm-time" style="font-size:16px;color:#475569"></b></div>
+      </div>
+    </div>
+  </div>
+
+<script src="js/api.js"></script>
+<script>
+'use strict';
+const TS_LABEL={A:'A(09-11)',B:'B(11-13)',C:'C(14-16)',D:'D(16-18)'};
+// 타임슬롯별 색상: h=헤더/강조, t=셀 배경 틴트, c=수량 글자색
+const SLOT_COLORS={
+  A:{h:'#0284c7',t:'#eff6ff',c:'#075985'},
+  B:{h:'#16a34a',t:'#f0fdf4',c:'#166534'},
+  C:{h:'#d97706',t:'#fffbeb',c:'#b45309'},
+  D:{h:'#7c3aed',t:'#f5f3ff',c:'#6d28d9'},
+  '기타':{h:'#64748b',t:'#f8fafc',c:'#475569'}
+};
+const ST={requested:{t:'요청',bg:'#e5e7eb',c:'#374151'},confirmed:{t:'확인',bg:'#dbeafe',c:'#1e40af'},done:{t:'완료',bg:'#dcfce7',c:'#166534'}};
+let _timer=null, _busy=false, _rows=[], _tab='part', _locMap={};
+function fmtQty(n){ n=Math.round(Number(n)*1000)/1000; return n.toLocaleString('en-US',{maximumFractionDigits:3}); }
+function esc1(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+function locTag(pn){ const o=_locMap[pn]; return (o&&o.loc)?`<div class="loc-tag">📍 ${o.loc}</div>`:''; }
+function boxTag(pn,qty){ const o=_locMap[pn]; if(!o||!o.box) return ''; const n=Math.ceil((Number(qty)||0)/o.box); return `<div class="box-tag">📦 ${n}박스</div>`; }
+function fmtDT(s){ if(!s) return '-'; return String(s).replace('T',' ').slice(0,16); }
+function fmtDTShort(s){ if(!s) return ''; return String(s).replace('T',' ').slice(5,16); }
+
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2200); }
+function pad(n){ return String(n).padStart(2,'0'); }
+function ymd(){ const v=document.getElementById('f-date').value; return v?v.replace(/-/g,''):''; }
+function photoUrl(r){
+  if(r.photo_url){ const u=AIT_API.normalizePhotoUrl(r.photo_url); if(u) return u; }
+  if(r.photo_file_id) return AIT_API.driveUrl(r.photo_file_id);
+  return '';
+}
+function headerStatus(items){
+  if(items.every(i=>i.status==='done')) return {t:'완료',bg:'#dcfce7',c:'#166534'};
+  if(items.some(i=>i.status==='confirmed'||i.status==='done')) return {t:'진행중',bg:'#fef3c7',c:'#92400e'};
+  return {t:'요청',bg:'#e5e7eb',c:'#374151'};
+}
+
+async function reload(){
+  if(_tab==='all'){ return loadOverview(); }
+  const line=document.getElementById('f-line').value;
+  const date=ymd();
+  const wrap=document.getElementById('content');
+  if(!date){ wrap.innerHTML='<div class="empty">날짜를 선택하세요</div>'; return; }
+  try{
+    const res=await AIT_API.getShipRequests(line,date);
+    _rows=Array.isArray(res)?res:[];
+    renderActive();
+    // 적재위치(MES) 비동기 로드 후 오버레이
+    const parts=[...new Set(_rows.map(r=>r.sub_part_no).filter(Boolean))];
+    if(parts.length){
+      AIT_API.getPartLocations(parts)
+        .then(m=>{ _locMap=(m&&typeof m==='object'&&!Array.isArray(m))?m:{}; renderActive(); })
+        .catch(()=>{});
+    }
+  }catch(e){ wrap.innerHTML=`<div class="empty" style="color:#ef4444">오류: ${e.message}</div>`; }
+}
+
+function openPartModal(pn){
+  const rows=_rows.filter(r=>String(r.sub_part_no)===String(pn));
+  if(!rows.length) return;
+  const nm=(rows.find(r=>r.part_name)||{}).part_name||'';
+  const prow=rows.find(r=>photoUrl(r)); const url=prow?photoUrl(prow):'';
+  const qty=rows.reduce((a,r)=>a+(Number(r.total_qty)||0),0);
+  const o=_locMap[pn]||{}; const loc=o.loc||''; const box=Number(o.box)||0;
+  const times=[...new Set(rows.map(r=>r.created_at).filter(Boolean))].sort();
+  const reqTime=times.length?times[times.length-1]:'';
+  document.getElementById('pm-ph').innerHTML=url
+    ? `<img src="${url}" onerror="this.parentNode.innerHTML='<div class=\\'noimg\\'>▣</div>'">`
+    : '<div class="noimg">▣</div>';
+  document.getElementById('pm-pn').textContent=pn;
+  document.getElementById('pm-nm').textContent=nm;
+  document.getElementById('pm-qt').textContent=fmtQty(qty);
+  const be=document.getElementById('pm-box');
+  if(box){ be.textContent=`${Math.ceil(qty/box)}박스`; be.title=`적입량 ${box.toLocaleString()}/박스`; be.style.color='#1d4ed8'; }
+  else { be.textContent='-'; be.style.color='#94a3b8'; }
+  const le=document.getElementById('pm-loc');
+  if(loc){ le.textContent=loc; le.className='pm-loc'; }
+  else   { le.textContent='미등록'; le.className='pm-loc none'; }
+  document.getElementById('pm-time').textContent=reqTime?fmtDT(reqTime):'-';
+  document.getElementById('pmodal').classList.add('open');
+}
+function closePartModal(){ document.getElementById('pmodal').classList.remove('open'); }
+
+function renderActive(){
+  if(_tab==='part') renderPart(_rows); else renderProduct(_rows);
+}
+function setTab(t){
+  _tab=t;
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.t===t));
+  if(t==='all'){ loadOverview(); } else { renderActive(); }
+}
+
+async function loadOverview(){
+  const date=ymd();
+  const wrap=document.getElementById('content');
+  if(!date){ wrap.innerHTML='<div class="empty">날짜를 선택하세요</div>'; return; }
+  wrap.innerHTML='<div class="empty">전체 현황 불러오는 중...</div>';
+  try{
+    let lines=[];
+    try{ const r=await AIT_API.getShipLines(); lines=Array.isArray(r)?r:(r&&r.lines)||[]; }catch{}
+    if(!lines.length){ lines=[...document.getElementById('f-line').options].map(o=>o.value); }
+    const results=await Promise.all(lines.map(l=>
+      AIT_API.getShipRequests(l,date)
+        .then(x=>({line:l, rows:Array.isArray(x)?x:[]}))
+        .catch(()=>({line:l, rows:[]}))));
+    const allParts=[...new Set(results.flatMap(r=>r.rows.map(x=>x.sub_part_no)).filter(Boolean))];
+    let meta={};
+    if(allParts.length){ try{ const m=await AIT_API.getPartLocations(allParts); if(m&&typeof m==='object'&&!Array.isArray(m)) meta=m; }catch{} }
+    if(_tab==='all') renderOverview(results, meta);
+  }catch(e){ wrap.innerHTML=`<div class="empty" style="color:#ef4444">오류: ${e.message}</div>`; }
+}
+
+function renderOverview(results, meta){
+  const wrap=document.getElementById('content');
+  let T={req:0,conf:0,done:0,box:0,oldest:''};
+  const data=results.map(({line,rows})=>{
+    let req=0,conf=0,done=0,box=0,oldest='';
+    rows.forEach(r=>{
+      const st=r.status;
+      if(st==='done') done++; else if(st==='confirmed') conf++; else req++;
+      if(st!=='done'){
+        const o=meta[r.sub_part_no];
+        if(o&&o.box) box+=Math.ceil((Number(r.total_qty)||0)/o.box);
+        if(r.created_at && (!oldest || r.created_at<oldest)) oldest=r.created_at;
+      }
+    });
+    const total=req+conf+done;
+    const pct=total?Math.round(done/total*100):0;
+    T.req+=req; T.conf+=conf; T.done+=done; T.box+=box;
+    if(oldest && (!T.oldest || oldest<T.oldest)) T.oldest=oldest;
+    return {line,req,conf,done,total,pct,box,oldest};
+  });
+  data.sort((a,b)=>(b.req+b.conf+b.done)-(a.req+a.conf+a.done));
+  document.getElementById('sum').textContent=`전체 ${data.length}개 라인`;
+  const bar=p=>`<div style="background:#e5e7eb;border-radius:6px;height:20px;position:relative;overflow:hidden;min-width:80px">
+      <div style="background:#16a34a;height:100%;width:${p}%"></div>
+      <span style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;color:#0f172a">${p}%</span>
+    </div>`;
+  const cnt=(v,c)=>`<span style="color:${v?c:'#cbd5e1'};font-weight:800;font-size:19px">${v}</span>`;
+  const th='padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:15px';
+  const td='padding:9px 8px;border-bottom:1px solid #f1f5f9;text-align:center';
+  let rows=data.map(d=>`<tr>
+    <td style="${td};text-align:left;font-weight:800;color:#1e3264;font-size:18px">${d.line}</td>
+    <td style="${td}">${cnt(d.req,'#475569')}</td>
+    <td style="${td}">${cnt(d.conf,'#1d4ed8')}</td>
+    <td style="${td}">${cnt(d.done,'#16a34a')}</td>
+    <td style="${td}">${d.total?bar(d.pct):'<span style=\"color:#cbd5e1\">-</span>'}</td>
+    <td style="${td};font-weight:800;font-size:19px;color:${d.box?'#b45309':'#cbd5e1'}">${d.box?fmtQty(d.box)+'박스':'-'}</td>
+    <td style="${td};font-size:14px;color:${d.oldest?'#dc2626':'#cbd5e1'};font-weight:700;white-space:nowrap">${d.oldest?fmtDT(d.oldest):'-'}</td>
+  </tr>`).join('');
+  const totalAll=T.req+T.conf+T.done;
+  const totPct=totalAll?Math.round(T.done/totalAll*100):0;
+  rows+=`<tr style="background:#f8fafc;border-top:2px solid #1e3264">
+    <td style="${td};text-align:left;font-weight:900;color:#1e3264;font-size:18px">합계</td>
+    <td style="${td}">${cnt(T.req,'#475569')}</td>
+    <td style="${td}">${cnt(T.conf,'#1d4ed8')}</td>
+    <td style="${td}">${cnt(T.done,'#16a34a')}</td>
+    <td style="${td}">${totalAll?bar(totPct):'-'}</td>
+    <td style="${td};font-weight:900;font-size:19px;color:${T.box?'#b45309':'#cbd5e1'}">${T.box?fmtQty(T.box)+'박스':'-'}</td>
+    <td style="${td};font-size:14px;color:${T.oldest?'#dc2626':'#cbd5e1'};font-weight:700;white-space:nowrap">${T.oldest?fmtDT(T.oldest):'-'}</td>
+  </tr>`;
+  wrap.innerHTML=`<div style="padding:10px 8px">
+    <div style="overflow:auto;border-radius:12px;box-shadow:0 2px 7px rgba(15,23,42,.08);background:#fff">
+      <table style="width:100%;border-collapse:collapse;min-width:620px">
+        <thead><tr style="background:#1e3264;color:#fff">
+          <th style="${th};text-align:left">라인</th>
+          <th style="${th}">요청</th><th style="${th}">확인</th><th style="${th}">완료</th>
+          <th style="${th}">진행률(완료)</th><th style="${th}">남은 박스</th><th style="${th}">가장 오래된 미처리</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+    <div style="font-size:13px;color:#94a3b8;margin-top:8px;padding-left:4px">※ 카운트는 부품(품목) 건수 · '남은 박스'는 적입량이 등록된 부품만 합산 · 진행률 = 완료/전체</div>
+  </div>`;
+}
+
+function renderPart(rows){
+  const wrap=document.getElementById('content');
+  const ORDER=['A','B','C','D'];
+  const slotSet=new Set();
+  rows.forEach(r=>slotSet.add((r.time_slot||'').toUpperCase()||'기타'));
+  // A/B/C/D 4개 컬럼은 항상 표시 + 그 외 슬롯(기타 등)이 있으면 뒤에 추가
+  const slots=ORDER.concat([...slotSet].filter(s=>!ORDER.includes(s)).sort());
+  const parts={}, porder=[];
+  rows.forEach(r=>{
+    const key=r.sub_part_no;
+    if(!parts[key]){ parts[key]={pn:key,nm:r.part_name||'',line:r.line_name||'',slots:{},total:0}; porder.push(key); }
+    const sl=(r.time_slot||'').toUpperCase()||'기타';
+    if(!parts[key].slots[sl]) parts[key].slots[sl]={qty:0,items:[],ts:''};
+    const q=Number(r.total_qty)||0;
+    parts[key].slots[sl].qty+=q;
+    parts[key].slots[sl].items.push({id:r.item_id,status:r.status});
+    if(r.created_at && r.created_at>parts[key].slots[sl].ts) parts[key].slots[sl].ts=r.created_at;
+    parts[key].total+=q;
+  });
+  document.getElementById('sum').textContent=porder.length?`부품 ${porder.length}종`:'부품 0종';
+  if(!porder.length){ wrap.innerHTML='<div class="empty">해당 라인/날짜의 출고요청이 없습니다</div>'; return; }
+  porder.sort((a,b)=>String(a).localeCompare(String(b)));
+  const sc=s=>SLOT_COLORS[s]||SLOT_COLORS['기타'];
+  let html='<div style="overflow:auto"><table class="ptbl"><thead><tr>'
+    + '<th class="nocol">NO.</th>'
+    + '<th class="pcol-h">부품</th>'
+    + '<th>라인명</th>'
+    + slots.map(s=>{const col=sc(s);return `<th style="background:${col.h}">${TS_LABEL[s]||s}</th>`;}).join('')
+    + '<th>합계</th></tr></thead><tbody>';
+  porder.forEach((k,idx)=>{
+    const p=parts[k];
+    html+=`<tr><td class="nocol numcell">${idx+1}</td>`
+      + `<td class="pcol pn-click" onclick="openPartModal('${esc1(p.pn)}')">${p.pn}<div class="pnm">${p.nm}</div>${locTag(p.pn)}</td>`
+      + `<td class="linecol">${p.line||''}</td>`;
+    slots.forEach(s=>{
+      const col=sc(s), c=p.slots[s];
+      if(!c||!c.qty){ html+=`<td style="background:${col.t}"></td>`; return; }
+      const ids=c.items.map(i=>i.id).join(',');
+      const allConf=c.items.every(i=>i.status==='confirmed'||i.status==='done');
+      const allDone=c.items.every(i=>i.status==='done');
+      const confT=allConf?'requested':'confirmed';
+      const doneT=allDone?'confirmed':'done';
+      const bg=allDone?'#dcfce7':col.t;
+      const qc=allDone?'#166534':(allConf?'#1d4ed8':col.c);
+      html+=`<td style="background:${bg}">
+        <div class="qty" style="color:${qc}">${fmtQty(c.qty)}</div>
+        ${boxTag(k,c.qty)}
+        ${c.ts?`<div class="cell-time">🕒 ${fmtDTShort(c.ts)}</div>`:''}
+        <div class="cellbtns">
+          <button onclick="setStatusBulk('${ids}','${confT}')" style="background:${allConf?'#dbeafe':'#fff'};color:${allConf?'#1e40af':'#94a3b8'};font-weight:${allConf?'800':'600'}">확인${allConf?' ✓':''}</button>
+          <button onclick="setStatusBulk('${ids}','${doneT}')" style="background:${allDone?'#dcfce7':'#fff'};color:${allDone?'#166534':'#94a3b8'};font-weight:${allDone?'800':'600'}">완료${allDone?' ✓':''}</button>
+        </div>
+      </td>`;
+    });
+    html+=`<td class="totcol">${fmtQty(p.total)}</td></tr>`;
+  });
+  html+='</tbody></table></div>';
+  wrap.innerHTML=html;
+}
+
+async function setStatusBulk(ids,status){
+  if(_busy) return; _busy=true;
+  try{
+    const list=String(ids).split(',').filter(Boolean);
+    for(const id of list){ await AIT_API.updateShipRequestItem(Number(id),status); }
+    toast('처리됨'); await reload();
+  }catch(e){ toast('실패: '+e.message); }
+  finally{ _busy=false; }
+}
+
+function renderProduct(rows){
+  const wrap=document.getElementById('content');
+  const groups={}, order=[];
+  rows.forEach(r=>{ if(!groups[r.request_id]){groups[r.request_id]=[];order.push(r.request_id);} groups[r.request_id].push(r); });
+  document.getElementById('sum').textContent=order.length?`요청 ${order.length}건`:'요청 0건';
+  if(!order.length){ wrap.innerHTML='<div class="empty">해당 라인/날짜의 출고요청이 없습니다</div>'; return; }
+  let html='';
+  order.forEach(rid=>{
+    const items=groups[rid], h=items[0], hs=headerStatus(items);
+    const prio=Number(h.priority)>0?`<span class="badge" style="background:#fee2e2;color:#b91c1c">${h.priority}순위</span>`:'';
+    const ts=h.time_slot?`<span class="badge" style="background:#e0e7ff;color:#3730a3">${TS_LABEL[h.time_slot]||h.time_slot}</span>`:'';
+    const src=h.source==='modal'?`<span class="badge" style="background:#f3e8ff;color:#6b21a8;font-size:14px">부품단건</span>`:'';
+    const itemCards=items.map(it=>{
+      const url=photoUrl(it);
+      const ph=url?`<img src="${url}" onerror="this.style.display='none'">`:`<div class="noimg">▣</div>`;
+      const sb=ST[it.status]||ST.requested;
+      const qt=fmtQty(it.total_qty);
+      const seg=['confirmed','done'].map(s=>{
+        const on=it.status===s;
+        // 이미 활성이면 다시 눌러 토글(취소): 확인→요청, 완료→확인
+        const target = on ? (s==='confirmed' ? 'requested' : 'confirmed') : s;
+        return `<button onclick="setStatus(${it.item_id},'${target}')" title="${on?'다시 누르면 취소':''}" style="background:${on?ST[s].bg:'#fff'};color:${on?ST[s].c:'#94a3b8'};font-weight:${on?'800':'600'}">${ST[s].t}${on?' ✓':''}</button>`;
+      }).join('');
+      return `<div class="item">
+        <div class="ph">${ph}<span class="badge" style="position:absolute;top:4px;right:4px;background:${sb.bg};color:${sb.c};font-size:14px">${sb.t}</span></div>
+        <div class="bd">
+          <div class="pn pn-click" onclick="openPartModal('${esc1(it.sub_part_no)}')">${it.sub_part_no}</div>
+          <div class="nm pn-click" onclick="openPartModal('${esc1(it.sub_part_no)}')">${it.part_name||''}</div>
+          <div class="qt">출고수량: <strong>${qt}</strong></div>
+          <div>${locTag(it.sub_part_no)}${boxTag(it.sub_part_no, it.total_qty)}</div>
+          <div class="seg">${seg}</div>
+        </div>
+      </div>`;
+    }).join('');
+    html+=`<div class="req-card">
+      <div class="req-hdr">
+        ${prio}${ts}
+        <span class="cd">${h.cd_item}</span>
+        <span style="font-size:16px;color:rgba(255,255,255,.8)">${h.product_name||''}</span>
+        ${h.work_order_no?`<span style="font-size:14px;color:rgba(255,255,255,.6);font-family:monospace">${h.work_order_no}</span>`:''}
+        ${src}
+        <div style="flex:1"></div>
+        ${h.created_at?`<span style="font-size:13px;color:rgba(255,255,255,.7);font-weight:600">🕒 ${fmtDT(h.created_at)}</span>`:''}
+        <span class="badge" style="background:${hs.bg};color:${hs.c}">${hs.t}</span>
+      </div>
+      <div class="items">${itemCards}</div>
+    </div>`;
+  });
+  wrap.innerHTML=html;
+}
+
+async function setStatus(itemId,status){
+  if(_busy) return; _busy=true;
+  try{ await AIT_API.updateShipRequestItem(itemId,status); toast('처리됨'); await reload(); }
+  catch(e){ toast('실패: '+e.message); }
+  finally{ _busy=false; }
+}
+
+function tick(){ if(document.getElementById('f-auto').checked && !_busy) reload(); }
+
+async function loadLines(){
+  try{
+    const r=await AIT_API.getShipLines();
+    const lines=Array.isArray(r)?r:(r&&r.lines)||[];
+    if(lines.length){
+      const sel=document.getElementById('f-line');
+      const cur=sel.value;
+      sel.innerHTML=lines.map(l=>`<option value="${l}">${l}</option>`).join('');
+      sel.value=lines.includes(cur)?cur:lines[0];
+    }
+  }catch(e){ /* 실패 시 HTML 하드코딩 라인 유지 */ }
+}
+
+(function init(){
+  const d=new Date();
+  document.getElementById('f-date').value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  loadLines().finally(reload);
+  _timer=setInterval(tick, 30000);
+})();
+</script>
+</body>
+</html>

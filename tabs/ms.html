@@ -1201,23 +1201,26 @@ window.print_ms = async function() {
     }));
   }
 
-  // DB에서 이번 달 전체 결과 로드 (미로드된 샘플+날짜만)
+  // DB에서 이번 달 전체 결과 로드 (수동 클릭 없이도 모든 샘플×모든 날짜를 인쇄에 표시)
   if (!AIT_API.MOCK && window.currentCarId) {
-    const _loadMS = window._msLoadMonthStatus;
-    const _hasDB  = window._msHasDBData;
-    const _loaded = window._msDBLoadedDays;
-    if (_loadMS) {
-      await Promise.all(msData.map((_, si) => _loadMS(si)));
+    // 1) 일괄 조회: 샘플당 1회 월 상태 조회로 대부분의 날짜를 미리 파악
+    if (window._msLoadMonthStatus) {
+      await Promise.all(msData.map((_, si) => window._msLoadMonthStatus(si)));
     }
-    if (_hasDB && _loaded && window._msLoadResultsFromDB) {
-      const toLoad = [];
-      msData.forEach((_, si) => {
-        days.forEach(day => {
-          const ck = `${si}_${day}_${y}_${mo}`;
-          if (_hasDB.has(ck) && !_loaded.has(ck)) toLoad.push([si, day]);
-        });
-      });
-      if (toLoad.length) await Promise.all(toLoad.map(([si, day]) => window._msLoadResultsFromDB(si, day)));
+    // 2) 보강: 모든 샘플 × 그 달 모든 날짜(1~말일)를 직접 조회. 월 상태(month-status) 의존 제거 —
+    //    아직 안 채워진 날만 큐에 넣고 동시 실행 6개로 스로틀(요청 폭주로 인한 누락 방지).
+    //    데이터 없는 날은 _msLoadResultsFromDB가 그냥 무시. 이미 로드된 날은 _msDBLoadedDays 가드로 스킵.
+    if (window._msLoadResultsFromDB) {
+      const _loaded = window._msDBLoadedDays;
+      const tasks = [];
+      msData.forEach((_, si) => days.forEach(day => {
+        const ck = `${si}_${day}_${y}_${mo}`;
+        if (!_loaded.has(ck)) tasks.push(() => window._msLoadResultsFromDB(si, day));
+      }));
+      const LIMIT = 6;
+      let ti = 0;
+      const worker = async () => { while (ti < tasks.length) { const c = ti++; try { await tasks[c](); } catch(_){} } };
+      await Promise.all(Array.from({length: Math.min(LIMIT, tasks.length)}, worker));
     }
   }
 

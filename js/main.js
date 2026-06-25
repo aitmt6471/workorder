@@ -1036,7 +1036,9 @@ async function addCar() {
   } else {
     try {
       const code = name.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 20);
-      await AIT_API.createCar({ code, name, stage: '', partno: '', partname: '', linename: '', enabled_docs: JSON.stringify(ALL_DOC_TYPES.map(d => d.id)) });
+      // 라인명은 이름 앞부분(괄호 앞)에서 도출 → shipping.html 라인 목록에 자동 반영
+      const linename = name.split('(')[0].trim();
+      await AIT_API.createCar({ code, name, stage: '', partno: '', partname: '', linename, enabled_docs: JSON.stringify(ALL_DOC_TYPES.map(d => d.id)) });
       await initCars();
       renderCarListInModal();
     } catch(e) {
