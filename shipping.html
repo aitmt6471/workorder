@@ -16,11 +16,17 @@
   *{box-sizing:border-box;font-family:'Malgun Gothic','맑은 고딕',-apple-system,system-ui,sans-serif;-webkit-tap-highlight-color:transparent}
   html,body{height:100%}
   body{margin:0;background:#eef2f7;color:#0f172a;height:100dvh;display:flex;flex-direction:column;overflow:hidden}
-  #hdr{flex-shrink:0;z-index:10;background:linear-gradient(180deg,#274680,#1e3264);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;box-shadow:0 2px 10px rgba(15,23,42,.28)}
-  #hdr h1{font-size:19px;margin:0;font-weight:800;letter-spacing:.5px;white-space:nowrap}
-  #hdr select,#hdr input[type=date]{font-size:16px;padding:7px 9px;border-radius:9px;border:1px solid #c9d4e8;background:#fff;color:#0f172a;min-height:40px}
-  #hdr label{font-size:14px;display:flex;align-items:center;gap:5px;color:#dbe4f6}
-  .pill{background:rgba(255,255,255,.18);padding:5px 12px;border-radius:999px;font-size:15px;font-weight:700;white-space:nowrap}
+  #hdr{flex-shrink:0;z-index:10;background:linear-gradient(180deg,#274680,#1e3264);color:#fff;padding:10px 12px;display:flex;flex-direction:column;gap:8px;box-shadow:0 2px 10px rgba(15,23,42,.28)}
+  .hrow{display:flex;align-items:center;gap:8px}
+  .hrow-title{justify-content:space-between}
+  #hdr h1{font-size:18px;margin:0;font-weight:800;letter-spacing:.5px;white-space:nowrap}
+  .pill{background:rgba(255,255,255,.18);padding:5px 12px;border-radius:999px;font-size:14px;font-weight:700;white-space:nowrap}
+  .fld{flex:1;min-width:0;display:flex;align-items:center;gap:6px;font-size:13px;color:#dbe4f6;white-space:nowrap}
+  .fld select,.fld input[type=date]{flex:1;min-width:0;width:100%;font-size:16px;padding:8px;border-radius:9px;border:1px solid #c9d4e8;background:#fff;color:#0f172a;min-height:42px}
+  .h-refresh{flex:1;min-height:42px;background:#16a34a;color:#fff;border:none;border-radius:9px;font-size:16px;font-weight:800;cursor:pointer}
+  .h-push{min-height:42px;padding:0 14px;background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:9px;font-size:14px;font-weight:700;cursor:pointer;white-space:nowrap}
+  .h-auto{display:flex;align-items:center;gap:5px;font-size:13px;color:#dbe4f6;white-space:nowrap}
+  .h-auto input{width:18px;height:18px}
   #content{flex:1;overflow:auto;padding:8px 6px 72px;-webkit-overflow-scrolling:touch}
   .req-card{border:1px solid #dce3ee;border-radius:12px;margin:10px 8px;overflow:hidden;background:#fff;box-shadow:0 2px 7px rgba(15,23,42,.08)}
   .req-hdr{background:linear-gradient(180deg,#274680,#1e3264);color:#fff;padding:10px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -110,21 +116,26 @@
 </head>
 <body>
   <div id="hdr">
-    <h1>📦 출고요청 현황</h1>
-    <label>라인
-      <select id="f-line" onchange="reload()">
-        <option value="OC">OC</option>
-        <option value="RC">RC</option>
-        <option value="TWO BALL">TWO BALL</option>
-        <option value="FP">FP</option>
-      </select>
-    </label>
-    <label>날짜 <input type="date" id="f-date" onchange="reload()"></label>
-    <span class="pill" id="sum">-</span>
-    <div style="flex:1"></div>
-    <label><input type="checkbox" id="f-auto" checked> 자동새로고침</label>
-    <button id="btn-push" onclick="enablePush()" style="font-size:15px;padding:6px 12px;border-radius:6px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.12);color:#fff;font-weight:700;cursor:pointer">🔔 알림 켜기</button>
-    <button onclick="reload()" style="font-size:17px;padding:6px 14px;border-radius:6px;border:none;background:#16a34a;color:#fff;font-weight:700;cursor:pointer">새로고침</button>
+    <div class="hrow hrow-title">
+      <h1>📦 출고요청 현황</h1>
+      <span class="pill" id="sum">-</span>
+    </div>
+    <div class="hrow">
+      <label class="fld">라인
+        <select id="f-line" onchange="reload()">
+          <option value="OC">OC</option>
+          <option value="RC">RC</option>
+          <option value="TWO BALL">TWO BALL</option>
+          <option value="FP">FP</option>
+        </select>
+      </label>
+      <label class="fld">날짜 <input type="date" id="f-date" onchange="reload()"></label>
+    </div>
+    <div class="hrow">
+      <button class="h-refresh" onclick="reload()">↻ 새로고침</button>
+      <button id="btn-push" class="h-push" onclick="enablePush()">🔔 알림</button>
+      <label class="h-auto"><input type="checkbox" id="f-auto" checked> 자동</label>
+    </div>
   </div>
   <div id="tabs">
     <button data-t="product" onclick="setTab('product')">완제품 기준</button>
