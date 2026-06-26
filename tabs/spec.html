@@ -158,6 +158,21 @@
   </div>
 </div>
 
+<!-- 공용 확인 모달 (브라우저 confirm 대체) -->
+<div id="spec-confirm-modal" style="display:none;position:fixed;inset:0;z-index:1200;background:rgba(0,0,0,.55);align-items:center;justify-content:center;font-family:'Malgun Gothic','맑은 고딕',sans-serif">
+  <div style="background:#fff;border-radius:12px;width:92vw;max-width:460px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.45)">
+    <div style="background:#1e3264;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px">
+      <div id="spec-confirm-title" style="flex:1;font-size:20px;font-weight:700">확인</div>
+      <button onclick="specConfirmClose(false)" style="background:none;border:none;color:rgba(255,255,255,.85);font-size:20px;cursor:pointer;line-height:1">✕</button>
+    </div>
+    <div id="spec-confirm-body" style="padding:18px;font-size:17px;color:#374151;line-height:1.5;max-height:55vh;overflow-y:auto"></div>
+    <div style="padding:0 18px 18px;display:flex;gap:8px">
+      <button onclick="specConfirmClose(false)" style="flex:1;padding:11px;background:#f3f4f6;color:#374151;border:1px solid #d1d5db;border-radius:8px;font-size:17px;cursor:pointer">취소</button>
+      <button id="spec-confirm-ok" onclick="specConfirmClose(true)" style="flex:2;padding:11px;background:#16a34a;color:#fff;border:none;border-radius:8px;font-size:17px;font-weight:700;cursor:pointer">확인</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
 'use strict';
@@ -244,6 +259,23 @@ function _specReqedBadge(cd){
     ? `<span style="display:inline-block;background:#16a34a;color:#fff;padding:2px 9px;border-radius:10px;font-size:14px;font-weight:800;margin-left:6px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25)">✅ 출고요청함</span>`
     : '';
 }
+// 앱 스타일 확인 모달(브라우저 confirm 대체) → Promise<boolean>
+let _specConfirmResolve = null;
+function specConfirm({title='확인', html='', confirmText='확인', confirmColor='#16a34a'}={}){
+  const modal=document.getElementById('spec-confirm-modal');
+  if(!modal) return Promise.resolve(window.confirm(String(html).replace(/<[^>]+>/g,'')));
+  document.getElementById('spec-confirm-title').textContent=title;
+  document.getElementById('spec-confirm-body').innerHTML=html;
+  const ok=document.getElementById('spec-confirm-ok');
+  ok.textContent=confirmText; ok.style.background=confirmColor;
+  modal.style.display='flex';
+  return new Promise(res=>{ _specConfirmResolve=res; });
+}
+window.specConfirmClose = function(ok){
+  const modal=document.getElementById('spec-confirm-modal');
+  if(modal) modal.style.display='none';
+  if(_specConfirmResolve){ _specConfirmResolve(!!ok); _specConfirmResolve=null; }
+};
 window.specBulkShipRequest = async function(){
   const checked = [...document.querySelectorAll('#spec-table-wrap .ship-chk:checked')];
   if (!checked.length){ showToast('출고요청할 항목을 선택하세요','info'); return; }
@@ -267,8 +299,14 @@ window.specBulkShipRequest = async function(){
   // 중복 출고요청 경고(분할출고 허용 → 차단하지 않고 확인만): 같은 날짜에 이미 요청된 완제품이 포함된 경우
   const dup = items.filter(it=>_specReqedCd.has(String(it.cd_item)));
   if (dup.length){
-    const list = dup.map(d=>'• '+d.cd_item).join('\n');
-    const ok = confirm(`이미 출고요청한 완제품이 ${dup.length}건 포함되어 있습니다 (분할출고).\n\n${list}\n\n그래도 추가로 출고요청하시겠습니까?`);
+    const list = dup.map(d=>`<div style="font-family:monospace;color:#1e3264;margin:2px 0">• ${d.cd_item}</div>`).join('');
+    const ok = await specConfirm({
+      title:'⚠ 중복 출고요청 확인',
+      html:`<div style="margin-bottom:10px">이미 출고요청한 완제품이 <b style="color:#dc2626">${dup.length}건</b> 포함되어 있습니다 <span style="color:#9ca3af">(분할출고)</span>.</div>
+        <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:8px 10px;margin-bottom:10px">${list}</div>
+        <div>그래도 추가로 출고요청하시겠습니까?</div>`,
+      confirmText:'추가 출고요청', confirmColor:'#16a34a'
+    });
     if (!ok) return;
   }
   showSaving();
@@ -529,6 +567,7 @@ window.specShipCancelCell = async function(idsStr,ridsStr){
     for(let i=0;i<ids.length;i++){ await AIT_API.deleteShipRequestItem(Number(ids[i]), Number(rids[i])||0); }
     showToast('출고요청 취소 완료','success');
     await specLoadShipStatus();
+    _specEnsureReqedCd(true);   // 삭제 반영 → '출고요청함' 배지 갱신
   }catch(e){ showToast('취소 실패: '+e.message,'error'); }
   finally{ hideSaving(); }
 };
@@ -547,6 +586,7 @@ window.specCancelShipRequest = async function(requestId){
     if(res&&res.ok===false) showToast('취소 불가: 이미 확인/완료 처리가 시작되었습니다','error');
     else showToast('출고요청 취소 완료','success');
     await specLoadShipStatus();
+    _specEnsureReqedCd(true);   // 삭제 반영 → '출고요청함' 배지 갱신
   }catch(e){ showToast('취소 실패: '+e.message,'error'); }
   finally{ hideSaving(); }
 };
@@ -1122,7 +1162,7 @@ window.specCloseModal=function(){
 };
 
 // ESC closes modal (출고요청 모달이 열려있으면 그것부터 닫기)
-document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const sm=document.getElementById('spec-ship-modal'); if(sm&&sm.style.display!=='none'){ specShipModalClose(); } else { specCloseModal(); } } });
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'){ const cm=document.getElementById('spec-confirm-modal'); if(cm&&cm.style.display!=='none'){ specConfirmClose(false); return; } const sm=document.getElementById('spec-ship-modal'); if(sm&&sm.style.display!=='none'){ specShipModalClose(); } else { specCloseModal(); } } });
 
 /* ── 모달 렌더 ── */
 function specRenderModal(bom){

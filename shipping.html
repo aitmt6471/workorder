@@ -121,7 +121,7 @@
   <div id="hdr">
     <div class="hrow hrow-title">
       <h1>📦 출고요청 현황</h1>
-      <span class="pill" id="sum">-</span>
+      <span style="display:flex;align-items:center;gap:8px"><span id="mes-who"></span><span class="pill" id="sum">-</span></span>
     </div>
     <div class="hrow">
       <label class="fld">라인
@@ -164,9 +164,80 @@
   </div>
 
 <script src="js/api.js"></script>
+<script src="js/mes-auth.js"></script>
 <script>
 'use strict';
 if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(()=>{}); }
+
+// 라인 → 생산창고 자동매핑 (이동처리용)
+const _whCache={ 'OC':'00034','RC':'00035','TWO BALL':'00030','FP':'00033','OD':'00036','TSL':'00032' };
+async function resolveWh(line){
+  if(_whCache[line]!==undefined) return _whCache[line];
+  try{ const r=await AIT_API.lineWarehouse(line); _whCache[line]=(r&&r.ok&&r.wh)?r.wh:null; }
+  catch(_){ _whCache[line]=null; }
+  return _whCache[line];
+}
+// 피더 확인 토글 — 낙관적 업데이트(즉시 화면 반영, 저장은 백그라운드, 전체 리로드 없음)
+function toggleCheck(ids,on){
+  const idSet=new Set(String(ids).split(',').filter(Boolean).map(Number));
+  if(!idSet.size) return;
+  const who=MES_AUTH.name||MES_AUTH.emp;
+  _rows.forEach(r=>{ if(idSet.has(Number(r.item_id))){
+    r.confirmed_at = on ? 'now' : null;
+    r.confirmed_by = on ? who : null;
+  }});
+  renderActive();   // 즉시 반영 (서버 응답 대기 X)
+  Promise.all([...idSet].map(id=>AIT_API.shipItemCheck(id,MES_AUTH.emp,on)))
+    .catch(e=>{ toast('확인 저장 실패: '+(e.message||e)); reload(); });
+}
+// ── 스캔 구동 이동 (APK식): 슬롯 하단 스캔창 → 품번 매칭 → 누적 → 모아서 저장 ──
+function beepErr(){ try{ const a=new (window.AudioContext||window.webkitAudioContext)(); const o=a.createOscillator(); o.frequency.value=220; o.connect(a.destination); o.start(); setTimeout(()=>{o.stop();a.close();},180);}catch(_){ } }
+function pendQty(pn){ return (_scanPending[pn]||[]).reduce((a,b)=>a+b.qty,0); }
+function pendTotals(){ let boxes=0,pns=0; for(const k in _scanPending){ const n=_scanPending[k].length; if(n){ boxes+=n; pns++; } } return {boxes,pns}; }
+function slotItemsOf(pn){ return _rows.filter(x=>(((x.time_slot||'').toUpperCase())||'기타')===_slot && String(x.sub_part_no)===String(pn)); }
+
+async function onSlotScan(){
+  const inp=document.getElementById('slot-scan'); if(!inp) return;
+  const label=inp.value.trim(); inp.value='';
+  if(!label){ inp.focus(); return; }
+  for(const k in _scanPending){ if(_scanPending[k].some(b=>b.label===label)){ toast('이미 스캔된 라벨입니다'); beepErr(); inp.focus(); return; } }
+  let r; try{ r=await AIT_API.labelInfo(label,'00025'); }catch(e){ toast('조회 오류: '+(e.message||e)); inp.focus(); return; }
+  if(!r||!r.ok){ toast('자재창고에 없는 라벨입니다'); beepErr(); inp.focus(); return; }
+  const pn=String(r.item);
+  const items=slotItemsOf(pn);
+  if(!items.length){ const other=_rows.find(x=>String(x.sub_part_no)===pn); toast(other?`이 타임에 없는 품번 (다른 타임 요청)`:`리스트에 없는 품번 ${pn}`); beepErr(); inp.focus(); return; }
+  if(items.every(x=>x.done_at)){ toast('이미 이동완료된 품번입니다'); beepErr(); inp.focus(); return; }
+  const need=items.reduce((a,x)=>a+(Number(x.total_qty)||0),0);
+  const q=Number(r.qty)||0;
+  if(pendQty(pn)+q>need){ if(!confirm(`'${pn}' 필요수량 ${fmtQty(need)} 초과 (현재 ${fmtQty(pendQty(pn))} + ${fmtQty(q)}).\n그래도 진행할까요?`)){ inp.focus(); return; } }
+  (_scanPending[pn]=_scanPending[pn]||[]).push({sysitem:r.sysitem,label:r.label,lot:r.lot,qty:q});
+  toast(`${pn} +1박스 (${fmtQty(q)})`);
+  renderActive();
+  const si=document.getElementById('slot-scan'); if(si) si.focus();
+}
+
+async function saveMoves(){
+  if(_busy) return;
+  const t=pendTotals(); if(!t.boxes){ toast('스캔된 박스가 없습니다'); return; }
+  const line=document.getElementById('f-line').value;
+  const wh=await resolveWh(line);
+  if(!wh){ toast(`'${line}' 생산창고를 찾을 수 없습니다`); return; }
+  const boxes=[]; for(const k in _scanPending) for(const b of _scanPending[k]) boxes.push(b);
+  _busy=true; toast(`이동 처리 중... (${t.boxes}박스)`);
+  try{
+    const res=await AIT_API.stockMove({out_wh:'00025',in_wh:wh,emp:MES_AUTH.emp,boxes});
+    if(res&&res.ok){
+      for(const pn in _scanPending){
+        const items=slotItemsOf(pn);
+        const need=items.reduce((a,x)=>a+(Number(x.total_qty)||0),0);
+        if(pendQty(pn)>=need){ for(const x of items){ if(x.item_id!=null){ try{ await AIT_API.shipItemDone(Number(x.item_id),MES_AUTH.emp);}catch(_){} } } }
+      }
+      toast('이동 완료 ('+res.no_stwm+')');
+      _scanPending={}; await reload();
+    } else { toast('이동 실패: '+((res&&res.error)||'오류')); beepErr(); }
+  }catch(e){ toast('이동 오류: '+(e.message||e)); beepErr(); }
+  finally{ _busy=false; }
+}
 const VAPID_PUBLIC='BLimlNDe_M60ZFhJ-rUIp3ohwrJEmCNk7EVv8vyehWXkapqOMI6bnvKo2MXgrqnzt1otM41XumWWZFthT8JUNbE';
 function _b64ToU8(s){ const pad='='.repeat((4-s.length%4)%4); const b=(s+pad).replace(/-/g,'+').replace(/_/g,'/'); const raw=atob(b); return Uint8Array.from([...raw].map(c=>c.charCodeAt(0))); }
 async function enablePush(){
@@ -214,7 +285,7 @@ const SLOT_COLORS={
   '기타':{h:'#64748b',t:'#f8fafc',c:'#475569'}
 };
 const ST={requested:{t:'요청',bg:'#e5e7eb',c:'#374151'},confirmed:{t:'확인',bg:'#dbeafe',c:'#1e40af'},done:{t:'완료',bg:'#dcfce7',c:'#166534'}};
-let _timer=null, _busy=false, _rows=[], _tab='part', _locMap={}, _slot='';
+let _timer=null, _busy=false, _rows=[], _tab='part', _locMap={}, _slot='', _scanPending={};
 function fmtQty(n){ n=Math.round(Number(n)*1000)/1000; return n.toLocaleString('en-US',{maximumFractionDigits:3}); }
 function esc1(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 function locTag(pn){ const o=_locMap[pn]; return (o&&o.loc)?`<div class="loc-tag">📍 ${o.loc}</div>`:''; }
@@ -387,11 +458,13 @@ function renderPart(rows, keep){
     const sl=(r.time_slot||'').toUpperCase()||'기타';
     if(!agg[sl]) agg[sl]={};
     const k=r.sub_part_no;
-    if(!agg[sl][k]) agg[sl][k]={pn:k,nm:r.part_name||'',qty:0,items:[],ts:''};
+    if(!agg[sl][k]) agg[sl][k]={pn:k,nm:r.part_name||'',qty:0,items:[],ts:'',chk:true,mv:true,chkBy:'',mvBy:''};
     const c=agg[sl][k];
     c.qty+=Number(r.total_qty)||0;
     c.items.push({id:r.item_id,status:r.status});
     if(r.created_at && r.created_at>c.ts) c.ts=r.created_at;
+    if(r.confirmed_at) c.chkBy=r.confirmed_by||c.chkBy; else c.chk=false;  // 피더 확인(독립)
+    if(r.done_at) c.mvBy=r.done_by||c.mvBy; else c.mv=false;               // 창고 이동완료(독립)
   });
   if(!rows.length){ document.getElementById('sum').textContent='부품 0종'; wrap.innerHTML='<div class="empty">해당 라인/날짜의 출고요청이 없습니다</div>'; return; }
   const cntOf=s=>agg[s]?Object.keys(agg[s]).length:0;
@@ -411,15 +484,38 @@ function renderPart(rows, keep){
   if(!parts.length){ body='<div class="empty">해당 타임 출고요청이 없습니다</div>'; }
   else{
     const col=sc(_slot);
-    body=`<div style="overflow:auto"><table class="ptbl2"><thead><tr><th style="text-align:left">부품</th><th style="background:${col.h};min-width:110px">출고수량</th><th style="min-width:96px">처리</th></tr></thead><tbody>`;
+    const allIds=parts.flatMap(p=>p.items.map(i=>i.id)).join(',');
+    const allChk=parts.length && parts.every(p=>p.chk);
+    const pt=pendTotals();
+    const toolbar=`<div style="padding:8px 8px 0;display:flex;flex-direction:column;gap:8px">
+      <input id="slot-scan" placeholder="📷 박스라벨 스캔 / 입력 후 Enter" autocomplete="off" inputmode="text"
+        style="width:100%;font-size:17px;padding:13px;border:2px solid #1e3264;border-radius:11px;min-height:52px;font-family:ui-monospace,monospace;box-sizing:border-box"
+        onkeydown="if(event.key==='Enter'){event.preventDefault();onSlotScan()}">
+      <div style="display:flex;gap:8px">
+        <button onclick="toggleCheck('${allIds}',${!allChk})" style="flex:1;min-height:44px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;${allChk?'background:#fff;color:#64748b;border:1px solid #cbd5e1':'background:#16a34a;color:#fff;border:none'}">${allChk?'전체확인 해제':'✓ 전체확인'}</button>
+        <button onclick="saveMoves()" ${pt.boxes?'':'disabled'} style="flex:1.4;min-height:44px;border-radius:10px;font-size:15px;font-weight:800;cursor:pointer;border:none;color:#fff;background:${pt.boxes?'#1e3264':'#cbd5e1'}">📦 이동 저장${pt.boxes?` (${pt.boxes}박스·${pt.pns}품목)`:''}</button>
+      </div>
+    </div>`;
+    body=toolbar+`<div style="overflow:auto"><table class="ptbl2"><thead><tr><th style="text-align:left">부품</th><th style="background:${col.h};min-width:100px">출고수량</th><th style="min-width:70px">확인<div style="font-size:11px;font-weight:400;opacity:.7">피더</div></th><th style="min-width:92px">이동<div style="font-size:11px;font-weight:400;opacity:.7">창고</div></th></tr></thead><tbody>`;
     parts.forEach(p=>{
       const ids=p.items.map(i=>i.id).join(',');
-      const allConf=p.items.every(i=>i.status==='confirmed'||i.status==='done');
-      const allDone=p.items.every(i=>i.status==='done');
-      const confT=allConf?'requested':'confirmed';
-      const doneT=allDone?'confirmed':'done';
-      const bg=allDone?'#dcfce7':col.t;
-      const qc=allDone?'#166534':(allConf?'#1d4ed8':col.c);
+      const bg=p.mv?'#dcfce7':col.t;
+      const qc=p.mv?'#166534':(p.chk?'#1d4ed8':col.c);
+      const chkBtn=`<button onclick="toggleCheck('${ids}',${!p.chk})" style="min-height:38px;padding:6px 8px;border:1px solid ${p.chk?'#16a34a':'#cbd5e1'};border-radius:8px;background:${p.chk?'#dcfce7':'#fff'};color:${p.chk?'#166534':'#94a3b8'};font-weight:800;font-size:15px;cursor:pointer">${p.chk?'✓':'☐'}</button>${p.chk&&p.chkBy?`<div class="byline" style="font-size:10px;color:#64748b;margin-top:2px">${p.chkBy}</div>`:''}`;
+      // 이동 칸 = 스캔 진행률 (버튼 없음). 완료/채움대기/부분/미스캔
+      const box=Number((_locMap[p.pn]||{}).box)||0;
+      const needBoxes=box?Math.ceil(p.qty/box):null;
+      const pq=pendQty(p.pn), pb=(_scanPending[p.pn]||[]).length;
+      let mvBtn;
+      if(p.mv){
+        mvBtn=`<div style="font-size:15px;font-weight:800;color:#166534">✅ 완료</div>${p.mvBy?`<div class="byline" style="font-size:10px;color:#64748b;margin-top:2px">${p.mvBy}</div>`:''}`;
+      } else if(pb && pq>=p.qty){
+        mvBtn=`<div style="font-size:14px;font-weight:800;color:#1d4ed8">🔵 채움 ✓</div><div class="byline" style="font-size:10px;color:#1d4ed8;margin-top:2px">${pb}박스 · 저장대기</div>`;
+      } else if(pb){
+        mvBtn=`<div style="font-size:14px;font-weight:800;color:#1d4ed8">🔵 ${pb}/${needBoxes??'?'}박스</div><div class="byline" style="font-size:10px;color:#64748b;margin-top:2px">${fmtQty(pq)}/${fmtQty(p.qty)}</div>`;
+      } else {
+        mvBtn=`<div style="font-size:14px;font-weight:700;color:#94a3b8">☐ ${needBoxes?('0/'+needBoxes+'박스'):'-'}</div>`;
+      }
       body+=`<tr>
         <td class="pcol2 pn-click" onclick="openPartModal('${esc1(p.pn)}')"><span class="pno2">${p.pn}</span><div class="pnm">${p.nm}</div>${locTag(p.pn)}</td>
         <td style="background:${bg}">
@@ -427,27 +523,17 @@ function renderPart(rows, keep){
           ${boxTag(p.pn,p.qty)}
           ${p.ts?`<div class="cell-time">🕒 ${fmtDTShort(p.ts)}</div>`:''}
         </td>
-        <td><div class="cellbtns">
-          <button onclick="setStatusBulk('${ids}','${confT}')" style="background:${allConf?'#dbeafe':'#fff'};color:${allConf?'#1e40af':'#94a3b8'};font-weight:${allConf?'800':'600'}">확인${allConf?' ✓':''}</button>
-          <button onclick="setStatusBulk('${ids}','${doneT}')" style="background:${allDone?'#dcfce7':'#fff'};color:${allDone?'#166534':'#94a3b8'};font-weight:${allDone?'800':'600'}">완료${allDone?' ✓':''}</button>
-        </div></td>
+        <td>${chkBtn}</td>
+        <td>${mvBtn}</td>
       </tr>`;
     });
     body+='</tbody></table></div>';
   }
   wrap.innerHTML=bar+body;
+  const si=document.getElementById('slot-scan'); if(si) si.focus({preventScroll:true});  // 스캔 대기 포커스
 }
 function setSlot(s){ _slot=s; renderPart(_rows, true); }
 
-async function setStatusBulk(ids,status){
-  if(_busy) return; _busy=true;
-  try{
-    const list=String(ids).split(',').filter(Boolean);
-    for(const id of list){ await AIT_API.updateShipRequestItem(Number(id),status); }
-    toast('처리됨'); await reload();
-  }catch(e){ toast('실패: '+e.message); }
-  finally{ _busy=false; }
-}
 
 function renderProduct(rows){
   const wrap=document.getElementById('content');
@@ -507,7 +593,7 @@ async function setStatus(itemId,status){
   finally{ _busy=false; }
 }
 
-function tick(){ if(document.getElementById('f-auto').checked && !_busy) reload(); }
+function tick(){ if(Object.keys(_scanPending).length) return; /* 스캔 대기 중엔 리로드 보류 */ if(document.getElementById('f-auto').checked && !_busy) reload(); }
 
 async function loadLines(){
   try{
@@ -525,9 +611,12 @@ async function loadLines(){
 (function init(){
   const d=new Date();
   document.getElementById('f-date').value=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  loadLines().finally(reload);
-  _refreshPushBtn();
-  _timer=setInterval(tick, 30000);
+  MES_AUTH.ready(()=>{
+    const w=document.getElementById('mes-who'); if(w) w.innerHTML=MES_AUTH.chipHtml();
+    loadLines().finally(reload);
+    _refreshPushBtn();
+    _timer=setInterval(tick, 30000);
+  });
 })();
 </script>
 </body>

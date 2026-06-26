@@ -149,11 +149,20 @@ const AIT_API = (() => {
     createShipRequestPart: (payload)                => _post('ait/spec/ship-request/part', payload, 30000),
     getShipRequests:       (lineName, date, status) => _get('ait/spec/ship-requests', status ? { lineName, date, status } : { lineName, date }),
     updateShipRequestItem: (item_id, status)        => _post('ait/spec/ship-request/item-status', { item_id, status }),
+    shipItemCheck:         (item_id, emp, on)        => _post('ait/spec/ship-request/item-check', { item_id, emp, on }),
+    shipItemDone:          (item_id, emp)            => _post('ait/spec/ship-request/item-done', { item_id, emp }),
     cancelShipRequest:     (request_id)             => _del('ait/spec/ship-request/cancel', { request_id }),
     deleteShipRequestItem: (item_id, request_id)    => _del('ait/spec/ship-request/item', { item_id, request_id }),
     getShipLines:          ()                       => _get('ait/spec/ship-lines'),
     getPartLocations:      (parts)                  => _get('ait/spec/part-locations', { parts: (parts || []).join(',') }),
     savePushSubscription:  (data)                   => _post('ait/spec/push-subscribe', data),
+
+    /* ── 창고이동(자재→생산) PDA ─────────────── */
+    pdaLogin:              (emp, pwd)               => _post('ait/spec/pda-login', { emp, pwd }),
+    lineWarehouse:         (line)                  => _get('ait/spec/line-warehouse', { line }),
+    labelInfo:             (label, wh)             => _get('ait/spec/label-info', wh ? { label, wh } : { label }),
+    // payload = { out_wh:'00025', in_wh, emp, boxes:[{sysitem,label,lot,qty}] }
+    stockMove:             (payload)               => _post('ait/spec/stock-move', payload, 30000),
 
     /* ── 작업표준서 ────────────────────────────── */
     getWsProcesses:   (carId)   => _get('ait/ws/processes', { carId }),
@@ -389,11 +398,17 @@ const AIT_API = (() => {
     createShipRequestPart: (payload)                => _real.createShipRequestPart(payload),
     getShipRequests:       (lineName, date, status) => _real.getShipRequests(lineName, date, status),
     updateShipRequestItem: (item_id, status)        => _real.updateShipRequestItem(item_id, status),
+    shipItemCheck:         (item_id, emp, on)        => _real.shipItemCheck(item_id, emp, on),
+    shipItemDone:          (item_id, emp)            => _real.shipItemDone(item_id, emp),
     cancelShipRequest:     (request_id)             => _real.cancelShipRequest(request_id),
     deleteShipRequestItem: (item_id, request_id)    => _real.deleteShipRequestItem(item_id, request_id),
     getShipLines:          ()                       => _real.getShipLines(),
     getPartLocations:      (parts)                  => _real.getPartLocations(parts),
     savePushSubscription:  (data)                   => _real.savePushSubscription(data),
+    pdaLogin:              (emp, pwd)               => _real.pdaLogin(emp, pwd),
+    lineWarehouse:         (line)                  => _real.lineWarehouse(line),
+    labelInfo:             (label, wh)             => _real.labelInfo(label, wh),
+    stockMove:             (payload)               => _real.stockMove(payload),
     numCircle
   };
 })();
