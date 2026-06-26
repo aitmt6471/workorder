@@ -58,7 +58,7 @@
           <div><div class="lab">스캔 누적</div><div class="val cur" id="mm-cur">0</div></div>
           <div><div class="lab">박스</div><div class="val" id="mm-box">0</div></div>
         </div>
-        <input class="scan" id="mm-scan" placeholder="📷 박스라벨 스캔 / 입력 후 Enter" autocomplete="off" inputmode="text">
+        <input class="scan" id="mm-scan" placeholder="📷 박스라벨 스캔 (PDA)" autocomplete="off" inputmode="none" virtualkeyboardpolicy="manual">
         <div class="hint" id="mm-hint"></div>
         <div class="blist" id="mm-blist"></div>
       </div>
