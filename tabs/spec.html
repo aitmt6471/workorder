@@ -196,6 +196,16 @@ function _specTsOptions(sel){
   const map = {A:'A(09-11)',B:'B(11-13)',C:'C(14-16)',D:'D(16-18)'};
   return Object.keys(map).map(k=>`<option value="${k}"${k===sel?' selected':''}>${map[k]}</option>`).join('');
 }
+// 출고시간대 A/B/C/D 색상(시간 흐름: 파랑→초록→노랑→빨강) — 작업자 시각 구분용
+const _SHIP_TS_COLOR = {A:'#2563eb', B:'#7c3aed', C:'#f59e0b', D:'#dc2626'};
+function _tsBarColor(v){ return _SHIP_TS_COLOR[v] || '#cbd5e1'; }
+// 선택값에 맞춰 좌측 컬러 바 + 옅은 배경 적용
+window._specTsColor = function(sel){
+  const c = _tsBarColor(sel.value);
+  sel.style.borderLeft = '8px solid ' + c;
+  sel.style.background = c + '1a'; // 약 10% 투명도 틴트
+  sel.style.fontWeight = '700';
+};
 window.specUpdateShipSelCount = function(){
   const n = document.querySelectorAll('#spec-table-wrap .ship-chk:checked').length;
   const el = document.getElementById('spec-ship-sel-count');
@@ -205,6 +215,35 @@ window.specToggleAllShip = function(master){
   document.querySelectorAll('#spec-table-wrap .ship-chk').forEach(c=>{ c.checked = master.checked; });
   specUpdateShipSelCount();
 };
+// ── 중복 출고요청 방지: 선택 날짜에 이미 요청된 완제품 도번 집합 (판정 = cd_item + 출고일자) ──
+let _specReqedCd = new Set();      // 이미 출고요청된 cd_item 집합
+let _specReqedKey = null;          // 캐시 키(라인|날짜)
+let _specReqedLoading = false;
+function _specReqKeyInfo(){
+  const lineName = _getCarLineName();
+  const m = getTabMonth('spec');
+  const dateStr = _specDay ? _fmtDate(m.year, m.month, _specDay) : '';
+  return { lineName, dateStr, key:(lineName||'')+'|'+dateStr };
+}
+// 선택 날짜의 기존 출고요청을 불러와 _specReqedCd 갱신(지연 로드). force=true면 강제 재조회.
+function _specEnsureReqedCd(force){
+  const { lineName, dateStr, key } = _specReqKeyInfo();
+  if(!force && key===_specReqedKey) return;
+  if(_specReqedLoading) return;
+  _specReqedKey = key;
+  if(!dateStr){ _specReqedCd = new Set(); return; }
+  _specReqedLoading = true;
+  AIT_API.getShipRequests(lineName, dateStr)
+    .then(res=>{ const rows=Array.isArray(res)?res:[]; _specReqedCd=new Set(rows.map(r=>String(r.cd_item))); })
+    .catch(()=>{ _specReqedCd=new Set(); })   // 조회 실패 시 빈 집합 → 경고/배지 없음(차단하지 않음)
+    .finally(()=>{ _specReqedLoading=false; if(_specTab==='orders') specRenderTable(); });
+}
+// 이미 출고요청된 완제품에 표시할 이력 배지
+function _specReqedBadge(cd){
+  return _specReqedCd.has(String(cd))
+    ? `<span style="display:inline-block;background:#16a34a;color:#fff;padding:2px 9px;border-radius:10px;font-size:14px;font-weight:800;margin-left:6px;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25)">✅ 출고요청함</span>`
+    : '';
+}
 window.specBulkShipRequest = async function(){
   const checked = [...document.querySelectorAll('#spec-table-wrap .ship-chk:checked')];
   if (!checked.length){ showToast('출고요청할 항목을 선택하세요','info'); return; }
@@ -225,6 +264,13 @@ window.specBulkShipRequest = async function(){
     items.push({ cd_item:meta.cd_item, color_code:meta.color_code, work_order_no:meta.work_order_no, product_name:meta.product_name, req_qty:qty, time_slot:ts, priority:prio });
   }
   if (!items.length){ showToast('유효한 요청이 없습니다'+(skipped.length?' ('+skipped.join(', ')+')':''),'error'); return; }
+  // 중복 출고요청 경고(분할출고 허용 → 차단하지 않고 확인만): 같은 날짜에 이미 요청된 완제품이 포함된 경우
+  const dup = items.filter(it=>_specReqedCd.has(String(it.cd_item)));
+  if (dup.length){
+    const list = dup.map(d=>'• '+d.cd_item).join('\n');
+    const ok = confirm(`이미 출고요청한 완제품이 ${dup.length}건 포함되어 있습니다 (분할출고).\n\n${list}\n\n그래도 추가로 출고요청하시겠습니까?`);
+    if (!ok) return;
+  }
   showSaving();
   try{
     const r=await AIT_API.createShipRequest({ line_name:lineName, req_date:reqDate, items });
@@ -239,6 +285,7 @@ window.specBulkShipRequest = async function(){
     document.querySelectorAll('#spec-table-wrap .ship-chk:checked').forEach(c=>c.checked=false);
     const all=document.getElementById('spec-ship-chk-all'); if(all) all.checked=false;
     specUpdateShipSelCount();
+    _specEnsureReqedCd(true);   // 방금 요청한 완제품에 '출고요청함' 배지 즉시 반영
   }catch(e){ showToast('출고요청 실패: '+e.message,'error'); }
   finally{ hideSaving(); }
 };
@@ -869,6 +916,7 @@ function specRenderTable(){
       wrap.innerHTML='<div style="padding:40px;text-align:center;color:#9ca3af;font-size:21px">해당 날짜에 작업지시가 없습니다<br><span style="font-size:19px">전체 리스트 탭에서 전체 품목을 볼 수 있습니다</span></div>';
       return;
     }
+    _specEnsureReqedCd();   // 이미 출고요청된 완제품 도번 로드(지연) → 배지/경고용
   }
 
   let rows;
@@ -992,7 +1040,8 @@ function specRenderTable(){
     const mes=_specMesMap[row.part_no]||null;
     const isSel=row.part_no===_specSelectedPartNo;
     const hasMesRow=!!mes;
-    const bg=isSel?'#eef2ff':(hasMesRow?'#f0fdf4':'#fff');
+    const _isReqed=_specReqedCd.has(String(row.bom_part_no||row.part_no));   // 이미 출고요청됨
+    const bg=isSel?'#eef2ff':(_isReqed?'#fff7ed':(hasMesRow?'#f0fdf4':'#fff'));
     const mesBadge=hasMesRow
       ?`<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:#22c55e;margin-right:4px;vertical-align:middle"></span>`:'';
     const nm=row.option_name||_specItemNames[row._base||row.part_no]||(mes&&mes.nm_item)||'';
@@ -1004,13 +1053,13 @@ function specRenderTable(){
     html+=`<tr data-pn="${row.part_no}" onclick="specSelectRow('${row.part_no}','${row._base||row.part_no}')"
       style="background:${bg};border-bottom:1px solid #f0f0f0;cursor:pointer">
       <td style="padding:5px 8px;text-align:center;font-weight:800;color:#64748b;font-size:18px">${idx+1}</td>
-      <td style="padding:5px 8px;font-weight:600;color:#1e3264;font-family:monospace;font-size:19px;white-space:nowrap">${mesBadge}${row._base||row.part_no||''}${_colorBadge(colorCode)}</td>
+      <td style="padding:5px 8px;font-weight:600;color:#1e3264;font-family:monospace;font-size:19px;white-space:nowrap">${mesBadge}${row._base||row.part_no||''}${_colorBadge(colorCode)}${_specReqedBadge(shipKey)}</td>
       <td style="padding:5px 8px;text-align:center">${_partTypeBadge(row._base||row.part_no)}</td>
       <td style="padding:5px 8px;font-size:19px;color:#374151">${nm}</td>
       <td style="padding:5px 8px;text-align:center;color:#6b7280;font-size:19px">${row.bom_count||0}</td>
       <td style="padding:5px 8px;font-family:monospace;font-size:18px;color:#6b7280">${mes?mes.no_mmmo||'':''}</td>
       <td style="padding:5px 8px;text-align:right;font-weight:600;color:${hasMesRow?'#16a34a':'#9ca3af'}">${mes?mes.qt_order||'':''}</td>
-      <td style="padding:3px 4px;text-align:center" onclick="event.stopPropagation()">${noBom?'-':`<select class="ship-ts" data-pn="${shipKey}" style="font-size:15px;padding:2px">${_specTsOptions(_autoTs)}</select>`}</td>
+      <td style="padding:3px 4px;text-align:center" onclick="event.stopPropagation()">${noBom?'-':`<select class="ship-ts" data-pn="${shipKey}" onchange="_specTsColor(this)" style="font-size:15px;padding:2px 2px 2px 6px;font-weight:700;border-left:8px solid ${_tsBarColor(_autoTs)};background:${_tsBarColor(_autoTs)}1a">${_specTsOptions(_autoTs)}</select>`}</td>
       <td style="padding:3px 4px;text-align:center" onclick="event.stopPropagation()">${noBom?'-':`<input type="number" min="0" class="ship-qty" data-pn="${shipKey}" value="${qtyDefault}" style="width:68px;font-size:16px;padding:3px;text-align:right">`}</td>
       <td style="padding:3px 4px;text-align:center" onclick="event.stopPropagation()">${noBom?`<span title="BOM 없음" style="color:#cbd5e1">✕</span>`:`<input type="checkbox" class="ship-chk" data-pn="${shipKey}" onchange="specUpdateShipSelCount()" style="width:18px;height:18px;cursor:pointer">`}</td>
     </tr>`;
