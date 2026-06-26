@@ -267,12 +267,15 @@ window.print_cp_gentex = async function() {
         const item   = safe(row.ctrl_item);
         // owner는 원본(한국어) 기준으로 ● 판단
         const owner  = safe(origRow.owner);
-        const fpfRaw = safe(row.char_general)||safe(row.fpf)||'';
-        const fpfMark= (fpfRaw==='1'||fpfRaw==='true'||fpfRaw==='Y')?'●':
-                       (fpfRaw&&fpfRaw!=='-'&&fpfRaw!=='—'&&fpfRaw!=='null')?fpfRaw:'';
+        const _mark = v => { const s=safe(v);
+          return (s==='1'||s==='true'||s==='Y')?'●':
+                 (s&&s!=='-'&&s!=='—'&&s!=='null')?s:''; };
+        const specMark= _mark(row.char_special);
+        const fpfMark = _mark(safe(row.char_general)||safe(row.fpf));
         h+=`<td style="${B}text-align:center;font-size:5.5pt;vertical-align:middle">${itemNo}</td>`;
         h+=`<td style="${B}text-align:left;padding:1px 3px;font-size:5.5pt;vertical-align:middle;white-space:pre-line">${cat==='제품'?item:''}</td>`;
         h+=`<td style="${B}text-align:left;padding:1px 3px;font-size:5.5pt;vertical-align:middle;white-space:pre-line">${cat==='공정'?item:''}</td>`;
+        h+=`<td style="${B}text-align:center;font-size:8pt;vertical-align:middle">${specMark}</td>`;
         h+=`<td style="${B}text-align:center;font-size:8pt;vertical-align:middle">${fpfMark}</td>`;
         h+=`<td style="${B}text-align:left;padding:1px 3px;font-size:5.5pt;vertical-align:middle;white-space:pre-line">${safe(row.standard)}</td>`;
         h+=`<td style="${B}text-align:center;font-size:5.5pt;vertical-align:middle;white-space:pre-line">${safe(row.tool)}</td>`;
@@ -308,7 +311,7 @@ window.print_cp_gentex = async function() {
     <colgroup>
       <col style="width:3%"><col style="width:2%"><col style="width:2%"><col style="width:2%">
       <col style="width:8%"><col style="width:7%"><col style="width:2%">
-      <col style="width:7%"><col style="width:7%"><col style="width:2.5%">
+      <col style="width:7%"><col style="width:7%"><col style="width:2.5%"><col style="width:2.5%">
       <col style="width:10%"><col style="width:5.5%"><col style="width:4%"><col style="width:7%">
       <col style="width:2.5%"><col style="width:2.5%"><col style="width:2.5%">
       <col style="width:9%"><col style="width:5%">
@@ -320,7 +323,8 @@ window.print_cp_gentex = async function() {
         <th rowspan="2" style="${B}padding:2px;font-size:6pt">Process Name</th>
         <th rowspan="2" style="${B}padding:2px;font-size:6pt">Equipment</th>
         <th colspan="3" style="${B}padding:2px;font-size:6pt">Control Item</th>
-        <th rowspan="2" style="${B}padding:2px;font-size:5.5pt">F/PF<br>Special<br>Char.</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:5.5pt">Special<br>Char.</th>
+        <th rowspan="2" style="${B}padding:2px;font-size:5.5pt">F/PF</th>
         <th rowspan="2" style="${B}padding:2px;font-size:6pt">Specification</th>
         <th rowspan="2" style="${B}padding:2px;font-size:6pt">Inspection<br>Method</th>
         <th rowspan="2" style="${B}padding:2px;font-size:6pt">Freq.</th>
