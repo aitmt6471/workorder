@@ -864,7 +864,7 @@ window.imfSetEditable = function(on){
   const addBtn = document.getElementById('imf-add-tab-btn'); if(addBtn) addBtn.style.display = on ? '' : 'none';
   const hint = document.getElementById('imf-empty-edit-hint'); if(hint) hint.style.display = (on && IMF_DATA.length === 0) ? '' : 'none';
   imfRenderSheetTabs();
-  if(IMF_DATA.length > 0) imfRenderCheckTable();
+  if(IMF_DATA.length > 0){ renderImfProcInfo(); imfRenderCheckTable(); }
   imfRenderPoints();
 };
 
