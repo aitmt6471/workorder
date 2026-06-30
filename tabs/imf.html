@@ -581,6 +581,24 @@ function imfRenderCheckTable(){
 
 /* ── 저장 핸들러 ── */
 window._imfSaveTime = function(k, v){ if(v) localStorage.setItem(k,v); else localStorage.removeItem(k); };
+
+/* ── 현재 시각 자동 기입 (결과 입력 시 시각 비어있으면 now) ── */
+function _imfNowHM(){
+  const d = new Date();
+  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+function _imfAutoFillTime(resTd, timeKey){
+  const cur = localStorage.getItem(timeKey);
+  if (cur && cur !== '') return cur;          // 이미 입력된 시각은 유지
+  const now = _imfNowHM();
+  localStorage.setItem(timeKey, now);
+  const timeTd = resTd && resTd.previousElementSibling;
+  if (timeTd){
+    const sels = timeTd.querySelectorAll('select');
+    if (sels.length === 2){ sels[0].value = now.slice(0,2); sels[1].value = now.slice(3,5); }
+  }
+  return now;
+}
 window._imfTimeSelHtml = function(key, stored){
   const [sh='', sm=''] = (stored||'').split(':');
   const hSel = `<select onchange="window._imfSaveTimeSel(this,'${key}')"
@@ -618,11 +636,13 @@ window._imfSaveResInput = function(inputEl, k, rowIdx){
   // DB stage
   const km = k.match(/_s(\d+)_(\w+)_(cho|jung|jong)_res$/);
   if(km){
+    const _timeKey = k.replace(/_res$/, '_time');
+    if(v) _imfAutoFillTime(inputEl.closest('td'), _timeKey);  // 결과 입력 시 시각 자동 기입
     if(!document.getElementById('imf-worker-input')?.value.trim()){
       if(typeof showToast==='function') showToast('점검자를 먼저 입력해주세요.','warning');
       return;
     }
-    const timeVal = localStorage.getItem(k.replace(/_res$/, '_time')) || '';
+    const timeVal = localStorage.getItem(_timeKey) || '';
     const rmkBase = k.replace(`_${km[3]}_res`, '_rmk');
     const rmkVal = localStorage.getItem(rmkBase) || '';
     _imfStageResult(parseInt(km[1]), km[2], imfCurDay, km[3], v, timeVal, rmkVal);
@@ -637,11 +657,13 @@ window._imfQuickRes = function(btn, k, v, rowIdx){
   // DB stage
   const km = k.match(/_s(\d+)_(\w+)_(cho|jung|jong)_res$/);
   if(km){
+    const _timeKey = k.replace(/_res$/, '_time');
+    if(v) _imfAutoFillTime(btn.closest('td'), _timeKey);  // 결과 입력 시 시각 자동 기입
     if(!document.getElementById('imf-worker-input')?.value.trim()){
       if(typeof showToast==='function') showToast('점검자를 먼저 입력해주세요.','warning');
       return;
     }
-    const timeVal = localStorage.getItem(k.replace(/_res$/, '_time')) || '';
+    const timeVal = localStorage.getItem(_timeKey) || '';
     const rmkBase = k.replace(`_${km[3]}_res`, '_rmk');
     const rmkVal = localStorage.getItem(rmkBase) || '';
     _imfStageResult(parseInt(km[1]), km[2], imfCurDay, km[3], v, timeVal, rmkVal);
