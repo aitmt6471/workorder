@@ -85,7 +85,7 @@
 
 <!-- 점검 테이블 -->
 <div style="padding:14px 16px;overflow-x:auto;background:#fff">
-  <table id="imf-check-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:760px">
+  <table id="imf-check-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px;table-layout:fixed">
     <thead id="imf-check-thead"></thead>
     <tbody id="imf-check-tbody"></tbody>
   </table>
@@ -113,19 +113,70 @@ let IMF_DATA = [];
   } catch(e) {}
 })();
 
-/* ── 작업 A: IMF_ITEMS (항목 메타 DB 캐시) ── */
-let IMF_ITEMS = {}; // { "sheetIdx_itemNo": { id, sheet_id, item_name, standard, method } }
-let _imfSheetIds = []; // parallel to IMF_DATA: _imfSheetIds[tabIdx] = DB sheet_id
+/* ── 작업 A: IMF_ITEMS (항목 메타 DB 캐시) — "{sheetDbId}_{itemNo}" 키 ── */
+let IMF_ITEMS = {}; // { "sheetDbId_itemNo": { id, car_id, sheet_id, item_no, item_name, standard, method, cycle } }
+function _imfSheetDbId(idx){ return (IMF_DATA[idx]||{}).id || null; } // 탭 → imf_sheets.id
 
 async function _imfLoadItems() {
   if (!window.currentCarId) return;
   try {
     const rows = await AIT_API.getImfItems(window.currentCarId);
     IMF_ITEMS = {};
-    _imfSheetIds = [];
-    rows.forEach(r => { if (!_imfSheetIds.includes(r.sheet_id)) _imfSheetIds.push(r.sheet_id); });
-    rows.forEach(r => { IMF_ITEMS[`${_imfSheetIds.indexOf(r.sheet_id)}_${r.item_no}`] = r; });
+    rows.forEach(r => { IMF_ITEMS[`${r.sheet_id}_${r.item_no}`] = r; });
   } catch(e) { console.warn('imf items 로드 실패', e); }
+}
+
+/* ── 시트 DB 동기화: localStorage 탭 ↔ imf_sheets (id 백필/생성) ── */
+async function _imfSyncSheets() {
+  if (!window.currentCarId || AIT_API.MOCK) return;
+  let dbSheets = [];
+  try { dbSheets = await AIT_API.getImfSheets(window.currentCarId) || []; }
+  catch(e) { console.warn('imf sheets 로드 실패', e); return; }
+  let changed = false;
+  for (let i = 0; i < IMF_DATA.length; i++) {
+    const s = IMF_DATA[i];
+    if (s.id) continue;
+    const hit = dbSheets.find(dbs => (dbs.sheet_name||'') === (s.sheet||'') && !IMF_DATA.some(x => x.id === dbs.id));
+    if (hit) { s.id = hit.id; changed = true; continue; }
+    try {
+      const res = await AIT_API.createImfSheet(window.currentCarId, { sheet_name: s.sheet||'', proc_no: s.proc_no||'', sort_order: i });
+      const newId = res && (res.id || res.insertId || (res.data && res.data.id));
+      if (newId) { s.id = newId; changed = true; }
+    } catch(e) { console.warn('imf sheet 생성 실패', e); }
+  }
+  if (changed) imfSaveData();
+}
+
+/* ── 결과 저장 전 항목 DB 업서트(item_id 확보) ── */
+async function _imfSyncAllItems() {
+  if (!window.currentCarId || AIT_API.MOCK) return;
+  await _imfSyncSheets();
+  const arr = [];
+  IMF_DATA.forEach(s => {
+    if (!s.id) return;
+    (s.items||[]).forEach((it, idx) => {
+      const db = IMF_ITEMS[`${s.id}_${it.no}`] || {};
+      arr.push({
+        sheet_id: s.id, item_no: parseInt(it.no) || (idx+1),
+        item_name: db.item_name != null ? db.item_name : (it.name || ''),
+        standard:  db.standard  != null ? db.standard  : (it.std  || ''),
+        method:    db.method    != null ? db.method    : (it.method || ''),
+        cycle:     db.cycle     != null ? db.cycle     : (it.cycle || ''),
+        sort_order: idx
+      });
+    });
+  });
+  if (arr.length) {
+    try { await AIT_API.syncImfItems(window.currentCarId, arr); }
+    catch(e) { console.warn('imf items 동기화 실패', e); }
+    await _imfLoadItems();
+  }
+}
+
+/* ── 로드 보장: 시트 id 없으면 동기화 후 항목 로드 ── */
+async function _imfEnsureDb() {
+  if (IMF_DATA.some(s => !s.id)) await _imfSyncSheets();
+  await _imfLoadItems();
 }
 
 /* ── 작업 E: pendingResults + debounce ── */
@@ -133,6 +184,11 @@ let _imfPendingResults = new Map();
 let _imfSaveTimer = null;
 
 function _imfStageResult(sheetIdx, itemNo, date, phase, result, checkTime, remark) {
+  // date가 일(day) 숫자면 현재 연-월로 정규화 → check_date는 항상 YYYY-MM-DD
+  if (typeof date === 'number' || /^\d{1,2}$/.test(String(date))) {
+    const _m = getTabMonth('imf');
+    date = `${_m.year}-${String(_m.month).padStart(2,'0')}-${String(date).padStart(2,'0')}`;
+  }
   const key = `${sheetIdx}_${itemNo}_${date}_${phase}`;
   _imfPendingResults.set(key, { sheetIdx, itemNo, date, phase, result, checkTime, remark });
   clearTimeout(_imfSaveTimer);
@@ -141,20 +197,34 @@ function _imfStageResult(sheetIdx, itemNo, date, phase, result, checkTime, remar
 
 async function _imfFlushResults() {
   if (!_imfPendingResults.size || !window.currentCarId) return;
+  if (AIT_API.MOCK) { _imfPendingResults.clear(); return; }
+  // item_id 확보: 시트/항목이 DB에 없으면 동기화
+  let needSync = false;
+  _imfPendingResults.forEach(v => {
+    const sid = _imfSheetDbId(v.sheetIdx);
+    if (!sid || !(IMF_ITEMS[`${sid}_${v.itemNo}`]||{}).id) needSync = true;
+  });
+  if (needSync) await _imfSyncAllItems();
+
   const grouped = new Map();
+  const skipped = [];
   _imfPendingResults.forEach((v) => {
-    const gKey = `${v.sheetIdx}_${v.date}`;
-    if (!grouped.has(gKey)) grouped.set(gKey, { sheetIdx: v.sheetIdx, date: v.date, results: [] });
+    const sid = _imfSheetDbId(v.sheetIdx);
+    const it  = IMF_ITEMS[`${sid}_${v.itemNo}`] || {};
+    if (!sid || !it.id) { skipped.push(v.itemNo); return; }
+    const gKey = `${sid}_${v.date}`;
+    if (!grouped.has(gKey)) grouped.set(gKey, { sheet_id: sid, date: v.date, results: [] });
     grouped.get(gKey).results.push({
-      item_no: v.itemNo, phase: v.phase,
+      item_id: it.id, phase: v.phase,
       check_time: v.checkTime || '', result: v.result || '', remark: v.remark || ''
     });
   });
   _imfPendingResults.clear();
+  if (skipped.length && typeof showToast === 'function')
+    showToast('일부 항목 저장 보류 — 새로고침 후 재시도', 'warning');
   for (const [, g] of grouped) {
-    const sheet_id = _imfSheetIds[g.sheetIdx] || g.sheetIdx;
     const worker = document.getElementById('imf-worker-input')?.value || '';
-    const payload = { sheet_id, check_date: g.date, worker, results: g.results };
+    const payload = { sheet_id: g.sheet_id, check_date: g.date, worker, results: g.results };
     try {
       await AIT_API.saveImfResults(payload);
     } catch(e) { console.warn('IMF 결과 저장 실패', e); }
@@ -200,44 +270,55 @@ function imfRenderSheetTabs(){
       ? `<span onclick="event.stopPropagation();window.imfDeleteSheet(${i})"
            style="margin-left:6px;display:inline-flex;align-items:center;justify-content:center;
            width:14px;height:14px;border-radius:50%;background:rgba(239,68,68,.15);color:#ef4444;
-           font-size:9px;font-weight:900;cursor:pointer;line-height:1" title="탭 삭제">✕</span>`
+           font-size:9px;font-weight:900;cursor:pointer;line-height:1;vertical-align:middle" title="탭 삭제">✕</span>`
       : '';
     const nameEl = (active && imfEditMode)
       ? `<span contenteditable="true"
            onclick="event.stopPropagation()"
            onkeydown="event.stopPropagation()"
            onblur="window._imfSaveSheetName(${i},this)"
-           style="outline:1px dashed rgba(255,255,255,.5);border-radius:2px;min-width:24px;display:inline-block;padding:0 2px">${s.sheet}</span>`
+           style="outline:1px dashed rgba(255,255,255,.5);border-radius:2px;min-width:24px;display:inline-block;padding:0 2px;vertical-align:middle">${s.sheet}</span>`
       : s.sheet;
     return `<button onclick="window._imfSelSheet(${i})"
       style="padding:6px 10px;font-size:11px;font-weight:600;border:1px solid ${active?'#1e3264':'#c4cedf'};border-bottom:none;
-      border-radius:6px 6px 0 0;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;
+      border-radius:6px 6px 0 0;cursor:pointer;white-space:nowrap;display:inline-block;
       background:${active?'#1e3264':'#fff'};color:${active?'#fff':'var(--text)'}">${nameEl}${delBtn}</button>`;
   }).join('');
 }
 
 /* ── 시트 추가 / 삭제 / 선택 ── */
-window.imfAddSheet = function(){
+window.imfAddSheet = async function(){
   const car = getCar();
   const _ln = JSON.parse(localStorage.getItem(`ait_cp_meta_${car}`) || '{}').linename || '';
-  IMF_DATA.push({
+  const newSheet = {
     sheet:'(시트명)', proc_no:'-', proc_name:'', location:_ln||'GN7 外', manager:'',
     items:[{no:'1', name:'(항목명)', std:'(판정기준)', method:'육안'}]
-  });
+  };
+  IMF_DATA.push(newSheet);
   curSheet = IMF_DATA.length - 1;
   imfSaveData();
   imfRenderAll();
+  if (window.currentCarId && !AIT_API.MOCK) {
+    try {
+      const res = await AIT_API.createImfSheet(window.currentCarId, { sheet_name:newSheet.sheet, proc_no:newSheet.proc_no, sort_order:curSheet });
+      const newId = res && (res.id || res.insertId || (res.data && res.data.id));
+      if (newId) { newSheet.id = newId; imfSaveData(); }
+    } catch(e) { console.warn('imf sheet 생성 실패', e); }
+  }
 };
 window.imfDeleteSheet = function(idx){
   if(!confirm(`"${IMF_DATA[idx].sheet}" 탭을 삭제하겠습니까?`)) return;
+  const _delId = IMF_DATA[idx].id;
   IMF_DATA.splice(idx, 1);
   if(curSheet >= IMF_DATA.length) curSheet = Math.max(0, IMF_DATA.length - 1);
   imfSaveData();
   imfRenderAll();
+  if (_delId && window.currentCarId && !AIT_API.MOCK)
+    AIT_API.deleteImfSheet(_delId).catch(e => console.warn('imf sheet 삭제 실패', e));
 };
 window._imfSelSheet = function(idx){
   curSheet = idx;
-  _imfLoadItems().then(() => {
+  _imfEnsureDb().then(() => {
     imfRenderSheetTabs();
     renderImfProcInfo();
     window.imfRenderDayPicker();
@@ -252,7 +333,7 @@ function imfRenderAll(){
   imfUpdateVisibility();
   imfRenderSheetTabs();
   if(IMF_DATA.length > 0){
-    _imfLoadItems().then(() => {
+    _imfEnsureDb().then(() => {
       renderImfProcInfo();
       window.imfRenderDayPicker();
       imfRenderCheckTable();
@@ -273,6 +354,9 @@ window._imfSaveSheetName = function(idx, el){
   const v = el.textContent.trim(); if(!v) return;
   IMF_DATA[idx].sheet = v;
   imfSaveData();
+  const sid = IMF_DATA[idx].id;
+  if (sid && window.currentCarId && !AIT_API.MOCK)
+    AIT_API.updateImfSheet(sid, { sheet_name: v }).catch(e => console.warn('imf sheet 이름 저장 실패', e));
 };
 
 /* ── 공정 정보 ── */
@@ -372,7 +456,7 @@ function _imfUpdateDayBtn(day){
 }
 const _imfDBLoadedDays = new Set();
 async function _imfLoadResultsFromDB(sheetIdx, day) {
-  const sheetId = _imfSheetIds[sheetIdx];
+  const sheetId = _imfSheetDbId(sheetIdx);
   if (!sheetId || !window.currentCarId || AIT_API.MOCK) return;
   const m = getTabMonth('imf'), car = getCar();
   const cacheKey = `${sheetIdx}_${day}_${m.year}_${m.month}`;
@@ -382,8 +466,13 @@ async function _imfLoadResultsFromDB(sheetIdx, day) {
   try {
     const rows = await AIT_API.getImfResults(sheetId, dateStr);
     if (!rows || !rows.length) return;
+    // 백엔드는 item_id 반환 → item_no 역매핑
+    const idToNo = {};
+    Object.values(IMF_ITEMS).forEach(it => { if (it.id != null) idToNo[it.id] = it.item_no; });
     rows.forEach(r => {
-      const base = `imf_daily_${car}_${m.year}_${m.month}_${day}_s${sheetIdx}_${r.item_no}`;
+      const itemNo = (r.item_no != null && r.item_no !== '') ? r.item_no : idToNo[r.item_id];
+      if (itemNo == null) return;
+      const base = `imf_daily_${car}_${m.year}_${m.month}_${day}_s${sheetIdx}_${itemNo}`;
       if (r.result != null && r.result !== '') localStorage.setItem(`${base}_${r.phase}_res`, r.result);
       if (r.check_time) localStorage.setItem(`${base}_${r.phase}_time`, r.check_time);
       if (r.remark) localStorage.setItem(`${base}_rmk`, r.remark);
@@ -420,8 +509,8 @@ function imfRenderCheckTable(){
   thead.innerHTML = `<tr style="background:#1e3264">
     ${delTh}
     <th rowspan="2" style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:36px">No.</th>
-    <th rowspan="2" style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">검사항목</th>
-    <th rowspan="2" style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15)">판정기준</th>
+    <th rowspan="2" style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:160px">검사항목</th>
+    <th rowspan="2" style="padding:7px 10px;text-align:left;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.15);width:240px">판정기준</th>
     <th rowspan="2" style="padding:7px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.3);width:72px">확인방법</th>
     <th colspan="2" style="padding:6px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.3);background:#7c2d12">초물</th>
     <th colspan="2" style="padding:6px 8px;text-align:center;font-weight:600;color:#fff;border-right:1px solid rgba(255,255,255,.3);background:#14532d">중물</th>
@@ -442,7 +531,7 @@ function imfRenderCheckTable(){
     const base = _imfResBase(imfCurDay, item.no);
     const rmk  = (localStorage.getItem(`${base}_rmk`) || '').replace(/"/g,'&quot;');
     const hasNg = ['cho','jung','jong'].some(t => localStorage.getItem(`${base}_${t}_res`) === '✕');
-    const _imfKey = `${curSheet}_${item.no}`;
+    const _imfKey = `${_imfSheetDbId(curSheet)}_${item.no}`;
     const _imfItem = IMF_ITEMS[_imfKey] || {};
     const n  = _imfItem.item_name || item.name  || '';
     const s  = _imfItem.standard  || item.std   || '';
@@ -600,21 +689,29 @@ window._imfSaveItemDef = function(td){
   const m = k.match(/_s(\d+)_no(\w+)_(name|std|method)$/);
   if (m) {
     const sheetIdx2 = parseInt(m[1]), itemNo = m[2], field = m[3];
-    const sheetDbId = _imfSheetIds[sheetIdx2] || sheetIdx2;
-    const _imfKey2 = `${sheetIdx2}_${itemNo}`;
-    if (!IMF_ITEMS[_imfKey2]) IMF_ITEMS[_imfKey2] = { sheet_id: sheetDbId, item_no: itemNo };
-    if (field === 'name')   IMF_ITEMS[_imfKey2].item_name = newVal;
-    if (field === 'std')    IMF_ITEMS[_imfKey2].standard  = newVal;
-    if (field === 'method') IMF_ITEMS[_imfKey2].method    = newVal;
+    // 로컬 IMF_DATA.items 갱신 (구조 권위 소스)
+    const sht = IMF_DATA[sheetIdx2];
+    const lit = sht && (sht.items||[]).find(it => String(it.no) === String(itemNo));
+    if (lit) {
+      if (field === 'name')   lit.name   = newVal;
+      if (field === 'std')    lit.std    = newVal;
+      if (field === 'method') lit.method = newVal;
+    }
+    // IMF_ITEMS 캐시 갱신 (시트 DB id 확보 시)
+    const sid = _imfSheetDbId(sheetIdx2);
+    if (sid) {
+      const ck = `${sid}_${itemNo}`;
+      if (!IMF_ITEMS[ck]) IMF_ITEMS[ck] = { sheet_id: sid, item_no: parseInt(itemNo)||itemNo };
+      if (field === 'name')   IMF_ITEMS[ck].item_name = newVal;
+      if (field === 'std')    IMF_ITEMS[ck].standard  = newVal;
+      if (field === 'method') IMF_ITEMS[ck].method    = newVal;
+    }
+    imfSaveData();
 
     clearTimeout(window._imfItemSyncTimer);
     window._imfItemSyncTimer = setTimeout(() => {
       if (!window.currentCarId) return;
-      const itemsArr = Object.values(IMF_ITEMS).map(it => ({
-        sheet_id: it.sheet_id, item_no: it.item_no,
-        item_name: it.item_name || '', standard: it.standard || '', method: it.method || ''
-      }));
-      const save = () => AIT_API.syncImfItems(window.currentCarId, itemsArr);
+      const save = () => _imfSyncAllItems();
       if (typeof window.safeApi === 'function') window.safeApi(save, { msg: '항목 저장' });
       else save().catch(e => console.warn('항목 저장 실패', e));
     }, 800);
