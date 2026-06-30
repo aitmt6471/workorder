@@ -99,6 +99,18 @@
   </button>
 </div>
 
+<!-- 검사 포인트 (참고사진) -->
+<div style="padding:0 16px 18px;background:#fff">
+  <div style="display:flex;align-items:center;gap:8px;background:#fef9e7;border:1px solid #f6e6a8;border-radius:8px 8px 0 0;padding:8px 14px">
+    <span style="font-size:13px;font-weight:800;color:#92400e;letter-spacing:1px">📷 검사 포인트</span>
+    <span style="font-size:11px;color:#a16207">검사 부위 참고사진</span>
+    <div style="flex:1"></div>
+    <button class="imf-edit-col" style="display:none;padding:4px 12px;background:#1e3264;color:#fff;border:none;border-radius:6px;font-size:11px;font-weight:600;cursor:pointer" onclick="window.imfAddPoint()">&#xFF0B; 사진 추가</button>
+  </div>
+  <div id="imf-points-grid"
+    style="display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;border:1px solid #f6e6a8;border-top:none;border-radius:0 0 8px 8px;padding:14px"></div>
+</div>
+
 </div><!-- /imf-content -->
 
 <script>
@@ -323,6 +335,7 @@ window._imfSelSheet = function(idx){
     renderImfProcInfo();
     window.imfRenderDayPicker();
     imfRenderCheckTable();
+    imfRenderPoints();
     _imfLoadWorker();
     if (!_imfHasLocalResults(idx, imfCurDay)) _imfLoadResultsFromDB(idx, imfCurDay);
   });
@@ -337,6 +350,7 @@ function imfRenderAll(){
       renderImfProcInfo();
       window.imfRenderDayPicker();
       imfRenderCheckTable();
+      imfRenderPoints();
       _imfLoadWorker();
     });
   }
@@ -758,6 +772,91 @@ window.imfDeleteItem = function(idx){
   imfRenderCheckTable();
 };
 
+/* ── 검사 포인트 (참고사진) ── 시트별 localStorage 저장, 이미지는 Google Drive ── */
+function _imfPointsKey(idx){ return `imf_points_${getCar()}_s${(idx==null?curSheet:idx)}`; }
+function _imfGetPoints(idx){ try { return JSON.parse(localStorage.getItem(_imfPointsKey(idx)) || '[]'); } catch(e){ return []; } }
+function _imfSetPoints(arr, idx){
+  localStorage.setItem(_imfPointsKey(idx), JSON.stringify(arr));
+  if(typeof window._markPaneDirty === 'function') window._markPaneDirty('imf');
+}
+function imfRenderPoints(){
+  const grid = document.getElementById('imf-points-grid'); if(!grid) return;
+  const pts = _imfGetPoints();
+  const ce = imfEditMode;
+  if(!pts.length && !ce){
+    grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#9ca3af;font-size:12px;padding:18px">등록된 검사 포인트 사진이 없습니다 — 편집 모드에서 추가하세요</div>`;
+    return;
+  }
+  grid.innerHTML = pts.map((p,i) => {
+    const url = p.fileId ? AIT_API.driveUrl(p.fileId) : (p.url || '');
+    const img = url
+      ? `<img src="${url}" onclick="window._imfOpenPhoto('${url}')" style="width:100%;height:150px;object-fit:cover;cursor:zoom-in;display:block" onerror="this.style.display='none';const ph=this.parentNode.querySelector('.imf-pt-ph');if(ph)ph.style.display='flex'">`
+      : '';
+    const phDisp = url ? 'display:none' : 'display:flex';
+    const upBtn = ce
+      ? `<label style="position:absolute;bottom:6px;right:6px;background:rgba(30,50,100,.82);color:#fff;font-size:10px;padding:3px 8px;border-radius:5px;cursor:pointer">📷 ${url?'교체':'업로드'}<input type="file" accept="image/*" style="display:none" onchange="window._imfUploadPoint(${i},this)"></label>`
+      : '';
+    const delBtn = ce
+      ? `<button onclick="window.imfDeletePoint(${i})" title="삭제" style="position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:rgba(239,68,68,.92);color:#fff;border:none;font-size:12px;font-weight:900;cursor:pointer;line-height:1">✕</button>`
+      : '';
+    const cap = ce
+      ? `<input type="text" value="${(p.caption||'').replace(/"/g,'&quot;')}" placeholder="검사 항목명" onchange="window._imfSavePointCaption(${i},this.value)" style="width:100%;text-align:center;border:none;border-top:1px solid #eee;padding:7px 6px;font-size:12px;font-weight:700;color:#b91c1c;font-family:inherit;outline:none">`
+      : `<div style="text-align:center;padding:7px 6px;font-size:12px;font-weight:700;color:#b91c1c;border-top:1px solid #eee">${p.caption||'-'}</div>`;
+    return `<div style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;background:#fff">
+      <div style="position:relative">
+        ${img}
+        <div class="imf-pt-ph" style="${phDisp};width:100%;height:150px;align-items:center;justify-content:center;background:#f3f4f6;color:#9ca3af;font-size:28px">🖼</div>
+        ${upBtn}${delBtn}
+      </div>
+      ${cap}
+    </div>`;
+  }).join('');
+}
+window.imfAddPoint = function(){
+  const pts = _imfGetPoints(); pts.push({ caption:'', fileId:'' });
+  _imfSetPoints(pts); imfRenderPoints();
+};
+window.imfDeletePoint = async function(i){
+  const pts = _imfGetPoints(); const p = pts[i]; if(!p) return;
+  if(!confirm('이 검사 포인트 사진을 삭제하겠습니까?')) return;
+  if(p.fileId){ try { await AIT_API.deleteDailyPhoto(p.fileId); } catch(_){} }
+  pts.splice(i,1); _imfSetPoints(pts); imfRenderPoints();
+};
+window._imfSavePointCaption = function(i, v){
+  const pts = _imfGetPoints(); if(!pts[i]) return;
+  pts[i].caption = v; _imfSetPoints(pts);
+};
+window._imfUploadPoint = async function(i, input){
+  const file = input.files[0]; input.value=''; if(!file) return;
+  if(file.size > 10*1024*1024){ alert('10MB 이하 이미지만 가능합니다.'); return; }
+  if(AIT_API.MOCK){ alert('서버 연결 후 사용 가능합니다.'); return; }
+  const car = getCar();
+  const r = new FileReader();
+  r.onload = async ev => {
+    try {
+      const base64 = ev.target.result.split(',')[1];
+      const ext = (file.name.split('.').pop()||'jpg');
+      const res = await AIT_API.uploadDailyPhoto({ car, proc:'imf', filename:`imf_${car}_s${curSheet}_pt${i}_${Date.now()}.${ext}`, base64 });
+      const pts = _imfGetPoints();
+      if(!pts[i]) pts[i] = { caption:'' };
+      const old = pts[i].fileId;
+      pts[i].fileId = res.fileId; delete pts[i].url;
+      _imfSetPoints(pts);
+      if(old){ try { await AIT_API.deleteDailyPhoto(old); } catch(_){} }
+      imfRenderPoints();
+    } catch(err){ alert('업로드 실패: ' + (err.message||err)); }
+  };
+  r.readAsDataURL(file);
+};
+window._imfOpenPhoto = function(url){
+  const ov = document.createElement('div');
+  ov.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+  ov.onclick=()=>ov.remove();
+  const img=document.createElement('img');
+  img.src=url; img.style.cssText='max-width:92vw;max-height:92vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.5)';
+  ov.appendChild(img); document.body.appendChild(ov);
+};
+
 /* ── 편집 모드 ── */
 window.imfSetEditable = function(on){
   imfEditMode = on;
@@ -766,6 +865,7 @@ window.imfSetEditable = function(on){
   const hint = document.getElementById('imf-empty-edit-hint'); if(hint) hint.style.display = (on && IMF_DATA.length === 0) ? '' : 'none';
   imfRenderSheetTabs();
   if(IMF_DATA.length > 0) imfRenderCheckTable();
+  imfRenderPoints();
 };
 
 /* ── 저장 버튼 핸들러 ── */
@@ -780,7 +880,7 @@ window._imfSaveNow = async function() {
     _imfP.items.forEach(item => {
       const _base = `imf_daily_${_imfCar}_${_imfM.year}_${_imfM.month}_${imfCurDay}_s${curSheet}_${item.no}`;
       const _allEmpty = ['cho','jung','jong'].every(t => !localStorage.getItem(`${_base}_${t}_res`));
-      const _imfItm = IMF_ITEMS[`${curSheet}_${item.no}`] || {};
+      const _imfItm = IMF_ITEMS[`${_imfSheetDbId(curSheet)}_${item.no}`] || {};
       const _nm = _imfItm.item_name || item.name || `항목 ${item.no}`;
       const _std = _imfItm.standard || item.std || '';
       if (_allEmpty) {
