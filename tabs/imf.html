@@ -966,6 +966,41 @@ window.print_imf = async function() {
 
   if(!IMF_DATA.length){alert('초중종물 데이터가 없습니다.');return;}
 
+  /* ── 월 전체 결과 DB 선(先)로드 — 사용자가 방문하지 않은 일자/시트도 인쇄에 반영 ── */
+  try {
+    if (!AIT_API.MOCK && typeof AIT_API.getImfResults === 'function') {
+      if(typeof showToast==='function') showToast('인쇄 데이터를 불러오는 중…','info');
+      const idToNo = {};
+      Object.values(IMF_ITEMS).forEach(it => { if (it && it.id != null) idToNo[it.id] = it.item_no; });
+      for (let si=0; si<IMF_DATA.length; si++){
+        const sheet = IMF_DATA[si];
+        const sheetId = sheet && sheet.id;
+        if (!sheetId) continue;
+        const items = sheet.items || [];
+        await Promise.all(days.map(async day => {
+          // 이미 로컬에 결과가 있는 일자는 재조회 생략
+          const hasLocal = items.some(it =>
+            localStorage.getItem(`imf_daily_${carKey}_${y}_${mo}_${day}_s${si}_${it.no}_cho_res`) !== null ||
+            localStorage.getItem(`imf_daily_${carKey}_${y}_${mo}_${day}_s${si}_${it.no}_jung_res`) !== null ||
+            localStorage.getItem(`imf_daily_${carKey}_${y}_${mo}_${day}_s${si}_${it.no}_jong_res`) !== null);
+          if (hasLocal) return;
+          const dateStr = `${y}-${String(mo).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+          try {
+            const rows = await AIT_API.getImfResults(sheetId, dateStr);
+            (rows||[]).forEach(r => {
+              const itemNo = (r.item_no != null && r.item_no !== '') ? r.item_no : idToNo[r.item_id];
+              if (itemNo == null) return;
+              const base = `imf_daily_${carKey}_${y}_${mo}_${day}_s${si}_${itemNo}`;
+              if (r.result != null && r.result !== '') localStorage.setItem(`${base}_${r.phase}_res`, r.result);
+              if (r.check_time) localStorage.setItem(`${base}_${r.phase}_time`, r.check_time);
+              if (r.remark) localStorage.setItem(`${base}_rmk`, r.remark);
+            });
+          } catch(e) {}
+        }));
+      }
+    }
+  } catch(e){ console.warn('IMF 인쇄용 월 결과 로드 실패', e); }
+
   const TD  =(v,style='')=>`<td style="border:1px solid #b8c4d8;padding:1px 2px;font-size:7px;vertical-align:middle;text-align:center;${style}">${v}</td>`;
   const TDL =(v,style='')=>`<td style="border:1px solid #b8c4d8;padding:2px 4px;font-size:7px;vertical-align:middle;${style}">${v}</td>`;
   const TH  =(v,extra='')=>`<th style="background:#1e3264;color:#fff;border:1px solid rgba(255,255,255,.25);padding:2px 1px;font-size:7px;font-weight:700;text-align:center;${extra}">${v}</th>`;
@@ -976,7 +1011,7 @@ window.print_imf = async function() {
     const items = sheet.items||[];
     const dayHeaders = days.map(d=>TH(d,'width:18px')).join('');
     const tbodyHtml = items.map(item=>{
-      const ikey  = `${si}_${item.no}`;
+      const ikey  = `${sheet.id}_${item.no}`;
       const idata = IMF_ITEMS[ikey]||{};
       const iname = idata.item_name||item.name||item.item_name||'';
       const istd  = idata.standard ||item.standard||item.std||'';
