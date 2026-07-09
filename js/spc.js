@@ -130,6 +130,65 @@ window.initSpcTab = function initSpcTab() {
     $('#spc-svg').innerHTML=svg;
   }
 
+  // 공정능력도(히스토그램 + 정규분포 곡선 + LSL/USL/Cp/Cpk)
+  function drawCapChart(d){
+    var box = $('#spc-cap');
+    if(!box) return;
+    if(d.cl==null || d.sigma==null || !d.sigma){ box.innerHTML=''; $('#spc-cap-title').textContent=''; return; }
+    var W=940, H=260, padL=54, padR=24, padT=16, padB=34;
+    var pw=W-padL-padR, ph=H-padT-padB;
+    var means = d.sub.map(function(s){ return s.mean; });
+    var lo = Math.min.apply(null, means), hi = Math.max.apply(null, means);
+    if(d.lsl!=null) lo = Math.min(lo, d.lsl);
+    if(d.usl!=null) hi = Math.max(hi, d.usl);
+    var pad = (hi-lo || 1)*0.1; lo -= pad; hi += pad;
+
+    // 히스토그램 (10구간)
+    var BINS = 10, width = (hi-lo)/BINS;
+    var counts = new Array(BINS).fill(0);
+    means.forEach(function(v){
+      var idx = width>0 ? Math.min(BINS-1, Math.max(0, Math.floor((v-lo)/width))) : 0;
+      counts[idx]++;
+    });
+    var maxCount = Math.max.apply(null, counts.concat([1]));
+
+    function X(v){ return padL + (v-lo)/(hi-lo)*pw; }
+    function Ybar(c){ return padT + (1-c/maxCount)*ph; }
+
+    var svg='';
+    // 막대
+    for(var b=0;b<BINS;b++){
+      var x0=X(lo+b*width), x1=X(lo+(b+1)*width), y=Ybar(counts[b]);
+      svg += '<rect x="'+x0+'" y="'+y+'" width="'+Math.max(0,x1-x0-1)+'" height="'+(padT+ph-y)+'" fill="#93c5fd"><title>'+counts[b]+'군</title></rect>';
+    }
+    // 정규분포 곡선 (히스토그램 최고점에 맞춰 스케일)
+    var pts=[];
+    for(var i=0;i<=60;i++){
+      var v = lo + (hi-lo)*i/60;
+      var z = (v-d.cl)/d.sigma;
+      var dens = Math.exp(-0.5*z*z);
+      pts.push(X(v)+','+(padT+ph*(1-dens)));
+    }
+    svg += '<polyline points="'+pts.join(' ')+'" fill="none" stroke="#1e3264" stroke-width="1.6"/>';
+    // LSL/USL/CL 세로선
+    function vline(v,color,dash,label){ if(v==null||v<lo||v>hi) return; var x=X(v);
+      svg+='<line x1="'+x+'" y1="'+padT+'" x2="'+x+'" y2="'+(padT+ph)+'" stroke="'+color+'" stroke-width="1.4"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>';
+      svg+='<text x="'+x+'" y="'+(padT-4)+'" text-anchor="middle" font-size="10" fill="'+color+'">'+label+'</text>'; }
+    vline(d.lsl,'#f59e0b','2 3','LSL'); vline(d.usl,'#f59e0b','2 3','USL');
+    vline(d.cl,'#64748b',null,'X̄̄');
+    // x축 눈금
+    for(var k=0;k<=4;k++){ var v=lo+(hi-lo)*k/4;
+      svg+='<text x="'+X(v)+'" y="'+(H-padB+16)+'" text-anchor="middle" font-size="9" fill="#94a3b8">'+v.toFixed(2)+'</text>'; }
+    $('#spc-cap').innerHTML = svg;
+    $('#spc-cap').setAttribute('viewBox', '0 0 '+W+' '+H);
+
+    var cp=d.cp, cpk=d.cpk;
+    var okColor = (cpk!=null && cpk>=1.33) ? '#16a34a' : (cpk!=null && cpk>=1.0 ? '#f59e0b' : '#dc2626');
+    $('#spc-cap-title').innerHTML = '공정능력도 — Cp <b style="color:'+(cp!=null&&cp>=1.33?'#16a34a':'#dc2626')+'">'+(cp!=null?cp:'–')+'</b>'
+      +' / Cpk <b style="color:'+okColor+'">'+(cpk!=null?cpk:'–')+'</b>'
+      +(cpk!=null ? (cpk>=1.33?' · 양호':cpk>=1.0?' · 주의(관리 필요)':' · 부적합(개선 필요)') : '');
+  }
+
   function render(){
     if(!DATA){ return; }
     var d=DATA;
@@ -138,6 +197,7 @@ window.initSpcTab = function initSpcTab() {
     $('#spc-chart-title').textContent='X̄ 관리도 — '+$('#spc-item').value;
     var oos=tiles(d,ucl,lcl);
     drawChart(d,ucl,lcl);
+    drawCapChart(d);
     $('#spc-foot').innerHTML='모델 '+esc(d.model||$('#spc-model').value)+' · 부분군 '+d.n+'개씩 '+d.sub.length+'군 · 표본 '+(d.samples||'')+' · Cp '+(d.cp!=null?d.cp:'–')+' / Cpk '+(d.cpk!=null?d.cpk:'–')
       +(oos?' · <span style="color:#dc2626">빨간점=관리한계 이탈('+oos+'군)</span>':'')
       +((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':'');
