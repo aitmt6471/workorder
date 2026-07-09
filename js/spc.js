@@ -4,9 +4,33 @@
    ══════════════════════════════════════════════════════════════ */
 window.initSpcTab = function initSpcTab() {
   var $ = function(s){ return document.querySelector(s); };
-  var META = [], DATA = null;
+  var META = [], DATA = null, SPECIAL_ITEMS = null;
   var car = window.currentCar || '';
   $('#spc-car').textContent = car ? '· 아이템: ' + car : '';
+
+  // CP 특별특성(char_special: C/숫자/문자/기호 등 마킹된 행)의 관리항목명만 추출
+  function normText(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
+  function isSpecialMark(v){ var s=String(v==null?'':v).trim(); return !!s && s!=='-' && s!=='—' && s.toLowerCase()!=='null'; }
+  async function loadSpecialItems(){
+    var carId = window.currentCarId;
+    if(!carId) return [];
+    try{
+      var rows = await AIT_API.getCpRows(carId);
+      return (rows||[])
+        .filter(function(r){ return !r.is_deleted && isSpecialMark(r.char_special); })
+        .map(function(r){ return String(r.ctrl_item||'').trim(); })
+        .filter(Boolean);
+    }catch(e){ console.warn('CP 특별특성 조회 실패', e); return []; }
+  }
+  function matchesSpecial(itemName, specialNames){
+    var a = normText(itemName);
+    if(!a) return false;
+    for(var i=0;i<specialNames.length;i++){
+      var b = normText(specialNames[i]);
+      if(b && (a.indexOf(b)>=0 || b.indexOf(a)>=0)) return true;
+    }
+    return false;
+  }
 
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function msg(html, color){ $('#spc-msg').innerHTML = html ? '<div style="padding:12px 16px;border-radius:10px;background:'+(color==='bad'?'#fef2f2':'#f1f5f9')+';color:'+(color==='bad'?'#dc2626':'#475569')+'">'+html+'</div>' : ''; }
@@ -33,7 +57,15 @@ window.initSpcTab = function initSpcTab() {
   function fillItems(){
     var model = $('#spc-model').value;
     var items = META.filter(function(m){ return m.model_name===model; });
+    var note = '';
+    if(SPECIAL_ITEMS && SPECIAL_ITEMS.length){
+      var special = items.filter(function(i){ return matchesSpecial(i.item_name, SPECIAL_ITEMS); });
+      if(special.length){ items = special; note = ' · <span style="color:#2563eb">CP 특별특성 항목만 표시 ('+special.length+'개)</span>'; }
+      else { note = ' · <span style="color:#dc2626">CP 특별특성과 매칭되는 측정항목 없음 — 전체 표시</span>'; }
+    }
     $('#spc-item').innerHTML = items.map(function(i){ return '<option value="'+esc(i.item_name)+'">'+esc(i.item_name)+' ('+esc(i.unit||'')+')</option>'; }).join('');
+    var carEl = $('#spc-car');
+    carEl.innerHTML = (car ? '· 아이템: ' + esc(car) : '') + note;
     updateSpecLabel();
   }
   function updateSpecLabel(){
@@ -125,7 +157,9 @@ window.initSpcTab = function initSpcTab() {
 
   async function init(){
     try{
-      META = await AIT_API.getSpcMeta();
+      var results = await Promise.all([ AIT_API.getSpcMeta(), loadSpecialItems() ]);
+      META = results[0];
+      SPECIAL_ITEMS = results[1];
       if(!Array.isArray(META)||!META.length){ msg('측정항목이 없습니다. (n8n ait/spc/meta 응답 비어있음)','bad'); return; }
     }catch(e){
       msg('⚠ SPC 메타 조회 실패 — n8n 엔드포인트 <b>ait/spc/meta · ait/spc/series</b> 를 배포해야 합니다.<br><span style="font-size:11px">'+esc(String(e))+'</span>','bad');
