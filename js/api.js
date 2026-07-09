@@ -419,6 +419,9 @@ const AIT_API = (() => {
     lineWarehouse:         (line)                  => _real.lineWarehouse(line),
     labelInfo:             (label, wh)             => _real.labelInfo(label, wh),
     stockMove:             (payload)               => _real.stockMove(payload),
+    /* SPC */
+    getSpcMeta:            (model)                          => _real.getSpcMeta(model),
+    getSpcSeries:          (model, item, n, groups)          => _real.getSpcSeries(model, item, n, groups),
     numCircle
   };
 })();
