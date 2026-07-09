@@ -189,6 +189,7 @@ async function _imfSyncAllItems() {
 async function _imfEnsureDb() {
   if (IMF_DATA.some(s => !s.id)) await _imfSyncSheets();
   await _imfLoadItems();
+  if (!_imfPointsLoaded) await _imfLoadPoints();
 }
 
 /* ── 작업 E: pendingResults + debounce ── */
@@ -772,12 +773,64 @@ window.imfDeleteItem = function(idx){
   imfRenderCheckTable();
 };
 
-/* ── 검사 포인트 (참고사진) ── 시트별 localStorage 저장, 이미지는 Google Drive ── */
-function _imfPointsKey(idx){ return `imf_points_${getCar()}_s${(idx==null?curSheet:idx)}`; }
-function _imfGetPoints(idx){ try { return JSON.parse(localStorage.getItem(_imfPointsKey(idx)) || '[]'); } catch(e){ return []; } }
+/* ── 검사 포인트 (참고사진) ── DB(imf_points) 저장, 이미지는 Google Drive ── */
+let IMF_POINTS = {};          // { sheetDbId: [ { caption, fileId, url } ] }
+let _imfPointsLoaded = false;
+let _imfPointsSyncTimers = {};
+
+async function _imfLoadPoints(){
+  if (!window.currentCarId || AIT_API.MOCK) return;
+  try {
+    const rows = await AIT_API.getImfPoints(window.currentCarId) || [];
+    IMF_POINTS = {};
+    rows.forEach(r => {
+      if (!r || r.sheet_id == null) return;
+      (IMF_POINTS[r.sheet_id] = IMF_POINTS[r.sheet_id] || []).push({
+        caption: r.caption || '', fileId: r.file_id || '', url: r.photo_url || ''
+      });
+    });
+    _imfPointsLoaded = true;
+    _imfMigratePoints();
+  } catch(e){ console.warn('imf points 로드 실패', e); }
+}
+
+/* 구버전 localStorage 데이터 1회 DB 이관 */
+function _imfMigratePoints(){
+  IMF_DATA.forEach((s, idx) => {
+    const k = `imf_points_${getCar()}_s${idx}`;
+    if (!s.id) return;
+    if (!(IMF_POINTS[s.id] || []).length) {
+      let old = [];
+      try { old = JSON.parse(localStorage.getItem(k) || '[]'); } catch(e){}
+      if (old.length) {
+        IMF_POINTS[s.id] = old.map(p => ({ caption: p.caption||'', fileId: p.fileId||'', url: p.url||'' }));
+        _imfSyncPoints(idx);
+      }
+    }
+    localStorage.removeItem(k);
+  });
+}
+
+function _imfGetPoints(idx){
+  const sid = _imfSheetDbId(idx==null?curSheet:idx);
+  return sid ? (IMF_POINTS[sid] || []) : [];
+}
 function _imfSetPoints(arr, idx){
-  localStorage.setItem(_imfPointsKey(idx), JSON.stringify(arr));
+  const i = (idx==null?curSheet:idx);
+  const sid = _imfSheetDbId(i);
+  if(!sid){ alert('시트가 아직 서버에 저장되지 않았습니다. 잠시 후 다시 시도해주세요.'); return; }
+  IMF_POINTS[sid] = arr;
+  _imfSyncPoints(i);
   if(typeof window._markPaneDirty === 'function') window._markPaneDirty('imf');
+}
+function _imfSyncPoints(idx){
+  const sid = _imfSheetDbId(idx);
+  if(!sid || !window.currentCarId || AIT_API.MOCK) return;
+  clearTimeout(_imfPointsSyncTimers[sid]);
+  _imfPointsSyncTimers[sid] = setTimeout(() => {
+    AIT_API.syncImfPoints(window.currentCarId, sid, IMF_POINTS[sid] || [])
+      .catch(e => console.warn('imf points 저장 실패', e));
+  }, 600);
 }
 function imfRenderPoints(){
   const grid = document.getElementById('imf-points-grid'); if(!grid) return;

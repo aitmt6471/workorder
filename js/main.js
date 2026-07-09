@@ -924,6 +924,7 @@ function renderCarListInModal() {
         </div>
         <button class="btn btn-ghost btn-sm car-edit-btn" onclick="startEditCar(${c.id})">✏</button>
         <button class="btn btn-ghost btn-sm car-save-btn" style="display:none;color:var(--green)" onclick="confirmEditCar(${c.id})">저장</button>
+        <button class="btn btn-ghost btn-sm" title="이 아이템 전체 복사(실적 제외)" onclick="cloneCar(${c.id})">📋</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteCar(${c.id})">🗑</button>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;padding:2px 0 4px 2px">${checks}</div>
@@ -1046,6 +1047,159 @@ async function addCar() {
     }
   }
   input.value = '';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   아이템 복사(클론): 기존 아이템의 모든 문서 구조를 새 아이템으로 딥카피
+   - 구조(템플릿)만 복사, 실적(일별 점검결과)은 제외 (실적은 날짜 기반 키 → 자연 제외)
+   - localStorage 구조(차종명 키)는 이름 스왑 + DB id 제거 → 새 차종이 독립 백필
+   - CP rows(DB) = 단일 진실 소스 → 복사 시 설비일상·작표 관리항목 자동 파생
+   - IMF 검사포인트는 DB(sheet_id 키) → 시트 선생성 후 old→new 매핑하여 복사
+   - 개정이력/서명(revisions/signs)은 승인기록이므로 복사하지 않음(새로 시작)
+   ══════════════════════════════════════════════════════════════ */
+
+// 이름을 키로 쓰는 localStorage 구조(템플릿) 키 접두어
+const _CLONE_LS_STRUCT_PREFIXES = ['ait_imf_data_', 'ait_ms_data_', 'ait_cp_meta_', 'ait_cft_', 'ait_daily_equip_'];
+
+// DB에서 발급된 id/FK/타임스탬프 제거 → 새 아이템에서 신규 발급되도록 (재귀)
+function _cloneStripIds(v) {
+  if (Array.isArray(v)) return v.map(_cloneStripIds);
+  if (v && typeof v === 'object') {
+    const o = {};
+    for (const k of Object.keys(v)) {
+      if (['id', 'car_id', 'sheet_id', 'sample_id', 'equip_id', 'process_id', 'created_at', 'updated_at'].includes(k)) continue;
+      o[k] = _cloneStripIds(v[k]);
+    }
+    return o;
+  }
+  return v;
+}
+
+// localStorage 구조 키를 srcName → newName 으로 복사 (DB id 제거)
+function _cloneCarLsStructure(srcName, newName) {
+  _CLONE_LS_STRUCT_PREFIXES.forEach(prefix => {
+    try {
+      const raw = localStorage.getItem(prefix + srcName);
+      if (raw == null) return;
+      const val = _cloneStripIds(JSON.parse(raw));
+      localStorage.setItem(prefix + newName, JSON.stringify(val));
+    } catch (e) { console.warn('구조 복사 실패:', prefix, e); }
+  });
+}
+
+async function cloneCar(srcId) {
+  if (typeof getMyRole === 'function' && getMyRole() !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
+  const cars = loadCars();
+  const src = cars.find(c => String(c.id) === String(srcId));
+  if (!src) return;
+  if (AIT_API.MOCK) { alert('DB 연결(비-MOCK) 상태에서만 복사할 수 있습니다.'); return; }
+
+  const srcName = src.name;
+  const newName = (prompt(`"${srcName}" 의 모든 문서(CP·작표·설비일상·초중종물·마스터샘플·사양표 등)를 복사합니다.\n실적(점검결과)과 개정이력은 복사되지 않습니다.\n\n새 아이템 이름:`, srcName + ' (복사)') || '').trim();
+  if (!newName) return;
+  if (cars.some(c => c.name === newName)) { alert('같은 이름의 아이템이 이미 있습니다.'); return; }
+
+  const toast = (m, t) => window.showToast && window.showToast(m, t || 'info');
+  toast('복사 시작…');
+
+  try {
+    // 1) 새 아이템 생성 (메타 복사)
+    const code = newName.toUpperCase().replace(/[^A-Z0-9]/g, '_').substring(0, 20);
+    const linename = newName.split('(')[0].trim();
+    const enabled = src.enabled_docs || ALL_DOC_TYPES.map(d => d.id);
+    await AIT_API.createCar({
+      code, name: newName, stage: src.stage || '', partno: src.partno || '',
+      partname: src.partname || '', linename, enabled_docs: JSON.stringify(enabled)
+    });
+    await initCars();
+    const created = loadCars().find(c => c.name === newName);
+    if (!created) throw new Error('새 아이템 생성 확인 실패');
+    const newId = created.id;
+
+    // 2) localStorage 구조 복사 (이름 스왑 + DB id 제거)
+    _cloneCarLsStructure(srcName, newName);
+    localStorage.setItem(`ait_enabled_docs_${newId}`, JSON.stringify(enabled));
+
+    // 3) CP rows(DB) — 단일 진실 소스: 설비일상·작표 관리항목이 여기서 자동 파생됨
+    try {
+      const cpRows = await AIT_API.getCpRows(srcId) || [];
+      for (const r of cpRows) await AIT_API.createCpRow(newId, _cloneStripIds(r));
+      const cpMeta = await AIT_API.getCpMeta(srcId);
+      if (cpMeta) await AIT_API.saveCpMeta(newId, _cloneStripIds(cpMeta));
+      toast('CP 복사 완료');
+    } catch (e) { console.warn('CP 복사 실패', e); }
+
+    // 4) 작표 STEP + 안전주의사항(DB)  ※관리항목은 CP에서 파생되므로 생략
+    try {
+      const steps = await AIT_API.getWsSteps(srcId) || [];
+      if (steps.length) await AIT_API.syncWsSteps(newId, steps.map(_cloneStripIds));
+      const wsMeta = await AIT_API.getWsMeta(srcId);
+      if (wsMeta && wsMeta.safety_html != null) await AIT_API.saveWsMeta(newId, wsMeta.safety_html);
+      toast('작표 복사 완료');
+    } catch (e) { console.warn('작표 복사 실패', e); }
+
+    // 5) 초중종물 시트 선생성 + 검사포인트(DB, sheet_id 키) 복사
+    try {
+      const srcSheets = await AIT_API.getImfSheets(srcId) || [];
+      const srcPoints = await AIT_API.getImfPoints(srcId) || [];
+      const lsKey = `ait_imf_data_${newName}`;
+      let lsData = JSON.parse(localStorage.getItem(lsKey) || 'null');
+      const sheetIdMap = {}; // old sheet_id → new sheet_id
+      for (let i = 0; i < srcSheets.length; i++) {
+        const ss = srcSheets[i];
+        const res = await AIT_API.createImfSheet(newId, {
+          sheet_name: ss.sheet_name || '', proc_no: ss.proc_no || '',
+          sort_order: ss.sort_order != null ? ss.sort_order : i
+        });
+        const nid = res && (res.id || res.insertId || (res.data && res.data.id));
+        if (!nid) continue;
+        sheetIdMap[ss.id] = nid;
+        // localStorage 시트 구조에 새 DB id 주입(이름 매칭) → 구조↔DB 정합
+        if (Array.isArray(lsData)) {
+          const m = lsData.find(x => (x.sheet || '') === (ss.sheet_name || '') && !x.id);
+          if (m) m.id = nid;
+        }
+      }
+      if (lsData) localStorage.setItem(lsKey, JSON.stringify(lsData));
+      // 검사포인트: old sheet_id 그룹 → new sheet_id 로 sync (Drive fileId 공유 = 불변파일이라 독립)
+      const byNewSheet = {};
+      srcPoints.forEach(p => {
+        const nid = sheetIdMap[p.sheet_id]; if (!nid) return;
+        (byNewSheet[nid] = byNewSheet[nid] || []).push({ caption: p.caption || '', fileId: p.file_id || '', url: p.photo_url || '' });
+      });
+      for (const nid of Object.keys(byNewSheet)) await AIT_API.syncImfPoints(newId, nid, byNewSheet[nid]);
+      toast('초중종물 복사 완료');
+    } catch (e) { console.warn('초중종물 복사 실패', e); }
+
+    // 6) 공정검사기준서 + Q-Point (JSON blob)
+    try {
+      const insp = await AIT_API.getInspDoc(srcId);
+      if (insp && insp.doc != null) await AIT_API.saveInspDoc(newId, insp.doc);
+    } catch (e) { console.warn('검사기준서 복사 실패', e); }
+    try {
+      const qp = await AIT_API.getQpointList(srcId);
+      const list = qp && (qp.list || qp);
+      if (list) await AIT_API.saveQpointList(newId, list);
+    } catch (e) { console.warn('Q-Point 복사 실패', e); }
+
+    // 7) 사양표(사양 마스터) — carModel = 차종명 기준, 새 차종명으로 재키잉하여 독립 복사
+    try {
+      const specRows = await AIT_API.getSpecMaster(srcName) || [];
+      for (const r of specRows) {
+        const d = _cloneStripIds(r);
+        d.carModel = newName; d.car_model = newName; // 저장 컬럼명 방어적 세팅
+        await AIT_API.createSpecMaster(d);
+      }
+      toast('사양표 복사 완료');
+    } catch (e) { console.warn('사양표 복사 실패', e); }
+
+    toast('복사 완료 ✓', 'success');
+    await initCars();
+    renderCarListInModal();
+  } catch (e) {
+    alert('복사 실패: ' + (e.message || e));
+    console.error('cloneCar 실패', e);
+  }
 }
 
 /* ── 차종별 콘텐츠 저장 ── */

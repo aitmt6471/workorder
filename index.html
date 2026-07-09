@@ -52,6 +52,10 @@
         <span class="nav-icon">🔍</span>
         <span class="nav-label">초중종물</span>
       </div>
+      <div class="nav-item" data-tab="spc" onclick="showTab('spc',this)">
+        <span class="nav-icon">📈</span>
+        <span class="nav-label">SPC 관리도</span>
+      </div>
       <div class="nav-item" data-tab="ms" onclick="showTab('ms',this)">
         <span class="nav-icon">🎯</span>
         <span class="nav-label">마스터샘플</span>
@@ -93,6 +97,7 @@
     <div id="pane-ws" class="pane"></div>
     <div id="pane-daily" class="pane"></div>
     <div id="pane-imf" class="pane"></div>
+    <div id="pane-spc" class="pane"></div>
     <div id="pane-ms" class="pane"></div>
     <div id="pane-spec" class="pane"></div>
     <div id="pane-insp" class="pane"></div>
@@ -364,7 +369,7 @@
 
 <!-- 탭 콘텐츠 fetch 로드 -->
 <script>
-const TABS = ['cp','ws','daily','imf','ms','spec','insp','qpoint'];
+const TABS = ['cp','ws','daily','imf','spc','ms','spec','insp','qpoint'];
 const loaded = {};
 async function loadTab(id) {
   if (loaded[id]) return;

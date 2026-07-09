@@ -116,6 +116,12 @@ const AIT_API = (() => {
     saveImfResults:   (payload) => _post('ait/imf/results', payload),
     // payload = { sheet_id, check_date, worker, results:[{item_id,phase,check_time,result,remark}] }
 
+    /* ── SPC(X-bar 관리도) — 기능검사기 측정값(대시보드 MySQL) ── */
+    // n8n: ait/spc/meta → [{model_name,item_name,unit,n,lsl,usl}]
+    getSpcMeta:       (model) => _get('ait/spc/meta', model ? { model } : {}),
+    // n8n: ait/spc/series → {cl,ucl,lcl,sigma,cp,cpk,sub:[{i,mean,range,t}], ...}
+    getSpcSeries:     (model, item, n = 5, groups = 80) => _get('ait/spc/series', { model, item, n, groups }),
+
     /* ── 마스터샘플 ────────────────────────────── */
     getMsSamples:     (carId)   => _get('ait/ms/samples', { carId }),
     getMsItems:       (carId)   => _get('ait/ms/items', { carId }),
@@ -205,6 +211,8 @@ const AIT_API = (() => {
     syncDailyItems:   (carId, items) => _post('ait/daily/items/sync', { carId, items }),
     getImfItems:      (carId)        => _get('ait/imf/items', { carId }),
     syncImfItems:     (carId, items) => _post('ait/imf/items/sync', { carId, items }),
+    getImfPoints:     (carId)        => _get('ait/imf/points', { carId }),
+    syncImfPoints:    (carId, sheetId, points) => _post('ait/imf/points/sync', { carId, sheetId, points }),
     getMsItems:       (carId)        => _get('ait/ms/items', { carId }),
     syncMsItems:      (carId, items) => _post('ait/ms/items/sync', { carId, items }),
 
@@ -369,6 +377,8 @@ const AIT_API = (() => {
     syncDailyItems:     (carId, items)  => _real.syncDailyItems(carId, items),
     getImfItems:        (carId)         => _real.getImfItems(carId),
     syncImfItems:       (carId, items)  => _real.syncImfItems(carId, items),
+    getImfPoints:       (carId)         => _real.getImfPoints(carId),
+    syncImfPoints:      (carId, sheetId, points) => _real.syncImfPoints(carId, sheetId, points),
     getMsItems:         (carId)         => _real.getMsItems(carId),
     syncMsItems:        (carId, items)  => _real.syncMsItems(carId, items),
     /* 공정검사기준서 / Q-Point */

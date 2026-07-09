@@ -1,0 +1,173 @@
+<!-- SPC X-bar 관리도 탭 -->
+<div style="padding:18px 22px;font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+    <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">📈 SPC · X&#772; 관리도</span>
+    <span id="spc-car" style="font-size:12px;color:#64748b"></span>
+  </div>
+
+  <!-- 컨트롤 -->
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px">
+    <label style="font-size:12px;color:#374151">모델
+      <select id="spc-model" style="margin-left:4px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px;max-width:200px"></select>
+    </label>
+    <label style="font-size:12px;color:#374151">측정항목
+      <select id="spc-item" style="margin-left:4px;padding:5px 8px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px;max-width:300px"></select>
+    </label>
+    <label style="font-size:12px;color:#374151">부분군
+      <input id="spc-n" type="number" min="2" max="10" value="5" style="width:46px;margin-left:4px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px">
+    </label>
+    <label style="font-size:12px;color:#374151">UCL(수동)
+      <input id="spc-ucl" type="number" step="0.001" placeholder="자동" style="width:74px;margin-left:4px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px">
+    </label>
+    <label style="font-size:12px;color:#374151">LCL(수동)
+      <input id="spc-lcl" type="number" step="0.001" placeholder="자동" style="width:74px;margin-left:4px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px">
+    </label>
+    <span id="spc-spec" style="font-size:12px;color:#64748b"></span>
+  </div>
+
+  <!-- 지표 타일 -->
+  <div id="spc-tiles" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px"></div>
+
+  <!-- 차트 -->
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px">
+    <div id="spc-chart-title" style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px"></div>
+    <div style="width:100%;overflow-x:auto"><svg id="spc-svg" viewBox="0 0 940 360" style="width:100%;min-width:640px;height:auto;display:block"></svg></div>
+    <div id="spc-foot" style="font-size:11px;color:#64748b;margin-top:8px"></div>
+  </div>
+
+  <div id="spc-msg" style="margin-top:14px;font-size:13px"></div>
+</div>
+
+<script>
+(function(){
+  var $ = function(s){ return document.querySelector(s); };
+  var META = [], DATA = null;
+  var car = window.currentCar || '';
+  $('#spc-car').textContent = car ? '· 아이템: ' + car : '';
+
+  function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function msg(html, color){ $('#spc-msg').innerHTML = html ? '<div style="padding:12px 16px;border-radius:10px;background:'+(color==='bad'?'#fef2f2':'#f1f5f9')+';color:'+(color==='bad'?'#dc2626':'#475569')+'">'+html+'</div>' : ''; }
+
+  // 아이템(차종)명으로 모델 추정 (best-effort)
+  function guessModel(models){
+    if(!car) return models[0];
+    var key = car.replace(/\s/g,'').toUpperCase();
+    var hit = models.find(function(m){ var M=m.replace(/\s/g,'').toUpperCase(); return M.indexOf(key)>=0 || key.indexOf(M.slice(0,4))>=0; });
+    return hit || models[0];
+  }
+
+  function fillItems(){
+    var model = $('#spc-model').value;
+    var items = META.filter(function(m){ return m.model_name===model; });
+    $('#spc-item').innerHTML = items.map(function(i){ return '<option value="'+esc(i.item_name)+'">'+esc(i.item_name)+' ('+esc(i.unit||'')+')</option>'; }).join('');
+    updateSpecLabel();
+  }
+  function updateSpecLabel(){
+    var it = META.find(function(m){ return m.model_name===$('#spc-model').value && m.item_name===$('#spc-item').value; });
+    $('#spc-spec').textContent = it ? ('규격 '+(it.lsl!=null?it.lsl:'–')+' ~ '+(it.usl!=null?it.usl:'–')+' '+(it.unit||'')) : '';
+  }
+
+  function tiles(d, ucl, lcl){
+    var oos = d.sub.filter(function(s){ return s.mean>ucl || s.mean<lcl; }).length;
+    var t = [
+      ['중심선 X&#773;', d.cl!=null?(+d.cl).toFixed(3):'–', ''],
+      ['UCL', (+ucl).toFixed(3), '#dc2626'],
+      ['LCL', (+lcl).toFixed(3), '#dc2626'],
+      ['σ(추정)', d.sigma!=null?(+d.sigma).toFixed(3):'–', ''],
+      ['Cpk', d.cpk!=null?(+d.cpk).toFixed(2):'–', (d.cpk!=null && d.cpk>=1.33)?'#16a34a':'#dc2626'],
+      ['관리이탈', oos+'/'+d.sub.length, oos?'#dc2626':'#16a34a']
+    ];
+    $('#spc-tiles').innerHTML = t.map(function(x){
+      return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px">'
+        +'<div style="font-size:11px;color:#64748b">'+x[0]+'</div>'
+        +'<div style="font-size:19px;font-weight:800;margin-top:4px;color:'+(x[2]||'#1e293b')+'">'+x[1]+'</div></div>';
+    }).join('');
+    return oos;
+  }
+
+  function drawChart(d, ucl, lcl){
+    var W=940, H=360, padL=64, padR=54, padT=16, padB=34;
+    var pw=W-padL-padR, ph=H-padT-padB;
+    var means = d.sub.map(function(s){ return s.mean; });
+    var lines = [d.cl, ucl, lcl].filter(function(v){ return v!=null; });
+    var ys = means.concat(lines);
+    if(d.usl!=null) ys.push(d.usl); if(d.lsl!=null) ys.push(d.lsl);
+    var lo=Math.min.apply(null,ys), hi=Math.max.apply(null,ys), pad=(hi-lo||1)*0.15;
+    // 규격선이 너무 멀면 제외하고 관리한계 중심으로
+    var clo=Math.min.apply(null,means.concat([ucl,lcl])), chi=Math.max.apply(null,means.concat([ucl,lcl]));
+    if((hi-lo)>(chi-clo)*6){ lo=clo; hi=chi; pad=(hi-lo||1)*0.3; }
+    lo-=pad; hi+=pad;
+    var n=d.sub.length;
+    function X(i){ return padL + (n<=1?0:(i/(n-1))*pw); }
+    function Y(v){ return padT + (1-(v-lo)/(hi-lo))*ph; }
+    var svg='';
+    // y 그리드/라벨
+    for(var k=0;k<=4;k++){ var v=lo+(hi-lo)*k/4, y=Y(v);
+      svg+='<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="#eef2f7"/>';
+      svg+='<text x="'+(padL-6)+'" y="'+(y+3)+'" text-anchor="end" font-size="10" fill="#94a3b8">'+v.toFixed(3)+'</text>';
+    }
+    function hline(v,color,dash,label){ if(v==null||v<lo||v>hi) return; var y=Y(v);
+      svg+='<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="'+color+'" stroke-width="1.4"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>';
+      svg+='<text x="'+(W-padR+4)+'" y="'+(y+3)+'" font-size="10" fill="'+color+'">'+label+'</text>'; }
+    hline(d.usl,'#f59e0b','2 3','USL'); hline(d.lsl,'#f59e0b','2 3','LSL');
+    hline(d.cl,'#64748b',null,'CL');
+    hline(ucl,'#dc2626','5 4','UCL'); hline(lcl,'#dc2626','5 4','LCL');
+    // 선
+    var pts=d.sub.map(function(s,i){ return X(i)+','+Y(s.mean); }).join(' ');
+    svg+='<polyline points="'+pts+'" fill="none" stroke="#2563eb" stroke-width="1.6"/>';
+    // 점
+    d.sub.forEach(function(s,i){ var out=s.mean>ucl||s.mean<lcl;
+      svg+='<circle cx="'+X(i)+'" cy="'+Y(s.mean)+'" r="'+(out?4:2.4)+'" fill="'+(out?'#dc2626':'#2563eb')+'"><title>부분군 '+s.i+': '+s.mean+' '+(d.unit||'')+'</title></circle>'; });
+    // x 라벨(약 10개)
+    var step=Math.max(1,Math.ceil(n/10));
+    for(var i=0;i<n;i+=step){ svg+='<text x="'+X(i)+'" y="'+(H-padB+16)+'" text-anchor="middle" font-size="9" fill="#94a3b8">'+d.sub[i].i+'</text>'; }
+    $('#spc-svg').innerHTML=svg;
+  }
+
+  function render(){
+    if(!DATA){ return; }
+    var d=DATA;
+    var mu=parseFloat($('#spc-ucl').value), ml=parseFloat($('#spc-lcl').value);
+    var ucl=!isNaN(mu)?mu:d.ucl, lcl=!isNaN(ml)?ml:d.lcl;
+    $('#spc-chart-title').textContent='X̄ 관리도 — '+$('#spc-item').value;
+    var oos=tiles(d,ucl,lcl);
+    drawChart(d,ucl,lcl);
+    $('#spc-foot').innerHTML='모델 '+esc(d.model||$('#spc-model').value)+' · 부분군 '+d.n+'개씩 '+d.sub.length+'군 · 표본 '+(d.samples||'')+' · Cp '+(d.cp!=null?d.cp:'–')+' / Cpk '+(d.cpk!=null?d.cpk:'–')
+      +(oos?' · <span style="color:#dc2626">빨간점=관리한계 이탈('+oos+'군)</span>':'')
+      +((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':'');
+  }
+
+  async function loadSeries(){
+    var model=$('#spc-model').value, item=$('#spc-item').value, n=parseInt($('#spc-n').value,10)||5;
+    if(!model||!item) return;
+    msg('불러오는 중…');
+    try{
+      DATA = await AIT_API.getSpcSeries(model, item, n, 80);
+      if(!DATA || DATA.error || !DATA.sub){ msg('데이터가 없습니다: '+((DATA&&DATA.error)||''),'bad'); DATA=null; $('#spc-svg').innerHTML=''; $('#spc-tiles').innerHTML=''; return; }
+      msg('');
+      render();
+    }catch(e){ DATA=null; msg('⚠ SPC 데이터 조회 실패 — n8n 엔드포인트(ait/spc/series)가 배포됐는지 확인하세요.<br><span style="font-size:11px">'+esc(String(e))+'</span>','bad'); }
+  }
+
+  async function init(){
+    try{
+      META = await AIT_API.getSpcMeta();
+      if(!Array.isArray(META)||!META.length){ msg('측정항목이 없습니다. (n8n ait/spc/meta 응답 비어있음)','bad'); return; }
+    }catch(e){
+      msg('⚠ SPC 메타 조회 실패 — n8n 엔드포인트 <b>ait/spc/meta · ait/spc/series</b> 를 배포해야 합니다.<br><span style="font-size:11px">'+esc(String(e))+'</span>','bad');
+      return;
+    }
+    var models=[]; META.forEach(function(m){ if(models.indexOf(m.model_name)<0) models.push(m.model_name); });
+    $('#spc-model').innerHTML = models.map(function(m){ return '<option value="'+esc(m)+'">'+esc(m)+'</option>'; }).join('');
+    $('#spc-model').value = guessModel(models);
+    fillItems();
+    // 이벤트
+    $('#spc-model').onchange=function(){ fillItems(); loadSeries(); };
+    $('#spc-item').onchange=function(){ updateSpecLabel(); loadSeries(); };
+    $('#spc-n').onchange=loadSeries;
+    $('#spc-ucl').oninput=render; $('#spc-lcl').oninput=render;
+    loadSeries();
+  }
+  init();
+})();
+</script>
