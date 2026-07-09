@@ -38,7 +38,8 @@ function _buildDailyFromCpRows(rows, linename) {
       equipMap[equip] = { sheet: equip, proc_no: procNo, proc_name: procNm, location: linename, manager: '', items: [] };
       equipOrder.push(equip);
     }
-    equipMap[equip].items.push({ no: String(equipMap[equip].items.length + 1), name: itm, std: r.standard || '', method: r.tool || '', cycle: r.sample_freq || '' });
+    // no = CP행 고유 id(안정 식별자). 위치순번을 쓰면 항목 추가/삽입 시 결과값이 밀림(item_id 재바인딩 버그).
+    equipMap[equip].items.push({ no: String(r.id), name: itm, std: r.standard || '', method: r.tool || '', cycle: r.sample_freq || '' });
   });
   return equipOrder.map(k => equipMap[k]);
 }
