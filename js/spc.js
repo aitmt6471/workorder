@@ -170,8 +170,8 @@ window.initSpcTab = function initSpcTab() {
     $('#spc-model').value = guessModel(models);
     fillItems();
     // 이벤트
-    $('#spc-model').onchange=function(){ fillItems(); loadSeries(); };
-    $('#spc-item').onchange=function(){ updateSpecLabel(); loadSeries(); };
+    $('#spc-model').onchange=function(){ $('#spc-ucl').value=''; $('#spc-lcl').value=''; fillItems(); loadSeries(); };
+    $('#spc-item').onchange=function(){ $('#spc-ucl').value=''; $('#spc-lcl').value=''; updateSpecLabel(); loadSeries(); };
     $('#spc-n').onchange=loadSeries;
     $('#spc-ucl').oninput=render; $('#spc-lcl').oninput=render;
     loadSeries();
