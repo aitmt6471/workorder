@@ -48,12 +48,23 @@
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function msg(html, color){ $('#spc-msg').innerHTML = html ? '<div style="padding:12px 16px;border-radius:10px;background:'+(color==='bad'?'#fef2f2':'#f1f5f9')+';color:'+(color==='bad'?'#dc2626':'#475569')+'">'+html+'</div>' : ''; }
 
-  // 아이템(차종)명으로 모델 추정 (best-effort)
+  // CP 품번(partno) 우선, 없으면 아이템(차종)명으로 모델 추정 (최장 공통 프리픽스 매칭)
+  function normKey(s){ return String(s||'').toUpperCase().replace(/[^0-9A-Z-]/g,''); }
+  function bestByPrefix(key, models){
+    if(!key) return null;
+    var best=null, bestLen=0;
+    models.forEach(function(m){
+      var M = normKey(m), len = 0;
+      while(len<key.length && len<M.length && key[len]===M[len]) len++;
+      if(len>bestLen){ bestLen=len; best=m; }
+    });
+    return bestLen>=6 ? best : null; // 최소 6자 이상 일치해야 신뢰 (예: "928A2-")
+  }
   function guessModel(models){
-    if(!car) return models[0];
-    var key = car.replace(/\s/g,'').toUpperCase();
-    var hit = models.find(function(m){ var M=m.replace(/\s/g,'').toUpperCase(); return M.indexOf(key)>=0 || key.indexOf(M.slice(0,4))>=0; });
-    return hit || models[0];
+    var cpMeta = (typeof _cpMetaGet === 'function') ? _cpMetaGet(car) : null;
+    var wsCar = (window._aitCars || []).find(function(c){ return String(c.id) === String(window.currentCarId); });
+    var partno = (cpMeta && cpMeta.partno) || (wsCar && wsCar.partno) || '';
+    return bestByPrefix(normKey(partno), models) || bestByPrefix(normKey(car), models) || models[0];
   }
 
   function fillItems(){
