@@ -76,6 +76,7 @@ const AIT_API = (() => {
     getCars:          ()        => _get('ait/cars'),
     createCar:        (data)    => _post('ait/cars', data),
     updateCar:        (id, data)=> _put('ait/cars',  { id, ...data }),
+    copyCar:          (data)    => _post('ait/cars/copy', data, 120000),
 
     /* ── 개정이력 ──────────────────────────────── */
     getRevisions:     (carId, docType) => _get('ait/revisions', { carId, docType }),
@@ -296,6 +297,7 @@ const AIT_API = (() => {
     getCars:            ()           => _real.getCars(),
     createCar:          (data)       => _real.createCar(data),
     updateCar:          (id, data)   => _real.updateCar(id, data),
+    copyCar:            (data)       => _real.copyCar(data),
     /* 개정 */
     getRevisions:       (cId, dt)    => _real.getRevisions(cId, dt),
     addRevision:        (cId, dt, d) => _real.addRevision(cId, dt, d),
