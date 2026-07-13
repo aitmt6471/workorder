@@ -1421,6 +1421,8 @@ function loadCarContent(pane) {
       initCpMeta(paneEl, car);
       initCpFlowDiagram(paneEl);
       initCpEventListeners();
+      window._cpActiveVariant = '공통';           // CP 로드 시 공통 탭부터
+      if (typeof _renderCpVariantTabs === 'function') _renderCpVariantTabs();
       setCpEditable(paneEl, false);
       // 뷰 모드에서도 전체 행 표시 (기본 펼침)
       paneEl.querySelectorAll('.cp-group-hd').forEach(hd => hd.classList.add('cp-grp-open'));

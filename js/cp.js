@@ -1,5 +1,125 @@
 /* ── CP 관리계획서 전용 로직 ── */
 
+/* ══════════════════════════════════════════════════════════════
+   CP 차종(variant) 탭 — 아이템 1개(OC/OD…) 안에서 차종별 CP 분리
+   · '공통' = 4차종 공유행(기본), 그 외 = 해당 차종 고유행
+   · 작표/설비일상은 전체(공통+차종고유) union 후 중복제거, 비고에 "◯◯만 해당" 태그
+   · 하위호환: variant 없으면 전부 '공통' 취급 → 기존 동작과 동일
+   ══════════════════════════════════════════════════════════════ */
+const CP_COMMON = '공통';
+window._cpActiveVariant = window._cpActiveVariant || CP_COMMON;
+
+/* 현재 car의 차종 목록(공통 제외): cars.variants(JSON) 우선 + 실제 행/DOM에 존재하는 값 병합 */
+function _cpVariantList(rows) {
+  let list = [];
+  const carObj = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
+  if (carObj && carObj.variants) {
+    try { const p = typeof carObj.variants === 'string' ? JSON.parse(carObj.variants) : carObj.variants;
+      if (Array.isArray(p)) list = p.slice(); } catch {}
+  }
+  const extra = new Set();
+  if (rows && rows.length) rows.forEach(r => extra.add((r.variant || CP_COMMON)));
+  else document.querySelectorAll('#cp-tbody tr.cp-child').forEach(tr => extra.add(tr.dataset.variant || CP_COMMON));
+  extra.forEach(v => { if (v && v !== CP_COMMON && !list.includes(v)) list.push(v); });
+  return list;
+}
+function _cpAllVariants(rows) { return [CP_COMMON, ..._cpVariantList(rows)]; }
+
+async function _cpSaveVariantList(list) {
+  const carObj = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
+  if (carObj) carObj.variants = JSON.stringify(list);
+  if (!AIT_API.MOCK && window.currentCarId) {
+    try { await AIT_API.updateCar(window.currentCarId, { variants: JSON.stringify(list) }); }
+    catch (e) { console.warn('차종목록 저장 실패', e); }
+  }
+}
+
+/* 차종 탭 바 렌더 */
+function _renderCpVariantTabs(rows) {
+  const bar = document.getElementById('cp-variant-tabs');
+  if (!bar) return;
+  const variants = _cpAllVariants(rows);
+  if (!variants.includes(window._cpActiveVariant)) window._cpActiveVariant = CP_COMMON;
+  const editMode = document.getElementById('pane-cp')?.classList.contains('edit-mode');
+  let html = variants.map(v => {
+    const active = v === window._cpActiveVariant;
+    const rm = (editMode && v !== CP_COMMON)
+      ? `<span onclick="event.stopPropagation();_cpRemoveVariant('${v}')" title="차종 삭제" style="margin-left:7px;color:${active?'#fecaca':'#ef4444'};font-weight:700">✕</span>` : '';
+    return `<button class="cp-vtab${active ? ' active' : ''}" data-v="${v}" onclick="_cpSwitchVariant('${v}')">${v}${rm}</button>`;
+  }).join('');
+  if (editMode) html += `<button class="cp-vtab-add" onclick="_cpAddVariant()">＋ 차종</button>`;
+  bar.innerHTML = html;
+  _cpApplyVariantFilter();
+}
+
+function _cpSwitchVariant(v) {
+  window._cpActiveVariant = v;
+  document.querySelectorAll('#cp-variant-tabs .cp-vtab').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+  _cpApplyVariantFilter();
+}
+
+/* 활성 차종 행만 표시(공통 탭은 공통행만, 차종 탭은 그 차종행만) */
+function _cpApplyVariantFilter() {
+  const v = window._cpActiveVariant || CP_COMMON;
+  const tbody = document.getElementById('cp-tbody');
+  if (!tbody) return;
+  tbody.querySelectorAll('tr.cp-group-hd, tr.cp-child').forEach(tr => {
+    const rv = tr.dataset.variant || CP_COMMON;
+    tr.classList.toggle('cp-variant-hidden', rv !== v);
+  });
+}
+
+async function _cpAddVariant() {
+  const name = (prompt('추가할 차종명 (예: GN7PE)') || '').trim();
+  if (!name) return;
+  if (name === CP_COMMON) { alert('"공통"은 기본 탭입니다.'); return; }
+  const list = _cpVariantList();
+  if (list.includes(name)) { alert('이미 있는 차종입니다.'); return; }
+  list.push(name);
+  await _cpSaveVariantList(list);
+  window._cpActiveVariant = name;
+  _renderCpVariantTabs();
+}
+
+async function _cpRemoveVariant(v) {
+  if (v === CP_COMMON) return;
+  if (!confirm(`"${v}" 차종 탭과 그 안의 행을 모두 삭제합니다.\n저장 버튼을 눌러야 DB에 반영됩니다. 계속?`)) return;
+  const tbody = document.getElementById('cp-tbody');
+  tbody?.querySelectorAll('tr.cp-child, tr.cp-group-hd').forEach(tr => {
+    if ((tr.dataset.variant || CP_COMMON) === v) tr.remove();
+  });
+  const list = _cpVariantList().filter(x => x !== v);
+  await _cpSaveVariantList(list);
+  window._cpActiveVariant = CP_COMMON;
+  _renderCpVariantTabs();
+}
+
+/* 여러 차종 행 union → 중복제거 + 대표행 + 비고태그(_variantTag)
+   중복키 = 표시 컬럼 일치(비고/흐름/id 제외). 대표행: 공통 우선, 아니면 최소 id(설비일상 item_no 안정성). */
+function _cpMergeVariants(rows) {
+  const _n = v => (v == null || v === 'null') ? '' : String(v).trim();
+  const KEYCOLS = ['proc_no','proc_name','equip_name','char_special','char_general',
+    'ctrl_category','ctrl_item','standard','tool','sample_freq','ctrl_method','owner','reaction_plan'];
+  const keyOf = r => KEYCOLS.map(c => _n(r[c])).join('§');
+  const map = new Map();
+  (rows || []).forEach(r => {
+    if (r.is_deleted) return;
+    const k = keyOf(r);
+    if (!map.has(k)) map.set(k, { rep: r, variants: new Set() });
+    const e = map.get(k);
+    e.variants.add(r.variant || CP_COMMON);
+    const cur = e.rep;
+    const curCommon = (cur.variant || CP_COMMON) === CP_COMMON;
+    const rCommon = (r.variant || CP_COMMON) === CP_COMMON;
+    if ((rCommon && !curCommon) || (rCommon === curCommon && Number(r.id) < Number(cur.id))) e.rep = r;
+  });
+  return [...map.values()].map(e => {
+    const vs = [...e.variants];
+    const tag = vs.includes(CP_COMMON) ? '' : vs.join(', ') + '만 해당';
+    return Object.assign({}, e.rep, { _variantTag: tag });
+  });
+}
+
 /* ── CP 그룹 토글 / 유틸 ── */
 function toggleCpGroup(gid) {
   const hd = document.querySelector(`.cp-group-hd[data-gid="${gid}"]`);
@@ -25,6 +145,7 @@ function _cpIdx(cells) {
 
 /* ── CP DB rows → 설비일상 구조 빌드 (단일 진실 소스) ── */
 function _buildDailyFromCpRows(rows, linename) {
+  rows = _cpMergeVariants(rows); // 차종 union + 중복제거(대표행 id 유지)
   const equipMap = {}, equipOrder = [];
   rows.forEach(r => {
     if (r.is_deleted) return;
@@ -39,13 +160,16 @@ function _buildDailyFromCpRows(rows, linename) {
       equipOrder.push(equip);
     }
     // no = CP행 고유 id(안정 식별자). 위치순번을 쓰면 항목 추가/삽입 시 결과값이 밀림(item_id 재바인딩 버그).
-    equipMap[equip].items.push({ no: String(r.id), name: itm, std: r.standard || '', method: r.tool || '', cycle: r.sample_freq || '' });
+    // 차종 고유행은 항목명 뒤에 "[CN8만 해당]" 태그(비고)
+    const nm = r._variantTag ? `${itm} [${r._variantTag}]` : itm;
+    equipMap[equip].items.push({ no: String(r.id), name: nm, std: r.standard || '', method: r.tool || '', cycle: r.sample_freq || '' });
   });
   return equipOrder.map(k => equipMap[k]);
 }
 
 /* ── CP DB rows → WS 관리항목 렌더 (단일 진실 소스) ── */
 function _buildWsMgmtFromCpRows(rows, paneEl) {
+  rows = _cpMergeVariants(rows); // 차종 union + 중복제거
   const seenProc = {}, procOrder = [];
   let mgmtHtml = '';
   const delBtn = `<td class="edit-only" style="padding:2px;text-align:center"><button onclick="this.closest('tr').remove()" style="width:28px;height:28px;border:none;background:#fee2e2;color:#ef4444;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;line-height:1" title="삭제">✕</button></td>`;
@@ -59,7 +183,9 @@ function _buildWsMgmtFromCpRows(rows, paneEl) {
     seenProc[procNo]++;
     const cat = _n(r.ctrl_category), item = _n(r.ctrl_item), std = _n(r.standard);
     const method = _n(r.tool), cycle = _n(r.sample_freq), plan = _n(r.ctrl_method);
-    const action = _n(r.reaction_plan), note = _n(r.linked_doc);
+    const action = _n(r.reaction_plan);
+    // 차종 고유행 → 비고에 "CN8만 해당" 태그 결합
+    const note = [_n(r.linked_doc), r._variantTag].filter(Boolean).join(' / ');
     const isDaily = plan.includes('설비일상') || plan.includes('점검');
     const catColor = cat.includes('제품') ? '#1d4ed8' : '#15803d';
     mgmtHtml += `<tr data-proc="${procNo}" data-plan="${plan}"${isDaily ? ' class="daily-row"' : ''}>
@@ -185,6 +311,8 @@ function setCpEditable(paneEl, on) {
     paneEl.querySelectorAll('.cp-copy-btn, .cp-autofill-btn').forEach(b => b.remove());
     destroyCpOrder(paneEl);
   }
+  // 편집모드 진입/해제 시 차종 탭의 ＋차종/✕ 버튼 표시 갱신
+  if (typeof _renderCpVariantTabs === 'function') _renderCpVariantTabs();
 }
 
 /* ── CP 행 추가 → 모달 ── */
@@ -203,8 +331,10 @@ function deleteEmptyCpRows() {
 }
 
 function openCpAddModal() {
+  const _av = window._cpActiveVariant || CP_COMMON;
   const groups = [];
   document.querySelectorAll('#cp-tbody .cp-group-hd').forEach(hd => {
+    if ((hd.dataset.variant || CP_COMMON) !== _av) return; // 현재 차종 탭의 그룹만
     const gid = hd.dataset.gid;
     const no = hd.querySelector('.cp-gid-no')?.textContent.trim() || '';
     const name = hd.querySelector('.cp-gid-name')?.textContent.trim() || '';
@@ -247,16 +377,19 @@ function submitCpAddModal() {
   const _isEditMode = cpPane?.classList.contains('edit-mode') || false;
   const _ce = _isEditMode ? 'true' : 'false';
 
+  const variant = window._cpActiveVariant || CP_COMMON; // 신규 행은 현재 활성 차종 탭 소속
+
   const groupSel = document.getElementById('cpa-group');
   let targetGid = groupSel.value;
   let targetGroupHd = null; // 삽입 기준이 되는 그룹 헤더 요소 (직접 참조)
 
   if (!targetGid) {
     if (!procNo || !procName) { alert('새 그룹을 추가하려면 공정번호와 공정명을 입력하세요.'); return; }
-    targetGid = 'cpg-' + procNo;
+    targetGid = 'cpg-' + variant + '-' + procNo;
     const hd = document.createElement('tr');
     hd.className = 'cp-group-hd cp-grp-open';
     hd.setAttribute('data-gid', targetGid);
+    hd.setAttribute('data-variant', variant);
     hd.setAttribute('onclick', `toggleCpGroup('${targetGid}')`);
     hd.innerHTML = `<td colspan="16" style="background:#dce6f7;color:#1e3264;padding:8px 14px;font-weight:700;cursor:pointer;user-select:none;border-bottom:2px solid #b8ccec">
       <span class="cp-gid-no" onclick="event.stopPropagation()" style="font-size:16px;font-weight:800;margin-right:10px;color:#1e3264">${procNo}</span>
@@ -274,6 +407,7 @@ function submitCpAddModal() {
   const tr = document.createElement('tr');
   tr.className = 'cp-child cp-open';
   tr.setAttribute('data-gid', targetGid);
+  tr.setAttribute('data-variant', variant);
   tr.style.background = '#fff';
   tr.innerHTML = `
     <td class="td-center td-mono" contenteditable="${_ce}">${procNo}</td>
@@ -373,6 +507,7 @@ async function _saveCpToDb(carName, paneEl) {
     const flowRaw = (cells[1]?.dataset?.ms || cells[1]?.textContent.trim() || '').toUpperCase();
     const dbId = tr.dataset.dbId ? parseInt(tr.dataset.dbId) : null;
     const data = {
+      variant:      tr.dataset.variant || CP_COMMON,
       proc_no:      _cv(cells[0]?.textContent),
       flow_main:    flowRaw.includes('MAIN') ? 1 : 0,
       flow_sub:     flowRaw === 'SUB'         ? 1 : 0,
@@ -686,18 +821,28 @@ async function _buildCpHtmlFromDb(car) {
     const rows = await AIT_API.getCpRows(carId);
     if (!rows || !rows.length) return null;
 
-    const groups = {}, groupOrder = [];
+    // 차종(variant) → 공정(proc_no) 2단 그룹화. 같은 아이템 내 차종별 CP 분리.
+    const variantOrder = _cpAllVariants(rows);
+    const byVariant = {};
     rows.forEach(r => {
-      const key = String(r.proc_no || '0');
-      if (!groups[key]) { groups[key] = { proc_no: r.proc_no, proc_name: r.proc_name, rows: [] }; groupOrder.push(key); }
-      groups[key].rows.push(r);
+      const v = r.variant || CP_COMMON;
+      if (!variantOrder.includes(v)) variantOrder.push(v);
+      (byVariant[v] = byVariant[v] || []).push(r);
     });
 
     let html = '';
-    groupOrder.forEach(key => {
+    variantOrder.forEach(variant => {
+      const vRows = byVariant[variant] || [];
+      const groups = {}, groupOrder = [];
+      vRows.forEach(r => {
+        const key = String(r.proc_no || '0');
+        if (!groups[key]) { groups[key] = { proc_no: r.proc_no, proc_name: r.proc_name, rows: [] }; groupOrder.push(key); }
+        groups[key].rows.push(r);
+      });
+      groupOrder.forEach(key => {
       const g = groups[key];
-      const gid = 'cpg-' + (g.proc_no || key);
-      html += `<tr class="cp-group-hd cp-grp-open" data-gid="${gid}" onclick="toggleCpGroup('${gid}')">
+      const gid = 'cpg-' + variant + '-' + (g.proc_no || key);
+      html += `<tr class="cp-group-hd cp-grp-open" data-gid="${gid}" data-variant="${variant}" onclick="toggleCpGroup('${gid}')">
         <td colspan="16" style="background:#dce6f7;color:#1e3264;padding:8px 14px;font-weight:700;cursor:pointer;user-select:none;border-bottom:2px solid #b8ccec">
           <span class="cp-gid-no" onclick="event.stopPropagation()" style="font-size:16px;font-weight:800;margin-right:10px;color:#1e3264">${g.proc_no || ''}</span>
           <span class="cp-gid-name" onclick="event.stopPropagation()" style="font-size:13px;color:#1e3264">${g.proc_name || ''}</span>
@@ -711,7 +856,7 @@ async function _buildCpHtmlFromDb(car) {
         const catStyle = _n(r.ctrl_category).includes('제품')?'color:#1e3264;font-weight:600':'color:#6b7280;font-weight:600';
         const plan = _n(r.ctrl_method);
         const planStyle = plan.includes('작업표준서')||plan.includes('작표')?'color:#1e3264;font-weight:600':plan.includes('설비일상')||plan.includes('점검')?'color:#16a34a;font-weight:600':'color:#6b7280';
-        html += `<tr class="cp-child cp-open" data-gid="${gid}" data-db-id="${r.id}" style="background:#fff">
+        html += `<tr class="cp-child cp-open" data-gid="${gid}" data-variant="${variant}" data-db-id="${r.id}" style="background:#fff">
           <td class="td-center td-mono" contenteditable="false">${_n(r.proc_no)}</td>
           <td class="cp-flow-cell" data-ms="${ms}" style="padding:0;vertical-align:middle;text-align:center">${_cpFlowHtml(ms,false)}</td>
           <td contenteditable="false">${_n(r.proc_name)}</td>
@@ -731,7 +876,8 @@ async function _buildCpHtmlFromDb(car) {
             <button onclick="this.closest('tr').remove()" style="display:block;width:28px;height:28px;border:none;background:#fee2e2;color:#ef4444;border-radius:5px;cursor:pointer;font-size:14px;font-weight:700;line-height:1" title="행 삭제">✕</button>
           </td></tr>`;
       });
-    });
+      }); // groupOrder.forEach
+    }); // variantOrder.forEach
     return html;
   } catch(e) {
     console.warn('DB CP 로드 실패:', e);

@@ -54,6 +54,19 @@
   </div>
 </div>
 
+<!-- ── CP 차종(variant) 탭 바 ── -->
+<style>
+  #cp-variant-tabs { display:flex; align-items:center; gap:4px; flex-wrap:wrap;
+    background:#eef3fb; border-bottom:2px solid #dce6f7; padding:5px 12px; }
+  #cp-variant-tabs:empty { display:none; }
+  .cp-vtab { background:#fff; border:1px solid #cdd9ee; color:#43506b; border-radius:6px 6px 0 0;
+    padding:5px 14px; font-size:12px; font-weight:600; cursor:pointer; line-height:1.4; }
+  .cp-vtab.active { background:#1e3264; border-color:#1e3264; color:#fff; font-weight:700; }
+  .cp-vtab-add { background:transparent; border:1px dashed #9db4dd; color:#1e3264; border-radius:6px; }
+  .cp-variant-hidden { display:none !important; }
+</style>
+<div id="cp-variant-tabs"></div>
+
 <div style="padding:0 4px 16px">
   <table id="cp-table" class="data-tbl" style="table-layout:fixed;width:100%">
     <colgroup>
@@ -131,7 +144,8 @@ window.print_cp = async function() {
     AIT_API.getCpRows(carId).catch(() => []),
     AIT_API.getCpMeta(carId).catch(() => null)
   ]);
-  const cpRows = (cpRowsRaw || []).filter(r => !r.is_deleted);
+  const _pv = window._cpActiveVariant || '공통';
+  const cpRows = (cpRowsRaw || []).filter(r => !r.is_deleted && ((r.variant || '공통') === '공통' || (r.variant || '공통') === _pv));
 
   // CFT 배열 (DB 메타 우선, 캐시 fallback)
   let cftArr = [];

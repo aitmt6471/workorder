@@ -73,7 +73,8 @@ window.print_cp_gentex = async function() {
     AIT_API.getCpRows(carId).catch(() => []),
     AIT_API.getCpMeta(carId).catch(() => null)
   ]);
-  const cpRowsOrig = (cpRowsRaw || []).filter(r => !r.is_deleted);
+  const _pv = window._cpActiveVariant || '공통';
+  const cpRowsOrig = (cpRowsRaw || []).filter(r => !r.is_deleted && ((r.variant || '공통') === '공통' || (r.variant || '공통') === _pv));
 
   // ── 번역 ─────────────────────────────────────────────────────────────────
   const cpRows = await _translateRows(cpRowsOrig);
