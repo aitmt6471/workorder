@@ -43,7 +43,11 @@ window.print_cp_gentex = async function() {
 
   const stage    = paneEl?.querySelector('#cp-stage-view')?.textContent.trim()    || cpMeta.stage    || '시작';
   const linename = paneEl?.querySelector('#cp-meta-linename')?.textContent.trim() || cpMeta.linename || '';
-  const carmodel = paneEl?.querySelector('#cp-meta-model')?.textContent.trim()    || carName;
+  // 차종 레이블: 특정 차종 탭 선택 시 그 차종명으로, 공통이면 기존대로
+  const _printVariant = window._cpActiveVariant || '공통';
+  const carmodel = (_printVariant !== '공통')
+    ? _printVariant
+    : (paneEl?.querySelector('#cp-meta-model')?.textContent.trim() || carName);
   const partno   = paneEl?.querySelector('#cp-meta-partno')?.textContent.trim()   || cpMeta.partno   || '';
   const partname = paneEl?.querySelector('#cp-meta-partname')?.textContent.trim() || cpMeta.partname || '';
   const revBadge = paneEl?.querySelector('#cp-rev-badge')?.textContent || '';
@@ -71,7 +75,7 @@ window.print_cp_gentex = async function() {
     AIT_API.getRevisions(carId, 'cp').catch(() => []),
     AIT_API.getRevisionSigns(carId, 'cp').catch(() => []),
     AIT_API.getCpRows(carId).catch(() => []),
-    AIT_API.getCpMeta(carId).catch(() => null)
+    Promise.resolve(null)   // ait/cp/meta 미사용(레거시 죽은 엔드포인트): CORS/500·signal 콘솔에러 방지. cft는 로컬캐시 폴백
   ]);
   const _pv = window._cpActiveVariant || '공통';
   const cpRowsOrig = (cpRowsRaw || []).filter(r => !r.is_deleted && ((r.variant || '공통') === '공통' || (r.variant || '공통') === _pv));
