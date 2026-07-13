@@ -145,9 +145,12 @@ window.print_cp = async function() {
   const cftText = paneEl?.querySelector('#cp-cft-inline')?.textContent.trim() || '';
 
   // ── DB 페치 ──────────────────────────────────────────
+  // 개정이력·결재서명도 선택 탭(차종)별로 조회: 공통='cp', 차종='cp@차종'
+  const _revDt = (typeof _revGroupKey === 'function') ? _revGroupKey('cp')
+               : ((window._cpActiveVariant && window._cpActiveVariant !== '공통') ? 'cp@' + window._cpActiveVariant : 'cp');
   const [revisions, signs, cpRowsRaw, cpMetaDb] = await Promise.all([
-    AIT_API.getRevisions(carId, 'cp').catch(() => []),
-    AIT_API.getRevisionSigns(carId, 'cp').catch(() => []),
+    AIT_API.getRevisions(carId, _revDt).catch(() => []),
+    AIT_API.getRevisionSigns(carId, _revDt).catch(() => []),
     AIT_API.getCpRows(carId).catch(() => []),
     Promise.resolve(null)   // ait/cp/meta 미사용(레거시 죽은 엔드포인트): CORS/500·signal 콘솔에러 방지. cft는 로컬캐시 폴백
   ]);
