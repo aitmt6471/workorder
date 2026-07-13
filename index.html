@@ -235,6 +235,37 @@
 </div>
 
 <!-- ── CP 항목 추가 모달 ── -->
+<!-- ── CP 차종 탭 추가/수정 모달 ── -->
+<div class="car-modal-overlay" id="cp-variant-modal">
+  <div class="car-modal" style="width:400px;max-width:96vw">
+    <div class="car-modal-hd">
+      <h4 id="cp-var-modal-title">차종 탭 추가</h4>
+      <button class="btn btn-ghost btn-sm" onclick="_cpCloseVarModal()">✕</button>
+    </div>
+    <div style="padding:18px 18px 6px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <label style="font-size:11px;color:#6b7280;font-weight:600">탭 이름 (차종)</label>
+        <input id="cp-var-modal-name" type="text" placeholder="예: GN7PE"
+          style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit"
+          onkeydown="if(event.key==='Enter')_cpVarModalSubmit()">
+      </div>
+      <label id="cp-var-modal-copyrow" style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:#374151;cursor:pointer;user-select:none">
+        <input type="checkbox" id="cp-var-modal-copy" checked style="accent-color:#1e3264;width:16px;height:16px">
+        공통 항목을 복사해서 시작 <span style="color:#9ca3af">(권장)</span>
+      </label>
+      <button id="cp-var-modal-copybtn" onclick="_cpVarModalCopyCommon()"
+        style="display:none;align-items:center;justify-content:center;gap:6px;background:#eef3ff;border:1px solid #c4cedf;color:#1e3264;border-radius:8px;padding:9px;font-size:12.5px;font-weight:600;cursor:pointer">⧉ 공통 내용을 이 탭으로 복사</button>
+      <div id="cp-var-modal-err" style="display:none;color:#ef4444;font-size:11.5px;font-weight:600"></div>
+    </div>
+    <div class="car-add-row" style="justify-content:flex-end;gap:8px;align-items:center">
+      <button id="cp-var-modal-del" class="btn btn-ghost btn-sm" onclick="_cpVarModalDelete()"
+        style="display:none;color:#ef4444;border-color:rgba(239,68,68,.4);margin-right:auto">삭제</button>
+      <button class="btn btn-ghost btn-sm" onclick="_cpCloseVarModal()">취소</button>
+      <button class="btn btn-primary btn-sm" id="cp-var-modal-ok" onclick="_cpVarModalSubmit()">추가</button>
+    </div>
+  </div>
+</div>
+
 <div class="car-modal-overlay" id="cp-add-modal">
   <div class="car-modal" style="width:580px;max-width:96vw">
     <div class="car-modal-hd">
@@ -362,7 +393,7 @@
 </div>
 
 <script src="js/api.js?v=20260710copy"></script>
-<script src="js/cp.js?v=20260713variant2"></script>
+<script src="js/cp.js?v=20260713variant3"></script>
 <script src="js/main.js?v=20260713variant"></script>
 <script src="js/ws.js?v=20260523a"></script>
 <script src="js/spc.js?v=20260709spc4"></script>

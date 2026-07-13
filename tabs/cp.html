@@ -54,18 +54,21 @@
   </div>
 </div>
 
-<!-- ── CP 차종(variant) 탭 바 ── -->
+<!-- ── CP 차종(variant) 탭 바 (작표/설비일상 탭 스타일 = process-nav) ── -->
 <style>
-  #cp-variant-tabs { display:flex; align-items:center; gap:4px; flex-wrap:wrap;
-    background:#eef3fb; border-bottom:2px solid #dce6f7; padding:5px 12px; }
   #cp-variant-tabs:empty { display:none; }
-  .cp-vtab { background:#fff; border:1px solid #cdd9ee; color:#43506b; border-radius:6px 6px 0 0;
-    padding:5px 14px; font-size:12px; font-weight:600; cursor:pointer; line-height:1.4; }
-  .cp-vtab.active { background:#1e3264; border-color:#1e3264; color:#fff; font-weight:700; }
-  .cp-vtab-add { background:transparent; border:1px dashed #9db4dd; color:#1e3264; border-radius:6px; }
+  #cp-variant-tabs .cp-vtab-add { border-style:dashed; color:#1e3264; background:#fff; font-weight:700; }
+  #cp-variant-tabs .cp-vtab-cog { padding:0; width:16px; height:16px; border:1px solid #c4cedf;
+    border-bottom:none; background:#eef3ff; color:#1e3264; border-radius:4px; cursor:pointer;
+    font-size:11px; line-height:1; margin-left:1px; margin-bottom:4px; flex-shrink:0; font-weight:700; }
   .cp-variant-hidden { display:none !important; }
+  /* 고급 모달: 배경 블러 + 팝 애니메이션 */
+  #cp-variant-modal { background:rgba(18,26,46,.5); backdrop-filter:blur(4px); -webkit-backdrop-filter:blur(4px); }
+  #cp-variant-modal .car-modal { border-radius:16px; box-shadow:0 20px 64px rgba(15,25,55,.38); animation:cpVarPop .19s cubic-bezier(.2,.9,.3,1.2); }
+  #cp-variant-modal .car-modal-hd h4 { font-size:15px; letter-spacing:.3px; }
+  @keyframes cpVarPop { from { opacity:0; transform:translateY(10px) scale(.96); } to { opacity:1; transform:none; } }
 </style>
-<div id="cp-variant-tabs"></div>
+<div id="cp-variant-tabs" class="process-nav"></div>
 
 <div style="padding:0 4px 16px">
   <table id="cp-table" class="data-tbl" style="table-layout:fixed;width:100%">

@@ -34,28 +34,33 @@ async function _cpSaveVariantList(list) {
   }
 }
 
-/* 차종 탭 바 렌더 */
+/* 차종 탭 바 렌더 (작표/설비일상 탭 스타일 = process-nav/proc-btn) */
 function _renderCpVariantTabs(rows) {
   const bar = document.getElementById('cp-variant-tabs');
   if (!bar) return;
   const variants = _cpAllVariants(rows);
   if (!variants.includes(window._cpActiveVariant)) window._cpActiveVariant = CP_COMMON;
   const editMode = document.getElementById('pane-cp')?.classList.contains('edit-mode');
+  const esc = s => String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;');
   let html = variants.map(v => {
-    const active = v === window._cpActiveVariant;
-    const rm = (editMode && v !== CP_COMMON)
-      ? `<span onclick="event.stopPropagation();_cpRemoveVariant('${v}')" title="차종 삭제" style="margin-left:7px;color:${active?'#fecaca':'#ef4444'};font-weight:700">✕</span>` : '';
-    return `<button class="cp-vtab${active ? ' active' : ''}" data-v="${v}" onclick="_cpSwitchVariant('${v}')">${v}${rm}</button>`;
+    const active = v === window._cpActiveVariant ? ' active' : '';
+    if (v === CP_COMMON || !editMode) {
+      return `<button class="proc-btn${active}" data-v="${esc(v)}" onclick="_cpSwitchVariant('${esc(v)}')">${v}</button>`;
+    }
+    // 차종 탭(편집): 탭 + ⋯(수정/삭제/공통복사 모달). 더블클릭도 모달.
+    return `<span class="proc-tab-wrap">`
+      + `<button class="proc-btn${active}" data-v="${esc(v)}" onclick="_cpSwitchVariant('${esc(v)}')" ondblclick="_cpOpenVarModal('edit','${esc(v)}')" title="더블클릭: 이름 수정">${v}</button>`
+      + `<button class="cp-vtab-cog" onclick="event.stopPropagation();_cpOpenVarModal('edit','${esc(v)}')" title="이름 수정 / 삭제 / 공통 복사">⋯</button>`
+      + `</span>`;
   }).join('');
-  if (editMode) html += `<button class="cp-vtab-add" onclick="_cpAddVariant()">＋ 차종</button>`
-    + `<button class="cp-vtab-add" onclick="_cpCopyToActive()" title="다른 차종 내용을 현재 탭으로 복사한 뒤 다른 부분만 수정">⧉ 탭복사</button>`;
+  if (editMode) html += `<button class="proc-btn cp-vtab-add" onclick="_cpOpenVarModal('add')" title="차종 탭 추가">＋ 차종</button>`;
   bar.innerHTML = html;
   _cpApplyVariantFilter();
 }
 
 function _cpSwitchVariant(v) {
   window._cpActiveVariant = v;
-  document.querySelectorAll('#cp-variant-tabs .cp-vtab').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+  document.querySelectorAll('#cp-variant-tabs .proc-btn[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
   _cpApplyVariantFilter();
 }
 
@@ -70,29 +75,103 @@ function _cpApplyVariantFilter() {
   });
 }
 
-async function _cpAddVariant() {
-  const name = (prompt('추가할 차종명 (예: GN7PE)') || '').trim();
-  if (!name) return;
-  if (name === CP_COMMON) { alert('"공통"은 기본 탭입니다.'); return; }
+/* ── 차종 탭 추가/수정 모달 ── */
+let _cpVarMode = 'add', _cpVarOrig = '';
+function _cpVarModalErr(msg) {
+  const e = document.getElementById('cp-var-modal-err');
+  if (!e) return;
+  e.textContent = msg || '';
+  e.style.display = msg ? 'block' : 'none';
+}
+function _cpOpenVarModal(mode, variant) {
+  _cpVarMode = mode; _cpVarOrig = variant || '';
+  const g = id => document.getElementById(id);
+  g('cp-var-modal-title').textContent = mode === 'edit' ? '차종 탭 수정' : '차종 탭 추가';
+  g('cp-var-modal-name').value = mode === 'edit' ? variant : '';
+  g('cp-var-modal-copyrow').style.display = mode === 'add' ? 'flex' : 'none';
+  g('cp-var-modal-copy').checked = true;
+  g('cp-var-modal-copybtn').style.display = mode === 'edit' ? 'block' : 'none';
+  const del = g('cp-var-modal-del');
+  del.style.display = mode === 'edit' ? 'inline-flex' : 'none';
+  del.dataset.armed = '0'; del.textContent = '삭제'; del.style.background = '';
+  g('cp-var-modal-ok').textContent = mode === 'edit' ? '저장' : '추가';
+  _cpVarModalErr('');
+  g('cp-variant-modal').classList.add('open');
+  setTimeout(() => g('cp-var-modal-name').focus(), 60);
+}
+function _cpCloseVarModal() { document.getElementById('cp-variant-modal')?.classList.remove('open'); }
+
+async function _cpVarModalSubmit() {
+  const nameEl = document.getElementById('cp-var-modal-name');
+  const name = (nameEl.value || '').trim();
+  if (!name) { _cpVarModalErr('탭 이름을 입력하세요.'); nameEl.focus(); return; }
+  if (name === CP_COMMON) { _cpVarModalErr('"공통"은 기본 탭이라 쓸 수 없습니다.'); return; }
   const list = _cpVariantList();
-  if (list.includes(name)) { alert('이미 있는 차종입니다.'); return; }
-  list.push(name);
-  await _cpSaveVariantList(list);
-  window._cpActiveVariant = name;
-  _renderCpVariantTabs();
+  if (_cpVarMode === 'add') {
+    if (list.includes(name)) { _cpVarModalErr('이미 있는 차종입니다.'); return; }
+    list.push(name);
+    await _cpSaveVariantList(list);
+    window._cpActiveVariant = name;
+    const doCopy = document.getElementById('cp-var-modal-copy').checked;
+    _cpCloseVarModal();
+    _renderCpVariantTabs();
+    if (doCopy) _cpCopyVariant(CP_COMMON, name);
+  } else {
+    if (name !== _cpVarOrig) {
+      if (list.includes(name)) { _cpVarModalErr('이미 있는 차종입니다.'); return; }
+      _cpApplyRename(_cpVarOrig, name);
+      await _cpSaveVariantList(list.map(x => x === _cpVarOrig ? name : x));
+      window._cpActiveVariant = name;
+    }
+    _cpCloseVarModal();
+    _renderCpVariantTabs();
+  }
 }
 
-async function _cpRemoveVariant(v) {
-  if (v === CP_COMMON) return;
-  if (!confirm(`"${v}" 차종 탭과 그 안의 행을 모두 삭제합니다.\n저장 버튼을 눌러야 DB에 반영됩니다. 계속?`)) return;
+function _cpVarModalDelete() {
+  const btn = document.getElementById('cp-var-modal-del');
+  if (btn.dataset.armed !== '1') {   // 2단계 확인(네이티브 confirm 대체)
+    btn.dataset.armed = '1'; btn.textContent = '한번 더 눌러 삭제';
+    btn.style.background = '#fee2e2';
+    setTimeout(() => { if (btn.dataset.armed === '1') { btn.dataset.armed = '0'; btn.textContent = '삭제'; btn.style.background = ''; } }, 3000);
+    return;
+  }
+  const v = _cpVarOrig;
   const tbody = document.getElementById('cp-tbody');
   tbody?.querySelectorAll('tr.cp-child, tr.cp-group-hd').forEach(tr => {
     if ((tr.dataset.variant || CP_COMMON) === v) tr.remove();
   });
-  const list = _cpVariantList().filter(x => x !== v);
-  await _cpSaveVariantList(list);
+  _cpSaveVariantList(_cpVariantList().filter(x => x !== v));
   window._cpActiveVariant = CP_COMMON;
+  _cpCloseVarModal();
   _renderCpVariantTabs();
+  window.showToast && window.showToast(`"${v}" 차종 삭제됨. 저장 시 DB 반영.`, 'success');
+}
+
+function _cpVarModalCopyCommon() {
+  const v = _cpVarOrig;
+  _cpCloseVarModal();
+  window._cpActiveVariant = v;
+  _cpCopyVariant(CP_COMMON, v);
+}
+
+/* 차종 이름 변경: DOM 행의 variant/gid 갱신 → 저장 시 DB 반영 */
+function _cpApplyRename(oldV, newV) {
+  const tbody = document.getElementById('cp-tbody');
+  tbody?.querySelectorAll('tr.cp-group-hd, tr.cp-child').forEach(tr => {
+    if ((tr.dataset.variant || CP_COMMON) !== oldV) return;
+    tr.dataset.variant = newV;
+    const isHd = tr.classList.contains('cp-group-hd');
+    const proc = isHd ? (tr.querySelector('.cp-gid-no')?.textContent.trim() || '')
+                      : (tr.cells[0]?.textContent.trim() || '');
+    const gid = 'cpg-' + newV + '-' + proc;
+    tr.setAttribute('data-gid', gid);
+    if (isHd) {
+      tr.setAttribute('onclick', `toggleCpGroup('${gid}')`);
+      tr.querySelector('button.edit-only[onclick*="deleteCpGroup"]')
+        ?.setAttribute('onclick', `event.stopPropagation();deleteCpGroup('${gid}')`);
+    }
+  });
 }
 
 /* 여러 차종 행 union → 중복제거 + 대표행 + 비고태그(_variantTag)
@@ -121,36 +200,18 @@ function _cpMergeVariants(rows) {
   });
 }
 
-/* 다른 차종 탭 내용을 현재 활성 탭으로 복사(원본은 그대로) → 차이만 수정 후 저장 */
-function _cpCopyToActive() {
-  const tgt = window._cpActiveVariant || CP_COMMON;
-  const others = _cpAllVariants().filter(v => v !== tgt);
-  if (!others.length) { alert('복사할 다른 차종 탭이 없습니다.'); return; }
-  const menu = others.map((v, i) => `${i + 1}. ${v}`).join('\n');
-  const ans = prompt(`"${tgt}" 탭으로 복사할 원본 차종을 번호로 선택하세요:\n\n${menu}`);
-  if (ans == null) return;
-  const src = others[parseInt(ans.trim()) - 1];
-  if (!src) { alert('잘못된 번호입니다.'); return; }
-  _cpCopyVariant(src, tgt);
-}
-
+/* 원본 차종(주로 공통) 행을 대상 탭으로 복제 — 원본은 유지, 대상 기존행은 대체.
+   명시적 액션이므로 자동 교체(저장 전이면 새로고침으로 원복 가능). */
 function _cpCopyVariant(src, tgt) {
-  if (src === tgt) { alert('같은 차종입니다.'); return; }
+  if (src === tgt) return;
   const tbody = document.getElementById('cp-tbody');
   if (!tbody) return;
   const all = [...tbody.querySelectorAll('tr.cp-group-hd, tr.cp-child')];
   const srcRows = all.filter(tr => (tr.dataset.variant || CP_COMMON) === src);
   const srcChildCnt = srcRows.filter(tr => tr.classList.contains('cp-child')).length;
-  if (!srcChildCnt) { alert(`"${src}" 탭에 복사할 행이 없습니다.`); return; }
-  // 대상에 이미 행이 있으면 대체 확인
-  const tgtRows = all.filter(tr => (tr.dataset.variant || CP_COMMON) === tgt);
-  const tgtChildCnt = tgtRows.filter(tr => tr.classList.contains('cp-child')).length;
-  if (tgtChildCnt) {
-    if (!confirm(`"${tgt}" 탭에 이미 ${tgtChildCnt}개 행이 있습니다.\n"${src}" 내용으로 대체할까요? (기존 삭제 후 복사)`)) return;
-    tgtRows.forEach(tr => tr.remove());
-  } else if (!confirm(`"${src}"의 ${srcChildCnt}개 행을 "${tgt}" 탭으로 복사합니다. 계속?`)) {
-    return;
-  }
+  if (!srcChildCnt) { window.showToast && window.showToast(`"${src}" 탭에 복사할 내용이 없습니다.`, 'error'); return; }
+  // 대상 기존행 제거(대체)
+  all.filter(tr => (tr.dataset.variant || CP_COMMON) === tgt).forEach(tr => tr.remove());
   // src 순서대로 복제 → 대상 차종으로 변형(새 행: data-db-id 제거)
   const frag = document.createDocumentFragment();
   srcRows.forEach(tr => {
