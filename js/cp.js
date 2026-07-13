@@ -47,7 +47,8 @@ function _renderCpVariantTabs(rows) {
       ? `<span onclick="event.stopPropagation();_cpRemoveVariant('${v}')" title="차종 삭제" style="margin-left:7px;color:${active?'#fecaca':'#ef4444'};font-weight:700">✕</span>` : '';
     return `<button class="cp-vtab${active ? ' active' : ''}" data-v="${v}" onclick="_cpSwitchVariant('${v}')">${v}${rm}</button>`;
   }).join('');
-  if (editMode) html += `<button class="cp-vtab-add" onclick="_cpAddVariant()">＋ 차종</button>`;
+  if (editMode) html += `<button class="cp-vtab-add" onclick="_cpAddVariant()">＋ 차종</button>`
+    + `<button class="cp-vtab-add" onclick="_cpCopyToActive()" title="다른 차종 내용을 현재 탭으로 복사한 뒤 다른 부분만 수정">⧉ 탭복사</button>`;
   bar.innerHTML = html;
   _cpApplyVariantFilter();
 }
@@ -118,6 +119,66 @@ function _cpMergeVariants(rows) {
     const tag = vs.includes(CP_COMMON) ? '' : vs.join(', ') + '만 해당';
     return Object.assign({}, e.rep, { _variantTag: tag });
   });
+}
+
+/* 다른 차종 탭 내용을 현재 활성 탭으로 복사(원본은 그대로) → 차이만 수정 후 저장 */
+function _cpCopyToActive() {
+  const tgt = window._cpActiveVariant || CP_COMMON;
+  const others = _cpAllVariants().filter(v => v !== tgt);
+  if (!others.length) { alert('복사할 다른 차종 탭이 없습니다.'); return; }
+  const menu = others.map((v, i) => `${i + 1}. ${v}`).join('\n');
+  const ans = prompt(`"${tgt}" 탭으로 복사할 원본 차종을 번호로 선택하세요:\n\n${menu}`);
+  if (ans == null) return;
+  const src = others[parseInt(ans.trim()) - 1];
+  if (!src) { alert('잘못된 번호입니다.'); return; }
+  _cpCopyVariant(src, tgt);
+}
+
+function _cpCopyVariant(src, tgt) {
+  if (src === tgt) { alert('같은 차종입니다.'); return; }
+  const tbody = document.getElementById('cp-tbody');
+  if (!tbody) return;
+  const all = [...tbody.querySelectorAll('tr.cp-group-hd, tr.cp-child')];
+  const srcRows = all.filter(tr => (tr.dataset.variant || CP_COMMON) === src);
+  const srcChildCnt = srcRows.filter(tr => tr.classList.contains('cp-child')).length;
+  if (!srcChildCnt) { alert(`"${src}" 탭에 복사할 행이 없습니다.`); return; }
+  // 대상에 이미 행이 있으면 대체 확인
+  const tgtRows = all.filter(tr => (tr.dataset.variant || CP_COMMON) === tgt);
+  const tgtChildCnt = tgtRows.filter(tr => tr.classList.contains('cp-child')).length;
+  if (tgtChildCnt) {
+    if (!confirm(`"${tgt}" 탭에 이미 ${tgtChildCnt}개 행이 있습니다.\n"${src}" 내용으로 대체할까요? (기존 삭제 후 복사)`)) return;
+    tgtRows.forEach(tr => tr.remove());
+  } else if (!confirm(`"${src}"의 ${srcChildCnt}개 행을 "${tgt}" 탭으로 복사합니다. 계속?`)) {
+    return;
+  }
+  // src 순서대로 복제 → 대상 차종으로 변형(새 행: data-db-id 제거)
+  const frag = document.createDocumentFragment();
+  srcRows.forEach(tr => {
+    const c = tr.cloneNode(true);
+    const isHd = c.classList.contains('cp-group-hd');
+    const procNo = isHd
+      ? (c.querySelector('.cp-gid-no')?.textContent.trim() || '')
+      : (c.cells[0]?.textContent.trim() || '');
+    const newGid = 'cpg-' + tgt + '-' + procNo;
+    c.dataset.variant = tgt;
+    c.setAttribute('data-gid', newGid);
+    c.removeAttribute('data-db-id');            // 새 행으로 저장되게
+    if (isHd) {
+      c.setAttribute('onclick', `toggleCpGroup('${newGid}')`);
+      c.querySelector('button.edit-only[onclick*="deleteCpGroup"]')
+        ?.setAttribute('onclick', `event.stopPropagation();deleteCpGroup('${newGid}')`);
+    }
+    // 편집/순서/공통입력 버튼은 setCpEditable가 재부착 → 복제본에선 제거
+    c.querySelectorAll('.cp-copy-btn, .cp-order-btn, .cp-autofill-btn').forEach(b => b.remove());
+    frag.appendChild(c);
+  });
+  tbody.appendChild(frag);
+  const paneEl = document.getElementById('pane-cp');
+  initCpFlowDiagram(paneEl);
+  setCpEditable(paneEl, true);                  // 버튼 재부착 + 탭 갱신
+  window._cpActiveVariant = tgt;
+  _renderCpVariantTabs();
+  window.showToast && window.showToast(`"${src}" → "${tgt}" 복사 완료. 다른 부분만 수정 후 저장하세요.`, 'success');
 }
 
 /* ── CP 그룹 토글 / 유틸 ── */
