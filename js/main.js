@@ -244,7 +244,12 @@ function saveRevData(carName, data) {
 const _STANDALONE_PANES = ['cp', 'ws', 'daily', 'imf', 'ms', 'insp', 'qpoint', 'spec'];
 // cp / ws / daily 는 동일한 개정 이력 공유
 function _revGroupKey(pane) {
-  return (pane === 'ws' || pane === 'daily') ? 'cp' : pane;
+  if (pane === 'ws' || pane === 'daily') return 'cp';        // 작표·설비일상 = 공통 CP 개정 공유
+  if (pane === 'cp') {                                        // CP는 차종 탭별 개정이력
+    const v = window._cpActiveVariant || '공통';
+    return v === '공통' ? 'cp' : 'cp@' + v;
+  }
+  return pane;
 }
 const _revMemStore = {}; // localStorage 대신 메모리 캐시 사용
 function getRevDataFor(pane, carName) {
@@ -270,6 +275,27 @@ function updateRevDisplay(pane) {
 
 function updateAllRevDisplays() {
   ['cp','ws','daily','imf','ms','insp','spec'].forEach(updateRevDisplay);
+}
+
+/* 활성 차종 탭의 개정이력 로드 → 배지/캐시 갱신 (CP 탭 전환/추가 시 호출) */
+function _loadCpRevForActive() {
+  const carName = getCurrentCar();
+  const v = window._cpActiveVariant || '공통';
+  updateRevDisplay('cp');                     // 캐시 우선 즉시 반영
+  if (AIT_API.MOCK || !window.currentCarId) return;
+  const dt = v === '공통' ? 'cp' : 'cp@' + v;
+  AIT_API.getRevisions(window.currentCarId, dt).then(rows => {
+    const valid = (rows || []).filter(r => r && r.id != null);
+    const rd = { rev: 0, history: [] };
+    valid.forEach(r => {
+      const rev = parseInt(r.rev) || 0;
+      if (rev > rd.rev) rd.rev = rev;
+      rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: 'cp', dbId: r.id, rev_display: r.rev_display || '' });
+    });
+    rd.history.sort((a, b) => b.rev - a.rev);
+    _revMemStore[`${dt}:${carName}`] = rd;    // 경쟁상태 방지: 캡처한 키로 직접 저장
+    if ((window._cpActiveVariant || '공통') === v) updateRevDisplay('cp');
+  }).catch(() => {});
 }
 
 let _revModalPane = null;
@@ -306,7 +332,8 @@ function openRevModal(pane) {
 
   function _renderRevModal() {
     const rd = (pane && _STANDALONE_PANES.includes(pane)) ? getRevDataFor(pane, carName) : getRevData(carName);
-    const label = pane === 'imf' ? '초중종물' : pane === 'ms' ? '마스터샘플' : '';
+    let label = pane === 'imf' ? '초중종물' : pane === 'ms' ? '마스터샘플' : '';
+    if (pane === 'cp') label = 'CP · ' + (window._cpActiveVariant || '공통');   // 어느 차종 탭 개정이력인지 표시
     document.getElementById('rev-modal-car').textContent = carName + (label ? ` — ${label}` : '');
     const tbody = document.getElementById('rev-modal-tbody');
     const liveMode = !AIT_API.MOCK;

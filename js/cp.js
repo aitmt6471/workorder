@@ -62,6 +62,7 @@ function _cpSwitchVariant(v) {
   window._cpActiveVariant = v;
   document.querySelectorAll('#cp-variant-tabs .proc-btn[data-v]').forEach(b => b.classList.toggle('active', b.dataset.v === v));
   _cpApplyVariantFilter();
+  if (typeof _loadCpRevForActive === 'function') _loadCpRevForActive();  // 탭별 개정이력 배지
 }
 
 /* 활성 차종 행만 표시(공통 탭은 공통행만, 차종 탭은 그 차종행만) */
@@ -126,6 +127,7 @@ async function _cpVarModalSubmit() {
     _cpCloseVarModal();
     _renderCpVariantTabs();
   }
+  if (typeof _loadCpRevForActive === 'function') _loadCpRevForActive();  // 차종별 개정이력 배지
 }
 
 function _cpVarModalDelete() {
@@ -145,6 +147,7 @@ function _cpVarModalDelete() {
   window._cpActiveVariant = CP_COMMON;
   _cpCloseVarModal();
   _renderCpVariantTabs();
+  if (typeof _loadCpRevForActive === 'function') _loadCpRevForActive();
   window.showToast && window.showToast(`"${v}" 차종 삭제됨. 저장 시 DB 반영.`, 'success');
 }
 
