@@ -710,6 +710,7 @@ function _syncCarMetaToLocal(carObj) {
   const name = carObj.name;
   _cpMetaSet(name, {
     stage:    carObj.stage    || '시작',
+    carmodel: carObj.carmodel || '',   // 차종: DB 저장값 로드(그동안 캐시에 안 실려 아이템명으로 폴백되던 버그)
     partno:   carObj.partno   || '',
     partname: carObj.partname || '',
     linename: carObj.linename || ''
@@ -745,7 +746,7 @@ function initCpMeta(paneEl, car) {
   const modelEl = paneEl.querySelector('#cp-meta-model');
   const pnoEl   = paneEl.querySelector('#cp-meta-partno');
   const pnmEl   = paneEl.querySelector('#cp-meta-partname');
-  if (modelEl) modelEl.textContent = meta.carmodel || car;
+  if (modelEl) modelEl.textContent = meta.carmodel || '';   // 차종=사용자 입력(아이템명 자동채움 제거). 라인명은 그대로 유지
   if (pnoEl)   pnoEl.textContent   = meta.partno   || '';
   if (pnmEl)   pnmEl.textContent   = meta.partname || '';
   const linenameEl = paneEl.querySelector('#cp-meta-linename');
@@ -764,7 +765,7 @@ function initCpMeta(paneEl, car) {
 function openPartModal() {
   const car = getCurrentCar();
   const meta = _cpMetaGet(car);
-  document.getElementById('part-modal-carmodel').value = meta.carmodel || car || '';
+  document.getElementById('part-modal-carmodel').value = meta.carmodel || '';   // 차종 모달도 아이템명 자동채움 제거
   document.getElementById('part-modal-partno').value   = meta.partno   || '';
   document.getElementById('part-modal-partname').value = meta.partname || '';
   document.getElementById('part-modal').classList.add('open');
