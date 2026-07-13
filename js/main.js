@@ -1041,9 +1041,23 @@ async function confirmEditCar(id) {
 async function deleteCar(id) {
   const cars = loadCars();
   if (cars.length <= 1) { alert('최소 1개의 아이템이 필요합니다.'); return; }
-  if (!confirm('이 아이템을 삭제하시겠습니까?')) return;
+  const target = cars.find(c => c.id === id);
+  const name = target ? target.name : ('#' + id);
+  const ans = confirm(
+    `"${name}" 아이템을 삭제합니다.\n\n` +
+    `⚠️ CP·작업표준서·설비일상점검표·초중종물·마스터샘플·개정이력/서명 등\n` +
+    `이 아이템에 속한 모든 데이터가 영구히 삭제되며 복구할 수 없습니다.\n\n` +
+    `계속하시겠습니까?`
+  );
+  if (!ans) return;
   if (!AIT_API.MOCK) {
-    try { await AIT_API.updateCar(id, { is_active: 0 }); } catch(e) { console.warn('차종 삭제 DB 실패', e); }
+    try {
+      await AIT_API.deleteCarCascade(id);
+    } catch(e) {
+      alert('삭제 실패: ' + (e.message || e));
+      console.warn('차종 삭제 DB 실패', e);
+      return;   // 서버 삭제 실패 시 로컬 목록은 건드리지 않음(상태 불일치 방지)
+    }
   }
   const updated = cars.filter(c => c.id !== id);
   saveCarsToStorage(updated);

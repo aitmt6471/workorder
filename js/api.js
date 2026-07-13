@@ -77,6 +77,8 @@ const AIT_API = (() => {
     createCar:        (data)    => _post('ait/cars', data),
     updateCar:        (id, data)=> _put('ait/cars',  { id, ...data }),
     copyCar:          (data)    => _post('ait/cars/copy', data, 120000),
+    // 아이템 삭제 시 관련 데이터(CP·작표·설비일상·초중종물·마스터샘플·개정이력/서명·공정검사기준서·Q-Point·알람) 전부 영구삭제
+    deleteCarCascade: (id)      => _post('ait/cars/delete-cascade', { carId: id }, 60000),
 
     /* ── 개정이력 ──────────────────────────────── */
     getRevisions:     (carId, docType) => _get('ait/revisions', { carId, docType }),
@@ -300,6 +302,7 @@ const AIT_API = (() => {
     createCar:          (data)       => _real.createCar(data),
     updateCar:          (id, data)   => _real.updateCar(id, data),
     copyCar:            (data)       => _real.copyCar(data),
+    deleteCarCascade:   (id)         => _real.deleteCarCascade(id),
     /* 개정 */
     getRevisions:       (cId, dt)    => _real.getRevisions(cId, dt),
     addRevision:        (cId, dt, d) => _real.addRevision(cId, dt, d),
