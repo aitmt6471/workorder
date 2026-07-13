@@ -618,7 +618,7 @@ async function _saveCpToDb(carName, paneEl) {
 
   const domRows = [...paneEl.querySelectorAll('#cp-tbody tr.cp-child')];
   const domDbIds = new Set();
-  const saves = [];
+  const rowsPayload = [];
 
   // proc_no 변경 감지: 그룹 dbId 기반 (▲▼ 이동 후 번호 수동변경 감지)
   const _toInt = v => parseInt(v) || 0;
@@ -632,6 +632,7 @@ async function _saveCpToDb(carName, paneEl) {
     const flowRaw = (cells[1]?.dataset?.ms || cells[1]?.textContent.trim() || '').toUpperCase();
     const dbId = tr.dataset.dbId ? parseInt(tr.dataset.dbId) : null;
     const data = {
+      id:           dbId || null,          // 기존행=id(upsert 유지), 신규=null(insert)
       variant:      tr.dataset.variant || CP_COMMON,
       proc_no:      _cv(cells[0]?.textContent),
       flow_main:    flowRaw.includes('MAIN') ? 1 : 0,
@@ -661,23 +662,39 @@ async function _saveCpToDb(carName, paneEl) {
         procNoSwaps.push({ from: oldNo, to: newNo });
       }
       domDbIds.add(dbId);
-      saves.push(() => AIT_API.updateCpRow(dbId, data));
-    } else {
-      saves.push(() => AIT_API.createCpRow(carId, data).then(res => {
-        const r = Array.isArray(res) ? res[0] : res;
-        if (r?.id) tr.dataset.dbId = String(r.id);
-      }));
     }
+    rowsPayload.push(data);
   });
 
-  const deletes = [...dbIds].filter(id => !domDbIds.has(id))
-    .map(id => () => AIT_API.deleteCpRow(id));
+  const deleteIds = [...dbIds].filter(id => !domDbIds.has(id));
 
-  await _batchRun([...saves, ...deletes], 3);
+  // 단일 요청 일괄 저장 (기존: 행당 HTTP 1건 → 수백 행이면 매우 느리고 중단 시 뒤쪽 누락)
+  await AIT_API.bulkSaveCpRows(carId, rowsPayload, deleteIds);
   if (!AIT_API.MOCK && procNoSwaps.length > 0) {
     await AIT_API.swapWsProcNos(carId, procNoSwaps).catch(e => console.warn('ws proc_no sync 실패:', e));
   }
-  return `${saves.length}개 저장, ${deletes.length}개 삭제`;
+  // 신규행 id 재바인딩 위해 DB 재렌더 (다음 저장 시 중복 insert 방지)
+  await _cpRebindAfterSave(carName, paneEl);
+  const created = rowsPayload.filter(r => !r.id).length;
+  return `${rowsPayload.length}행 저장(신규 ${created}), ${deleteIds.length} 삭제`;
+}
+
+/* 저장 후 DB에서 CP를 재렌더 → 신규행에 실제 id 바인딩(다음 저장 중복방지). 편집상태·활성탭 유지 */
+async function _cpRebindAfterSave(carName, paneEl) {
+  try {
+    const html = await _buildCpHtmlFromDb(carName);   // 내부적으로 window.currentCarId 사용
+    const tbody = paneEl.querySelector('#cp-tbody');
+    if (html == null || !tbody) return;
+    const wasEdit = paneEl.classList.contains('edit-mode');
+    tbody.innerHTML = html;
+    initCpFlowDiagram(paneEl);
+    initCpEventListeners();
+    _renderCpVariantTabs();
+    setCpEditable(paneEl, wasEdit);
+    paneEl.querySelectorAll('.cp-group-hd').forEach(hd => hd.classList.add('cp-grp-open'));
+    paneEl.querySelectorAll('.cp-child').forEach(tr => tr.classList.add('cp-open'));
+    _cpApplyVariantFilter();
+  } catch (e) { console.warn('CP 재바인딩 실패(무해):', e); }
 }
 
 /* ── CP 메타 캐시 ── */

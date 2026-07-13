@@ -94,6 +94,8 @@ const AIT_API = (() => {
     updateCpRow:      (id, data)=> _put('ait/cp/rows',  { id, ...data }, 30000),
     deleteCpRow:      (id)      => _del('ait/cp/rows',  { id }),
     updateCpOrder:    (carId, items) => _put('ait/cp/order', { carId, items }),
+    // 일괄 저장(upsert+soft delete) — 행마다 요청하던 것을 단일 요청으로. 대용량 대비 120s
+    bulkSaveCpRows:   (carId, rows, deleteIds) => _post('ait/cp/rows/bulk', { carId, rows, deleteIds }, 120000),
 
     /* ── 설비일상 ──────────────────────────────── */
     getDailyEquipments: (carId) => _get('ait/daily/equipments', { carId }),
@@ -311,6 +313,7 @@ const AIT_API = (() => {
     updateCpRow:        (id, d)      => _real.updateCpRow(id, d),
     deleteCpRow:        (id)         => _real.deleteCpRow(id),
     updateCpOrder:      (cId, items) => _real.updateCpOrder(cId, items),
+    bulkSaveCpRows:     (cId, rows, delIds) => _real.bulkSaveCpRows(cId, rows, delIds),
     /* 설비일상 */
     getDailyEquipments: (carId)      => impl.getDailyEquipment ? impl.getDailyEquipment(carId) : _real.getDailyEquipments(carId),
     createDailyEquip:   (carId, d)   => _real.createDailyEquip(carId, d),
