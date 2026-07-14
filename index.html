@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>공정문서 관리시스템</title>
   <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="style.css?v=20260714rev">
 <script>
   (function() {
     const token = localStorage.getItem('ait_token');
@@ -184,14 +184,13 @@
         <div class="rev-modal-title">개정 이력</div>
         <div class="rev-modal-sub" id="rev-modal-car"></div>
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="closeRevModal()">✕</button>
+      <button onclick="closeRevModal()" style="background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;font-size:18px;padding:2px 6px;line-height:1">✕</button>
     </div>
     <div class="rev-modal-body">
       <table class="rev-tbl">
         <thead>
           <tr>
-            <th style="width:72px">개정번호</th>
-            <th style="width:72px">표시Rev.</th>
+            <th style="width:80px">Rev.</th>
             <th style="width:88px">개정일</th>
             <th>개정 내용</th>
             <th style="width:90px">작성자</th>
@@ -211,7 +210,7 @@
   <div class="rev-modal" style="max-width:430px">
     <div class="rev-modal-hd">
       <div class="rev-modal-title" id="sign-modal-title">서명</div>
-      <button class="btn btn-ghost btn-sm" onclick="closeSignModal()">✕</button>
+      <button onclick="closeSignModal()" style="background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;font-size:18px;padding:2px 6px;line-height:1">✕</button>
     </div>
     <div class="rev-modal-body" style="padding:20px">
       <div style="margin-bottom:14px">
@@ -230,6 +229,33 @@
         <button class="sign-save-btn" onclick="signSave()"
           style="padding:8px 22px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600">저장</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 작업표준서 개정 확인 모달 (CP 스타일 경고모달) ── -->
+<div class="car-modal-overlay" id="ws-rev-modal" style="z-index:3200">
+  <div class="car-modal" style="width:420px;max-width:96vw;padding:0;overflow:hidden">
+    <div style="background:#1e3264;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px">
+      <div style="flex:1">
+        <div style="font-size:16px;font-weight:700">개정이력 등록</div>
+        <div id="ws-rev-modal-sub" style="font-size:12px;color:rgba(255,255,255,.65);margin-top:2px"></div>
+      </div>
+      <button onclick="_wsRevModalClose()" style="background:none;border:none;color:rgba(255,255,255,.8);cursor:pointer;font-size:18px;padding:2px 6px;line-height:1">✕</button>
+    </div>
+    <div style="padding:18px;display:flex;flex-direction:column;gap:12px">
+      <div id="ws-rev-modal-msg" style="font-size:13.5px;color:#374151;line-height:1.5"></div>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <label style="font-size:11px;color:#6b7280;font-weight:600">개정 내용</label>
+        <input id="ws-rev-modal-desc" type="text" placeholder="예: 안전수칙 문구 수정"
+          style="border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:14px;font-family:inherit"
+          onkeydown="if(event.key==='Enter')_wsRevModalConfirm(true)">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;padding:0 18px 18px;justify-content:flex-end">
+      <button onclick="_wsRevModalClose()" class="btn btn-ghost btn-sm">취소</button>
+      <button onclick="_wsRevModalConfirm(false)" class="btn btn-ghost btn-sm">저장만</button>
+      <button onclick="_wsRevModalConfirm(true)" class="btn btn-primary btn-sm">개정 등록</button>
     </div>
   </div>
 </div>
@@ -393,8 +419,8 @@
 </div>
 
 <script src="js/api.js?v=20260714cascade"></script>
-<script src="js/cp.js?v=20260713variant6"></script>
-<script src="js/main.js?v=20260714cascade"></script>
+<script src="js/cp.js?v=20260714rev"></script>
+<script src="js/main.js?v=20260714rev"></script>
 <script src="js/ws.js?v=20260523a"></script>
 <script src="js/spc.js?v=20260709spc4"></script>
 <script src="js/print_cp_gentex.js?v=20260713variant6"></script>

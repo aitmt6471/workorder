@@ -44,13 +44,14 @@ function _renderCpVariantTabs(rows) {
   const esc = s => String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;');
   let html = variants.map(v => {
     const active = v === window._cpActiveVariant ? ' active' : '';
-    if (v === CP_COMMON || !editMode) {
+    if (!editMode) {
       return `<button class="proc-btn${active}" data-v="${esc(v)}" onclick="_cpSwitchVariant('${esc(v)}')">${v}</button>`;
     }
-    // 차종 탭(편집): 탭 + ⋯(수정/삭제/공통복사 모달). 더블클릭도 모달.
+    // 차종 탭(편집): 탭 + ⋯(수정/삭제/공통복사 모달). 더블클릭도 모달. 공통 탭은 삭제만 가능(이름수정/복사 불가).
+    const title = v === CP_COMMON ? '더블클릭: 삭제' : '더블클릭: 이름 수정';
     return `<span class="proc-tab-wrap">`
-      + `<button class="proc-btn${active}" data-v="${esc(v)}" onclick="_cpSwitchVariant('${esc(v)}')" ondblclick="_cpOpenVarModal('edit','${esc(v)}')" title="더블클릭: 이름 수정">${v}</button>`
-      + `<button class="cp-vtab-cog" onclick="event.stopPropagation();_cpOpenVarModal('edit','${esc(v)}')" title="이름 수정 / 삭제 / 공통 복사">⋯</button>`
+      + `<button class="proc-btn${active}" data-v="${esc(v)}" onclick="_cpSwitchVariant('${esc(v)}')" ondblclick="_cpOpenVarModal('edit','${esc(v)}')" title="${title}">${v}</button>`
+      + `<button class="cp-vtab-cog" onclick="event.stopPropagation();_cpOpenVarModal('edit','${esc(v)}')" title="${v === CP_COMMON ? '삭제' : '이름 수정 / 삭제 / 공통 복사'}">⋯</button>`
       + `</span>`;
   }).join('');
   if (editMode) html += `<button class="proc-btn cp-vtab-add" onclick="_cpOpenVarModal('add')" title="차종 탭 추가">＋ 차종</button>`;
@@ -86,19 +87,21 @@ function _cpVarModalErr(msg) {
 }
 function _cpOpenVarModal(mode, variant) {
   _cpVarMode = mode; _cpVarOrig = variant || '';
+  const isCommon = mode === 'edit' && variant === CP_COMMON;
   const g = id => document.getElementById(id);
   g('cp-var-modal-title').textContent = mode === 'edit' ? '차종 탭 수정' : '차종 탭 추가';
   g('cp-var-modal-name').value = mode === 'edit' ? variant : '';
+  g('cp-var-modal-name').disabled = isCommon;   // 공통은 이름 변경 불가(삭제만)
   g('cp-var-modal-copyrow').style.display = mode === 'add' ? 'flex' : 'none';
   g('cp-var-modal-copy').checked = true;
-  g('cp-var-modal-copybtn').style.display = mode === 'edit' ? 'block' : 'none';
+  g('cp-var-modal-copybtn').style.display = (mode === 'edit' && !isCommon) ? 'block' : 'none';
   const del = g('cp-var-modal-del');
   del.style.display = mode === 'edit' ? 'inline-flex' : 'none';
   del.dataset.armed = '0'; del.textContent = '삭제'; del.style.background = '';
   g('cp-var-modal-ok').textContent = mode === 'edit' ? '저장' : '추가';
-  _cpVarModalErr('');
+  _cpVarModalErr(isCommon ? '"공통"을 삭제하면 다른 차종 데이터를 기준으로 작표/설비일상 태그가 재계산됩니다.' : '');
   g('cp-variant-modal').classList.add('open');
-  setTimeout(() => g('cp-var-modal-name').focus(), 60);
+  setTimeout(() => { if (!isCommon) g('cp-var-modal-name').focus(); }, 60);
 }
 function _cpCloseVarModal() { document.getElementById('cp-variant-modal')?.classList.remove('open'); }
 
@@ -106,7 +109,7 @@ async function _cpVarModalSubmit() {
   const nameEl = document.getElementById('cp-var-modal-name');
   const name = (nameEl.value || '').trim();
   if (!name) { _cpVarModalErr('탭 이름을 입력하세요.'); nameEl.focus(); return; }
-  if (name === CP_COMMON) { _cpVarModalErr('"공통"은 기본 탭이라 쓸 수 없습니다.'); return; }
+  if (name === CP_COMMON && _cpVarOrig !== CP_COMMON) { _cpVarModalErr('"공통"은 기본 탭이라 쓸 수 없습니다.'); return; }
   const list = _cpVariantList();
   if (_cpVarMode === 'add') {
     if (list.includes(name)) { _cpVarModalErr('이미 있는 차종입니다.'); return; }
@@ -131,6 +134,12 @@ async function _cpVarModalSubmit() {
 }
 
 function _cpVarModalDelete() {
+  const v = _cpVarOrig;
+  const otherVariants = _cpVariantList().filter(x => x !== v);
+  if (otherVariants.length === 0 && v === CP_COMMON) {
+    _cpVarModalErr('최소 1개 탭은 남아있어야 합니다.');
+    return;
+  }
   const btn = document.getElementById('cp-var-modal-del');
   if (btn.dataset.armed !== '1') {   // 2단계 확인(네이티브 confirm 대체)
     btn.dataset.armed = '1'; btn.textContent = '한번 더 눌러 삭제';
@@ -138,17 +147,21 @@ function _cpVarModalDelete() {
     setTimeout(() => { if (btn.dataset.armed === '1') { btn.dataset.armed = '0'; btn.textContent = '삭제'; btn.style.background = ''; } }, 3000);
     return;
   }
-  const v = _cpVarOrig;
   const tbody = document.getElementById('cp-tbody');
   tbody?.querySelectorAll('tr.cp-child, tr.cp-group-hd').forEach(tr => {
     if ((tr.dataset.variant || CP_COMMON) === v) tr.remove();
   });
-  _cpSaveVariantList(_cpVariantList().filter(x => x !== v));
-  window._cpActiveVariant = CP_COMMON;
+  if (v === CP_COMMON) {
+    // 공통 삭제: 남은 차종 중 하나로 전환(공통 자체는 목록에 없으므로 저장 대상 아님)
+    window._cpActiveVariant = otherVariants[0];
+  } else {
+    _cpSaveVariantList(otherVariants);
+    window._cpActiveVariant = CP_COMMON;
+  }
   _cpCloseVarModal();
   _renderCpVariantTabs();
   if (typeof _loadCpRevForActive === 'function') _loadCpRevForActive();
-  window.showToast && window.showToast(`"${v}" 차종 삭제됨. 저장 시 DB 반영.`, 'success');
+  window.showToast && window.showToast(`"${v}" 탭 삭제됨. 저장 시 DB 반영.`, 'success');
 }
 
 function _cpVarModalCopyCommon() {

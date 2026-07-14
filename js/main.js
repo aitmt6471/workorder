@@ -251,6 +251,47 @@ function _revGroupKey(pane) {
   }
   return pane;
 }
+/* 작표만 변경했을 때 붙는 서브 개정(Rev.9-1, 9-2...) — 표시용 rev_display 문자열을 파싱.
+   "9-1" → {base:9,sub:1} / "9" → {base:9,sub:0} / 커스텀 코드(AAB 등)·빈값 → fallbackRev를 base로 사용 */
+function _revParseDisplay(disp, fallbackRev) {
+  const s = String(disp || '').trim();
+  let m = s.match(/^(\d+)-(\d+)$/);
+  if (m) return { base: parseInt(m[1], 10), sub: parseInt(m[2], 10) };
+  m = s.match(/^(\d+)$/);
+  if (m) return { base: parseInt(m[1], 10), sub: 0 };
+  return { base: fallbackRev || 0, sub: 0 };
+}
+/* 다음 "정식" 개정번호(정수) — rev_display 기준이라 서브개정이 끼어있어도 정확 */
+function _revNextWhole(rd) {
+  const latest = rd.history[0];
+  if (!latest) return 0;
+  return _revParseDisplay(latest.rev_display, latest.rev).base + 1;
+}
+/* 다음 "작표수정" 서브 개정 {base, sub} — 최근 항목이 이미 서브개정이면 sub만 증가 */
+function _revNextSub(rd) {
+  const latest = rd.history[0];
+  if (!latest) return { base: 0, sub: 1 };
+  const p = _revParseDisplay(latest.rev_display, latest.rev);
+  return { base: p.base, sub: p.sub + 1 };
+}
+/* DB에서 그룹(주로 'cp')의 개정이력을 다시 읽어 메모리캐시 동기화 — ws 서브개정 저장 직후
+   서버가 부여한 실제 rev(서명 매칭용)로 로컬 낙관적 값을 덮어써 drift 방지 */
+function _refreshRevGroup(groupKey, carName) {
+  if (AIT_API.MOCK || !window.currentCarId) return Promise.resolve();
+  return AIT_API.getRevisions(window.currentCarId, groupKey).then(rows => {
+    const valid = (rows || []).filter(r => r && r.id != null);
+    if (!valid.length) return;
+    const rd = { rev: 0, history: [] };
+    valid.forEach(r => {
+      const rev = parseInt(r.rev) || 0;
+      if (rev > rd.rev) rd.rev = rev;
+      rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: groupKey, dbId: r.id, rev_display: r.rev_display || '' });
+    });
+    rd.history.sort((a, b) => b.rev - a.rev);
+    _revMemStore[`${groupKey}:${carName}`] = rd;
+    updateAllRevDisplays();
+  }).catch(() => {});
+}
 const _revMemStore = {}; // localStorage 대신 메모리 캐시 사용
 function getRevDataFor(pane, carName) {
   if (!_STANDALONE_PANES.includes(pane)) return getRevData(carName);
@@ -343,8 +384,7 @@ function openRevModal(pane) {
         const sg = _signsMap[h.rev] || {};
         const au = sg.author   || {}, rv = sg.reviewer || {}, ap = sg.approver || {};
         return `<tr>
-          <td class="td-center"><span class="rev-num">Rev.${h.rev}</span></td>
-          <td class="td-center" style="color:#0f766e;font-weight:600">${h.rev_display||''}</td>
+          <td class="td-center"><span class="rev-num">Rev.${h.rev_display || h.rev}</span></td>
           <td class="td-center">${h.date}</td>
           <td>${h.desc}</td>
           <td class="td-center">${_signCell(h.rev,'author',  au.fileId||'', au.name||h.user||'', liveMode)}</td>
@@ -541,7 +581,86 @@ function snapshotPane(pane) {
   return src.textContent.replace(/\s+/g, ' ').trim();
 }
 
+/* ── 작표(WS) 전용 개정 확인모달 — CP와 개정이력을 공유(_revGroupKey('ws')==='cp')하므로
+   작표만 고쳤을 때는 정식 개정(Rev.N+1) 대신 서브개정(Rev.N-1, N-2...)을 붙인다. ── */
+let _wsRevModalCtx = null;
+function _openWsReviseModal(carName, current) {
+  const rd = getRevDataFor('ws', carName);
+  const g = id => document.getElementById(id);
+  g('ws-rev-modal-sub').textContent = carName;
+  if (rd.history.length === 0) {
+    g('ws-rev-modal-msg').innerHTML = `최초 저장입니다. 개정이력을 등록하시겠습니까?<br>등록 시 <b>Rev.0</b>(최초 작성)으로 시작합니다.`;
+  } else {
+    const next = _revNextSub(rd);
+    g('ws-rev-modal-msg').innerHTML = `작업표준서를 변경했습니다. 개정이력을 등록하시겠습니까?<br>등록 시 <b>Rev.${next.base}-${next.sub}</b> (작표수정)으로 기록됩니다.`;
+  }
+  g('ws-rev-modal-desc').value = '';
+  _wsRevModalCtx = { carName, current };
+  document.getElementById('ws-rev-modal').classList.add('open');
+  setTimeout(() => g('ws-rev-modal-desc').focus(), 60);
+}
+function _wsRevModalClose() {
+  document.getElementById('ws-rev-modal').classList.remove('open');
+  _wsRevModalCtx = null;   // 취소 — 저장하지 않고 편집모드 유지
+}
+function _wsRevModalConfirm(doRevise) {
+  const ctx = _wsRevModalCtx;
+  if (!ctx) return;
+  document.getElementById('ws-rev-modal').classList.remove('open');
+  _wsRevModalCtx = null;
+  const { carName, current } = ctx;
+
+  if (doRevise) {
+    const rd = getRevDataFor('ws', carName);
+    const descInput = (document.getElementById('ws-rev-modal-desc').value || '').trim();
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
+    let revDisplay, noteText, revInt;
+    if (rd.history.length === 0) {
+      revInt = 0; revDisplay = '0'; noteText = descInput || '내용 변경';
+    } else {
+      const next = _revNextSub(rd);
+      revInt = next.base; revDisplay = `${next.base}-${next.sub}`;
+      noteText = (descInput || '내용 변경') + ' (작표수정)';
+    }
+    rd.rev = revInt;
+    rd.history.unshift({ rev: revInt, date: dateStr, user: '', desc: noteText, docs: '작업표준서', rev_display: revDisplay });
+    saveRevDataFor('ws', carName, rd);
+    updateAllRevDisplays();
+    if (!AIT_API.MOCK && window.currentCarId) {
+      AIT_API.addRevision(window.currentCarId, _revGroupKey('ws'), {
+        rev_date: dateStr, note: noteText, author: '', rev_display: revDisplay
+      }).then(() => _refreshRevGroup('cp', carName))   // 서버가 부여한 실제 rev로 재동기화(서명 매칭용)
+        .catch(e => console.warn('개정이력 DB 저장 실패', e));
+    }
+    window.showToast && window.showToast(`✅ Rev.${revDisplay} 개정 등록 완료`, 'success');
+  }
+
+  snapshots.ws = current;
+  _saveCarContent('ws', carName);
+  _wsSaveDoneCleanup();
+}
+function _wsSaveDoneCleanup() {
+  const paneEl = document.getElementById('pane-ws');
+  if (!paneEl) return;
+  paneEl.classList.remove('edit-mode');
+  _syncSidebarReset();
+  const editBtn = paneEl.querySelector('[id$="-edit-btn"]') || document.getElementById('ws-edit-btn');
+  if (editBtn) {
+    editBtn.textContent = '✏ 편집 모드';
+    editBtn.classList.remove('btn-primary');
+    editBtn.classList.add('btn-ghost');
+    editBtn.style.background = '';
+    editBtn.style.color = '';
+  }
+  setWsEditable(paneEl, false);
+}
+
 function saveDocument(pane) {
+  if (pane === 'ws') {          // 작표는 CP와 개정이력을 공유하므로 전용 확인모달(서브개정) 플로우 사용
+    _openWsReviseModal(getCurrentCar(), snapshotPane('ws'));
+    return;
+  }
   try {
     const carName = getCurrentCar();
     const current = snapshotPane(pane);
@@ -552,7 +671,7 @@ function saveDocument(pane) {
 
     if (doRevise) {
       const rd = getRevDataFor(pane, carName);
-      const newRev = rd.history.length === 0 ? 0 : rd.rev + 1;
+      const newRev = rd.history.length === 0 ? 0 : _revNextWhole(rd);
       const desc = prompt(newRev === 0 ? `개정 내용을 입력하세요\nRev.0 (최초 작성)` : `개정 내용을 입력하세요\nRev.${rd.rev} → Rev.${newRev}`);
       if (desc === null) {
         doRevise = false; // 설명 입력 취소 → 개정 없이 저장만 진행
@@ -567,7 +686,8 @@ function saveDocument(pane) {
         if (!AIT_API.MOCK && window.currentCarId) {
           AIT_API.addRevision(window.currentCarId, _revGroupKey(pane), {
             rev_date: dateStr, note: desc || '내용 변경', author: '', rev_display: revDisplay
-          }).catch(e => console.warn('개정이력 DB 저장 실패', e));
+          }).then(() => _refreshRevGroup(_revGroupKey(pane), carName))   // 작표 서브개정과 섞여도 rev drift 없이 동기화
+            .catch(e => console.warn('개정이력 DB 저장 실패', e));
         }
         alert(`✅ Rev.${newRev}${revDisplay ? ' (' + revDisplay + ')' : ''} 개정 완료\n개정일: ${dateStr}`);
       }
