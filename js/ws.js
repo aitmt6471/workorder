@@ -1,5 +1,8 @@
 function showProcess(num, el) {
-  document.querySelectorAll('.proc-btn').forEach(b => b.classList.remove('active'));
+  // active 제거는 작표 공정 네비게이션(#ws-proc-nav)으로만 한정 — 전역 '.proc-btn'을 지우면
+  // CP 차종탭·마스터샘플·초중종 등 다른 탭의 .proc-btn active까지 벗겨져(탭 왕복 후 공통이 안 눌린 상태로 보임)
+  const _wsNav = (el && el.closest('#ws-proc-nav')) || document.getElementById('ws-proc-nav');
+  (_wsNav || document).querySelectorAll('.proc-btn').forEach(b => b.classList.remove('active'));
   if (el) el.classList.add('active');
 
   document.querySelectorAll('[id^="ws-step-list-"]').forEach(list => {
