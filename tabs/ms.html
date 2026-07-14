@@ -842,7 +842,7 @@ function renderMsCheckTable(){
       ${delTd}
       <td style="padding:7px 8px;text-align:center;border-right:1px solid var(--border);color:var(--text3);font-size:11px">${i+1}</td>
       <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_name"  style="padding:7px 10px;border-right:1px solid var(--border);font-weight:500;${es}" onblur="window._msSaveItemDef(this)">${n}</td>
-      <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_std"   style="padding:7px 10px;border-right:1px solid var(--border);color:${std.includes('NG')?'#dc2626':'var(--text2)'};font-weight:${std.includes('NG')?'700':'400'};${es}" onblur="window._msSaveItemDef(this)">${std}</td>
+      <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_std"   style="padding:7px 10px;border-right:1px solid var(--border);color:${std.includes('NG')?'#dc2626':'var(--text2)'};font-weight:${std.includes('NG')?'700':'400'};${es}" oninput="window._msStdColorize(this)" onblur="window._msSaveItemDef(this)">${std}</td>
       <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_method" style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._msSaveItemDef(this)">${mt}</td>
       <td contenteditable="${ce}" data-mk="ms_item_${car}_s${curSample}_no${item.no}_cycle"  style="padding:7px 8px;border-right:1px solid var(--border);text-align:center;${es}" onblur="window._msSaveItemDef(this)">${cy}</td>
       <td style="padding:4px 5px;border-right:1px solid var(--border);text-align:center;vertical-align:middle">
@@ -1077,6 +1077,11 @@ window._msSyncToDb = async function() {
   });
   if (allItems.length)
     await AIT_API.syncMsItems(carId, allItems).catch(e => console.warn('MS 항목 동기화 실패', e));
+};
+window._msStdColorize=function(td){
+  const isNg = td.textContent.includes('NG');
+  td.style.color = isNg ? '#dc2626' : 'var(--text2)';
+  td.style.fontWeight = isNg ? '700' : '400';
 };
 window._msSaveItemDef=function(td){
   // 작업 D: localStorage 대신 MS_ITEMS 업데이트 + DB sync debounce
