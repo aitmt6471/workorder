@@ -750,6 +750,12 @@ function saveDocument(pane) {
                   await AIT_API.saveInspDoc(window.currentCarId, merged);
                   if (typeof window.inspLoadDoc === 'function') window.inspLoadDoc();
                 }
+
+                // ③ 작표(WS) 새로고침 — loadTab()이 탭당 1회만 fetch하므로 이미 열어본 적 있으면
+                // CP를 바꿔 저장해도 재방문 시 예전 내용 그대로 보이는 문제가 있었음(캐시 무효화 누락)
+                if (typeof loaded !== 'undefined' && loaded['ws'] && typeof loadCarContent === 'function') {
+                  loadCarContent('ws');
+                }
               } catch(e) {
                 console.warn('CP 연동 동기화 실패:', e);
               }
