@@ -227,25 +227,35 @@ window._dailyGetEquip = () => DAILY_EQUIP;
 
 // DB에서 로드한 설비 목록으로 탭 재초기화
 window._dInitEquip = async function(list) {
-  // id 없는 CP 데이터 → DB 동기화 후 ID만 병합 (이름·항목은 CP 데이터 유지)
+  // id 없는 CP 설비 → DB에 개별 생성(createDailyEquip=WHERE NOT EXISTS 안전삽입)해 ID 확보.
+  // ⚠ syncDailyEquip은 'DELETE ... NOT IN(payload)'라 부분목록으로 부르면 나머지 설비+항목(ON DELETE CASCADE)이
+  //   통째로 삭제된다. 절대 여기서 쓰지 말 것. 표시순서는 CP가 결정하므로 sort_order는 충돌(uk_car_sort)만 피하면 됨.
+  //   설비명 공백/줄바꿈은 API 전송 중 뭉개질 수 있어 공백 제거 정규화 키로 매칭.
   if (list.length > 0 && list.some(e => !e.id) && window.currentCarId && !AIT_API.MOCK) {
-    const noIdItems = list.filter(e => !e.id);
+    const _dNorm = s => String(s || '').replace(/\s+/g, '');
     try {
-      await AIT_API.syncDailyEquip(window.currentCarId, noIdItems.map(e => ({
-        sheet: e.sheet,
-        proc_no: e.proc_no || '',
-        proc_name: e.proc_name || '',
-        location: e.location || '',
-        manager: e.manager || '',
-        sort_order: list.indexOf(e)
-      })));
+      const dbRows = await AIT_API.getDailyEquipments(window.currentCarId) || [];
+      const idMap = {};
+      dbRows.forEach(r => { idMap[_dNorm(r.equip_name)] = r.id; });
+      let maxSort = dbRows.reduce((m, r) => Math.max(m, parseInt(r.sort_order) || 0), -1);
+      for (const e of list) {
+        if (e.id) continue;
+        const hit = idMap[_dNorm(e.sheet)];
+        if (hit) { e.id = hit; continue; }
+        const res = await AIT_API.createDailyEquip(window.currentCarId, {
+          equip_name: e.sheet, proc_no: e.proc_no || '', proc_name: e.proc_name || '',
+          location: e.location || '', manager: e.manager || '', sort_order: ++maxSort
+        });
+        const newId = res?.insertId || res?.id || res?.[0]?.insertId;
+        if (newId) { e.id = newId; idMap[_dNorm(e.sheet)] = newId; }
+      }
     } catch(err) { console.warn('설비 DB 등록 실패', err); }
     try {
-      const dbRows = await AIT_API.getDailyEquipments(window.currentCarId);
-      if (dbRows && dbRows.length) {
-        const idMap = {};
-        dbRows.forEach(r => { idMap[r.equip_name] = { id: r.id, photo_count: r.photo_count||0 }; });
-        list = list.map(e => ({ ...e, ...(idMap[e.sheet] || {}) }));
+      const dbRows2 = await AIT_API.getDailyEquipments(window.currentCarId);
+      if (dbRows2 && dbRows2.length) {
+        const m = {};
+        dbRows2.forEach(r => { m[_dNorm(r.equip_name)] = { id: r.id, photo_count: r.photo_count || 0 }; });
+        list = list.map(e => ({ ...e, ...(m[_dNorm(e.sheet)] || {}) }));
       }
     } catch(e) { console.warn('설비 DB ID 조회 실패', e); }
   }
@@ -386,14 +396,21 @@ window._dUploadEquipPhoto = async function(order, input) {
   const car = getCar();
   let e = DAILY_EQUIP[curEquip], equipId = e?.id;
   if (!equipId && window.currentCarId && !AIT_API.MOCK) {
+    // 안전 개별 생성만 사용 (syncDailyEquip 금지 — DELETE-NOT-IN으로 타 설비 삭제). 공백 정규화 매칭.
     try {
-      await AIT_API.syncDailyEquip(window.currentCarId, [{
-        sheet: e.sheet, proc_no: e.proc_no||'', proc_name: e.proc_name||'',
-        location: e.location||'', manager: e.manager||'', sort_order: DAILY_EQUIP.indexOf(e)
-      }]);
-      const dbRows = await AIT_API.getDailyEquipments(window.currentCarId);
-      const found = dbRows && dbRows.find(r => r.equip_name === e.sheet);
-      if (found) { e.id = found.id; equipId = found.id; }
+      const _dNorm = s => String(s || '').replace(/\s+/g, '');
+      const dbRows0 = await AIT_API.getDailyEquipments(window.currentCarId) || [];
+      let hit = dbRows0.find(r => _dNorm(r.equip_name) === _dNorm(e.sheet));
+      if (!hit) {
+        const maxSort = dbRows0.reduce((m, r) => Math.max(m, parseInt(r.sort_order) || 0), -1);
+        await AIT_API.createDailyEquip(window.currentCarId, {
+          equip_name: e.sheet, proc_no: e.proc_no||'', proc_name: e.proc_name||'',
+          location: e.location||'', manager: e.manager||'', sort_order: maxSort + 1
+        });
+        const dbRows1 = await AIT_API.getDailyEquipments(window.currentCarId) || [];
+        hit = dbRows1.find(r => _dNorm(r.equip_name) === _dNorm(e.sheet));
+      }
+      if (hit) { e.id = hit.id; equipId = hit.id; }
     } catch(err) { console.warn('설비 등록 재시도 실패', err); }
   }
   const photoKey = _photoKey(e);

@@ -1748,9 +1748,12 @@ function loadCarContent(pane) {
         if (cpRows && cpRows.length) {
           const list = _buildDailyFromCpRows(cpRows, linename);
           if (dbRows && dbRows.length) {
+            // 설비명은 공백/줄바꿈이 API 전송 중 뭉개질 수 있어(예: '자동스크류\n체결기4'→'자동스크류체결기4')
+            // 공백 전부 제거한 정규화 키로 매칭해야 id가 안정적으로 붙는다.
+            const _dNorm = s => String(s || '').replace(/\s+/g, '');
             const idMap = {};
-            dbRows.forEach(r => { idMap[r.equip_name] = { id: r.id, photo_count: r.photo_count || 0 }; });
-            list.forEach(e => { Object.assign(e, idMap[e.sheet] || {}); });
+            dbRows.forEach(r => { idMap[_dNorm(r.equip_name)] = { id: r.id, photo_count: r.photo_count || 0 }; });
+            list.forEach(e => { Object.assign(e, idMap[_dNorm(e.sheet)] || {}); });
           }
           if (list.length && typeof window._dInitEquip === 'function') window._dInitEquip(list);
           else if (typeof window._dFlushInfo === 'function') window._dFlushInfo();
