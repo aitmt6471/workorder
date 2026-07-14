@@ -1331,9 +1331,12 @@ function _wsRenderStepsFromDb(rows, paneEl, car, extraProcs) {
       .filter(r => ['수입검사','출하검사'].some(k => (r.proc_name || '').includes(k)))
       .map(r => parseInt(r.proc_no)).filter(Boolean)
   );
-  const procs = ((extraProcs && extraProcs.length)
-    ? [...extraProcs, ...stepProcs.filter(p => !extraProcs.includes(p))]
-    : stepProcs).filter(p => !_wsExcludeProcs.has(p));
+  // extraProcs(=CP에서 병합·필터 끝난 권위 목록)는 그대로 신뢰. 출하/수입검사 제외는 stale STEP(stepProcs)에만 적용.
+  // ⚠ 예전엔 합친 목록 전체에 _wsExcludeProcs를 걸어, 어떤 차종(예: CN8)에서 그 공정이 '출하검사'면
+  //   공통이 '외관검사'인 정상 공정(예: OD 200공정)까지 통째로 빠지는 버그가 있었음.
+  const procs = (extraProcs && extraProcs.length)
+    ? [...extraProcs, ...stepProcs.filter(p => !extraProcs.includes(p) && !_wsExcludeProcs.has(p))]
+    : stepProcs.filter(p => !_wsExcludeProcs.has(p));
   if (!procs.length) return false;
   buildWsProcs(procs, paneEl);
   const delBtn = `<button class="edit-only" onclick="wsRemovePhoto(this)" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border:none;background:rgba(0,0,0,.55);color:#fff;border-radius:4px;cursor:pointer;font-size:12px;line-height:1">✕</button>`;
