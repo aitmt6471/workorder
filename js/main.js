@@ -1324,9 +1324,16 @@ function _wsRenderStepsFromDb(rows, paneEl, car, extraProcs) {
     (byProc[p]||(byProc[p]=[])).push(r);
   });
   const stepProcs = Object.keys(byProc).map(Number).filter(Boolean).sort((a,b)=>a-b);
-  const procs = (extraProcs && extraProcs.length)
+  // 수입검사/출하검사 공정은 작표에서 제외 — CP에서 이미 뺐지만, 저장된 STEP이 남아있으면
+  // stepProcs 경유로 탭이 되살아나므로 여기서도 CP proc_name 기준으로 한 번 더 걸러낸다.
+  const _wsExcludeProcs = new Set(
+    (window._cpRowsForWs || [])
+      .filter(r => ['수입검사','출하검사'].some(k => (r.proc_name || '').includes(k)))
+      .map(r => parseInt(r.proc_no)).filter(Boolean)
+  );
+  const procs = ((extraProcs && extraProcs.length)
     ? [...extraProcs, ...stepProcs.filter(p => !extraProcs.includes(p))]
-    : stepProcs;
+    : stepProcs).filter(p => !_wsExcludeProcs.has(p));
   if (!procs.length) return false;
   buildWsProcs(procs, paneEl);
   const delBtn = `<button class="edit-only" onclick="wsRemovePhoto(this)" style="position:absolute;top:4px;right:4px;width:22px;height:22px;border:none;background:rgba(0,0,0,.55);color:#fff;border-radius:4px;cursor:pointer;font-size:12px;line-height:1">✕</button>`;
