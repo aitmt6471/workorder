@@ -191,10 +191,14 @@ async function _msLoadItems() {
   if (!window.currentCarId) return;
   try {
     const rows = await AIT_API.getMsItems(window.currentCarId);
+    // ⚠ _msSampleIds는 _msInitFromDb가 getMsSamples(빈 샘플 포함, 탭순서 그대로)로 만든 권위 있는 목록이다.
+    //   여기서 items(INNER JOIN이라 항목 없는 새 탭은 빠짐) 기준으로 재구성하면 빈 탭이 목록에서 사라지고
+    //   탭인덱스↔sample_id 매핑이 어긋나 저장이 엉뚱한 샘플로 가거나 유실된다. 절대 재구성하지 말 것.
     MS_ITEMS = {};
-    _msSampleIds = [];
-    rows.forEach(r => { if (!_msSampleIds.includes(r.sample_id)) _msSampleIds.push(r.sample_id); });
-    rows.forEach(r => { MS_ITEMS[`${_msSampleIds.indexOf(r.sample_id)}_${r.item_no}`] = r; });
+    rows.forEach(r => {
+      const idx = _msSampleIds.indexOf(r.sample_id);
+      if (idx >= 0) MS_ITEMS[`${idx}_${r.item_no}`] = r;
+    });
   } catch(e) { console.warn('ms items 로드 실패', e); }
 }
 
@@ -1090,22 +1094,27 @@ window._msSaveItemDef=function(td){
   const mkMatch = mk.match(/_s(\d+)_no([^_]+)_(\w+)$/);
   if (mkMatch) {
     const sampleIdx = parseInt(mkMatch[1]), itemNo = mkMatch[2], field = mkMatch[3];
-    const sampleDbId = _msSampleIds[sampleIdx] || sampleIdx;
+    const sampleDbId = _msSampleIds[sampleIdx];   // 실제 DB id만 사용 (index 폴백 금지 — 다른 차종 샘플 오염 방지)
     const _msKey2 = `${sampleIdx}_${itemNo}`;
     if (!MS_ITEMS[_msKey2]) MS_ITEMS[_msKey2] = { sample_id: sampleDbId, item_no: itemNo };
     const fieldMap = { name: 'item_name', std: 'standard', method: 'method', cycle: 'cycle' };
     const dbField = fieldMap[field] || field;
     MS_ITEMS[_msKey2][dbField] = td.textContent.trim();
-    // MS_DATA도 동기화 — _msSyncToDb가 MS_DATA 기준으로 읽기 때문에 반드시 필요
+    // MS_DATA도 동기화 — 저장 payload를 MS_DATA(완전한 원본) 기준으로 만들기 때문에 반드시 필요
     const _msDSamp = MS_DATA[sampleIdx];
     if (_msDSamp) { const _msDItem = _msDSamp.items.find(it => String(it.no) === String(itemNo)); if (_msDItem) _msDItem[field] = td.textContent.trim(); }
 
     if (window.currentCarId) {
       clearTimeout(window._msItemSyncTimer);
       window._msItemSyncTimer = setTimeout(() => {
-        const itemsArr = Object.values(MS_ITEMS).map(it => ({
-          sample_id: it.sample_id, item_no: it.item_no,
-          item_name: it.item_name || '', standard: it.standard || '',
+        // 편집한 탭의 전체 항목을 MS_DATA에서 구성해 저장.
+        // Object.values(MS_ITEMS)(개별 편집분만 든 부분 캐시)로 보내면 백엔드가 sample 단위로
+        // 전체삭제 후 재삽입하므로 편집 안 한 형제 항목이 유실된다. 반드시 MS_DATA 전체를 보낼 것.
+        const _sd = MS_DATA[sampleIdx];
+        if (!_sd || !sampleDbId) return;   // 아직 DB id 없는 신규 탭은 msAddItem/_msSyncToDb 경로로 저장됨
+        const itemsArr = _sd.items.map((it, iIdx) => ({
+          sample_id: sampleDbId, item_no: parseInt(it.no) || (iIdx + 1),
+          item_name: it.name || '', standard: it.std || '',
           method: it.method || '', cycle: it.cycle || ''
         }));
         window.safeApi
