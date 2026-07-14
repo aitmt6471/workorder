@@ -47,11 +47,10 @@ function _renderCpVariantTabs(rows) {
     if (!editMode) {
       return `<button class="proc-btn${active}" data-v="${esc(v)}" onclick="_cpSwitchVariant('${esc(v)}')">${v}</button>`;
     }
-    // 차종 탭(편집): 탭 + ⋯(수정/삭제/공통복사 모달). 더블클릭도 모달. 공통 탭은 삭제만 가능(이름수정/복사 불가).
-    const title = v === CP_COMMON ? '더블클릭: 삭제' : '더블클릭: 이름 수정';
+    // 차종 탭(편집): 탭 + ⋯(수정/삭제/공통복사 모달). 더블클릭도 모달. 공통 탭은 이름수정/삭제 가능(공통복사만 의미없어 제외).
     return `<span class="proc-tab-wrap">`
-      + `<button class="proc-btn${active}" data-v="${esc(v)}" onclick="_cpSwitchVariant('${esc(v)}')" ondblclick="_cpOpenVarModal('edit','${esc(v)}')" title="${title}">${v}</button>`
-      + `<button class="cp-vtab-cog" onclick="event.stopPropagation();_cpOpenVarModal('edit','${esc(v)}')" title="${v === CP_COMMON ? '삭제' : '이름 수정 / 삭제 / 공통 복사'}">⋯</button>`
+      + `<button class="proc-btn${active}" data-v="${esc(v)}" onclick="_cpSwitchVariant('${esc(v)}')" ondblclick="_cpOpenVarModal('edit','${esc(v)}')" title="더블클릭: 이름 수정">${v}</button>`
+      + `<button class="cp-vtab-cog" onclick="event.stopPropagation();_cpOpenVarModal('edit','${esc(v)}')" title="${v === CP_COMMON ? '이름 수정 / 삭제' : '이름 수정 / 삭제 / 공통 복사'}">⋯</button>`
       + `</span>`;
   }).join('');
   if (editMode) html += `<button class="proc-btn cp-vtab-add" onclick="_cpOpenVarModal('add')" title="차종 탭 추가">＋ 차종</button>`;
@@ -91,7 +90,7 @@ function _cpOpenVarModal(mode, variant) {
   const g = id => document.getElementById(id);
   g('cp-var-modal-title').textContent = mode === 'edit' ? '차종 탭 수정' : '차종 탭 추가';
   g('cp-var-modal-name').value = mode === 'edit' ? variant : '';
-  g('cp-var-modal-name').disabled = isCommon;   // 공통은 이름 변경 불가(삭제만)
+  g('cp-var-modal-name').disabled = false;
   g('cp-var-modal-copyrow').style.display = mode === 'add' ? 'flex' : 'none';
   g('cp-var-modal-copy').checked = true;
   g('cp-var-modal-copybtn').style.display = (mode === 'edit' && !isCommon) ? 'block' : 'none';
@@ -99,9 +98,9 @@ function _cpOpenVarModal(mode, variant) {
   del.style.display = mode === 'edit' ? 'inline-flex' : 'none';
   del.dataset.armed = '0'; del.textContent = '삭제'; del.style.background = '';
   g('cp-var-modal-ok').textContent = mode === 'edit' ? '저장' : '추가';
-  _cpVarModalErr(isCommon ? '"공통"을 삭제하면 다른 차종 데이터를 기준으로 작표/설비일상 태그가 재계산됩니다.' : '');
+  _cpVarModalErr(isCommon ? '이름을 바꾸거나 삭제하면 다른 차종 데이터를 기준으로 작표/설비일상 태그가 재계산됩니다.' : '');
   g('cp-variant-modal').classList.add('open');
-  setTimeout(() => { if (!isCommon) g('cp-var-modal-name').focus(); }, 60);
+  setTimeout(() => g('cp-var-modal-name').focus(), 60);
 }
 function _cpCloseVarModal() { document.getElementById('cp-variant-modal')?.classList.remove('open'); }
 
@@ -124,7 +123,9 @@ async function _cpVarModalSubmit() {
     if (name !== _cpVarOrig) {
       if (list.includes(name)) { _cpVarModalErr('이미 있는 차종입니다.'); return; }
       _cpApplyRename(_cpVarOrig, name);
-      await _cpSaveVariantList(list.map(x => x === _cpVarOrig ? name : x));
+      // 공통(CP_COMMON)은 list(공통 제외 목록)에 없으므로 map이 아니라 추가해야 함
+      const newList = _cpVarOrig === CP_COMMON ? [...list, name] : list.map(x => x === _cpVarOrig ? name : x);
+      await _cpSaveVariantList(newList);
       window._cpActiveVariant = name;
     }
     _cpCloseVarModal();
