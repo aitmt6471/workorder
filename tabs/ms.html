@@ -308,8 +308,8 @@ async function _msInitFromDb() {
       AIT_API.getMsItems(window.currentCarId).catch(() => [])
     ]);
 
-    const samples  = (Array.isArray(samplesRaw) && samplesRaw.length ? samplesRaw : [])
-      .sort((a, b) => (a.mgmt_no || '').localeCompare(b.mgmt_no || ''));
+    // 서버가 이미 sort_order, id 순으로 정렬해서 내려줌 — 여기서 재정렬하면 사용자가 지정한 탭 순서가 매번 무시되므로 그대로 사용
+    const samples  = Array.isArray(samplesRaw) ? samplesRaw : [];
     const allItems = Array.isArray(itemsRaw) ? itemsRaw : [];
 
     // 항목을 sample_id 기준으로 그룹화
@@ -424,6 +424,16 @@ function msRenderSampleTabs(){
            width:14px;height:14px;border-radius:50%;background:rgba(239,68,68,.15);color:#ef4444;
            font-size:9px;font-weight:900;cursor:pointer;line-height:1" title="탭 삭제">✕</span>`
       : '';
+    const moveBtns = msEditMode
+      ? `<span onclick="event.stopPropagation();window._msMoveSample(${i},-1)"
+           style="margin-left:4px;display:${i===0?'none':'inline-flex'};align-items:center;justify-content:center;
+           width:14px;height:14px;color:${active?'#fff':'var(--text2)'};
+           font-size:10px;font-weight:900;cursor:pointer;line-height:1" title="왼쪽으로 이동">◀</span>
+         <span onclick="event.stopPropagation();window._msMoveSample(${i},1)"
+           style="display:${i===MS_DATA.length-1?'none':'inline-flex'};align-items:center;justify-content:center;
+           width:14px;height:14px;color:${active?'#fff':'var(--text2)'};
+           font-size:10px;font-weight:900;cursor:pointer;line-height:1" title="오른쪽으로 이동">▶</span>`
+      : '';
     const label = _msDeriveTabLabel(s, i);
     const labelEl = msEditMode
       ? `<input value="${label.replace(/"/g,'&quot;')}"
@@ -438,7 +448,7 @@ function msRenderSampleTabs(){
       border-radius:6px 6px 0 0;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;
       background:${active?'#1e3264':'#fff'};color:${active?'#fff':'var(--text)'}">
       <span style="display:inline-block;font-size:9px;font-weight:700;padding:1px 5px;border-radius:3px;
-        background:${active?'rgba(255,255,255,.2)':typeBg};color:${active?'#fff':typeColor};margin-right:4px">${s.type}</span>${labelEl}${delBtn}
+        background:${active?'rgba(255,255,255,.2)':typeBg};color:${active?'#fff':typeColor};margin-right:4px">${s.type}</span>${labelEl}${moveBtns}${delBtn}
     </button>`;
   }).join('');
 }
@@ -475,6 +485,21 @@ window.msDeleteSample = function(idx){
   msRenderAll();
 };
 
+window._msMoveSample = function(idx, dir){
+  const j = idx + dir;
+  if (j < 0 || j >= MS_DATA.length) return;
+  [MS_DATA[idx], MS_DATA[j]] = [MS_DATA[j], MS_DATA[idx]];
+  [_msSampleIds[idx], _msSampleIds[j]] = [_msSampleIds[j], _msSampleIds[idx]];
+  if (curSample === idx) curSample = j;
+  else if (curSample === j) curSample = idx;
+  msRenderSampleTabs();
+  if (window.currentCarId && !AIT_API.MOCK) {
+    [idx, j].forEach(k => {
+      const sId = _msSampleIds[k];
+      if (sId) AIT_API.updateMsSample(sId, { sort_order: (k + 1) * 10 }).catch(e => console.warn('탭 순서 저장 실패', e));
+    });
+  }
+};
 window._msSelSample = function(idx){
   curSample = idx;
   const _mm = getTabMonth('ms');
