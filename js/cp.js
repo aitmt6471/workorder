@@ -17,13 +17,28 @@ function _cpVariantList(rows) {
     try { const p = typeof carObj.variants === 'string' ? JSON.parse(carObj.variants) : carObj.variants;
       if (Array.isArray(p)) list = p.slice(); } catch {}
   }
+  list = list.filter(v => v !== CP_COMMON);   // 공통은 이 목록에 절대 포함되지 않음(과거 저장 오염 방어)
   const extra = new Set();
   if (rows && rows.length) rows.forEach(r => extra.add((r.variant || CP_COMMON)));
   else document.querySelectorAll('#cp-tbody tr.cp-child').forEach(tr => extra.add(tr.dataset.variant || CP_COMMON));
   extra.forEach(v => { if (v && v !== CP_COMMON && !list.includes(v)) list.push(v); });
   return list;
 }
-function _cpAllVariants(rows) { return [CP_COMMON, ..._cpVariantList(rows)]; }
+/* 공통 탭은 "실제 공통행이 있을 때"만 노출 — 삭제 후 재렌더에서 빈 유령탭으로 남지 않게 함.
+   단, 행이 통째로 하나도 없는 최초 아이템은 시작 지점으로 공통 탭을 계속 보여줌. */
+function _cpAllVariants(rows) {
+  const list = _cpVariantList(rows);
+  let hasCommon, totalRows;
+  if (rows && rows.length !== undefined) {
+    hasCommon = (rows || []).some(r => (r.variant || CP_COMMON) === CP_COMMON);
+    totalRows = (rows || []).length;
+  } else {
+    const trs = [...document.querySelectorAll('#cp-tbody tr.cp-child')];
+    hasCommon = trs.some(tr => (tr.dataset.variant || CP_COMMON) === CP_COMMON);
+    totalRows = trs.length;
+  }
+  return (hasCommon || totalRows === 0) ? [CP_COMMON, ...list] : list;
+}
 
 async function _cpSaveVariantList(list) {
   const carObj = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
@@ -39,7 +54,9 @@ function _renderCpVariantTabs(rows) {
   const bar = document.getElementById('cp-variant-tabs');
   if (!bar) return;
   const variants = _cpAllVariants(rows);
-  if (!variants.includes(window._cpActiveVariant)) window._cpActiveVariant = CP_COMMON;
+  if (!variants.includes(window._cpActiveVariant)) {
+    window._cpActiveVariant = variants.includes(CP_COMMON) ? CP_COMMON : (variants[0] || CP_COMMON);
+  }
   const editMode = document.getElementById('pane-cp')?.classList.contains('edit-mode');
   const esc = s => String(s).replace(/'/g, "\\'").replace(/"/g, '&quot;');
   let html = variants.map(v => {
@@ -108,12 +125,15 @@ async function _cpVarModalSubmit() {
   const nameEl = document.getElementById('cp-var-modal-name');
   const name = (nameEl.value || '').trim();
   if (!name) { _cpVarModalErr('탭 이름을 입력하세요.'); nameEl.focus(); return; }
-  if (name === CP_COMMON && _cpVarOrig !== CP_COMMON) { _cpVarModalErr('"공통"은 기본 탭이라 쓸 수 없습니다.'); return; }
+  // 공통 탭이 이미 존재할 때만 "공통"으로의 개명/추가를 막음(삭제 후엔 재사용 가능하게)
+  if (name === CP_COMMON && _cpVarOrig !== CP_COMMON && _cpAllVariants().includes(CP_COMMON)) {
+    _cpVarModalErr('"공통" 탭이 이미 있습니다.'); return;
+  }
   const list = _cpVariantList();
   if (_cpVarMode === 'add') {
     if (list.includes(name)) { _cpVarModalErr('이미 있는 차종입니다.'); return; }
     list.push(name);
-    await _cpSaveVariantList(list);
+    await _cpSaveVariantList(list.filter(x => x !== CP_COMMON));   // 공통은 저장 목록에 넣지 않음(유령탭 방지)
     window._cpActiveVariant = name;
     const doCopy = document.getElementById('cp-var-modal-copy').checked;
     _cpCloseVarModal();
@@ -123,8 +143,9 @@ async function _cpVarModalSubmit() {
     if (name !== _cpVarOrig) {
       if (list.includes(name)) { _cpVarModalErr('이미 있는 차종입니다.'); return; }
       _cpApplyRename(_cpVarOrig, name);
-      // 공통(CP_COMMON)은 list(공통 제외 목록)에 없으므로 map이 아니라 추가해야 함
-      const newList = _cpVarOrig === CP_COMMON ? [...list, name] : list.map(x => x === _cpVarOrig ? name : x);
+      // 공통(CP_COMMON)은 list(공통 제외 목록)에 없으므로 map이 아니라 추가해야 함. 공통은 절대 저장 목록에 넣지 않음(유령탭 방지)
+      const newList = (_cpVarOrig === CP_COMMON ? [...list, name] : list.map(x => x === _cpVarOrig ? name : x))
+        .filter(x => x !== CP_COMMON);
       await _cpSaveVariantList(newList);
       window._cpActiveVariant = name;
     }
