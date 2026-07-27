@@ -32,10 +32,18 @@ window.initSpcTab = function initSpcTab() {
         .filter(function(x){ return !!x.name; });
     }catch(e){ console.warn('CP 특별특성 조회 실패', e); return []; }
   }
-  // itemName(측정항목명)과 가장 잘 맞는 CP 특별특성 행을 찾는다 (완전일치 우선, 부분일치는 최장매칭)
+  // CP 관리항목명과 검사기 측정항목명이 텍스트로 안 겹치는 경우를 위한 수동 별칭(정규화된 이름 기준)
+  var CTRL_ITEM_ALIAS = {
+    'room소모전류': 'room전류(touch)'
+  };
+  // itemName(측정항목명)과 가장 잘 맞는 CP 특별특성 행을 찾는다 (별칭 우선, 완전일치, 부분일치는 최장매칭)
   function findSpecialMatch(itemName, specialRows){
     var a = normText(itemName);
     if(!a || !specialRows || !specialRows.length) return null;
+    for(var i=0;i<specialRows.length;i++){
+      var alias = CTRL_ITEM_ALIAS[normText(specialRows[i].name)];
+      if(alias && alias===a) return specialRows[i];
+    }
     for(var i=0;i<specialRows.length;i++){ if(normText(specialRows[i].name)===a) return specialRows[i]; }
     var best=null, bestLen=0;
     specialRows.forEach(function(r){
