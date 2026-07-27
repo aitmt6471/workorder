@@ -4,11 +4,11 @@
    ══════════════════════════════════════════════════════════════ */
 window.initSpcTab = function initSpcTab() {
   var $ = function(s){ return document.querySelector(s); };
-  var META = [], DATA = null, SPECIAL_ITEMS = null;
+  var META = [], DATA = null, SPECIAL_ITEMS = null, SPEC_OVERRIDE = null, specAuto = false;
   var car = window.currentCar || '';
   $('#spc-car').textContent = car ? '· 아이템: ' + car : '';
 
-  // CP 특별특성(char_special: C/숫자/문자/기호 등 마킹된 행)의 관리항목명만 추출
+  // CP 특별특성(char_special: C/숫자/문자/기호 등 마킹된 행)의 관리항목명+규격을 추출
   function normText(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
   function isSpecialMark(v){ var s=String(v==null?'':v).trim(); return !!s && s!=='-' && s!=='—' && s.toLowerCase()!=='null'; }
   async function loadSpecialItems(){
@@ -18,18 +18,45 @@ window.initSpcTab = function initSpcTab() {
       var rows = await AIT_API.getCpRows(carId);
       return (rows||[])
         .filter(function(r){ return !r.is_deleted && isSpecialMark(r.char_special); })
-        .map(function(r){ return String(r.ctrl_item||'').trim(); })
-        .filter(Boolean);
+        .map(function(r){ return { name: String(r.ctrl_item||'').trim(), standard: String(r.standard||'').trim() }; })
+        .filter(function(x){ return !!x.name; });
     }catch(e){ console.warn('CP 특별특성 조회 실패', e); return []; }
   }
-  function matchesSpecial(itemName, specialNames){
+  // itemName(측정항목명)과 가장 잘 맞는 CP 특별특성 행을 찾는다 (완전일치 우선, 부분일치는 최장매칭)
+  function findSpecialMatch(itemName, specialRows){
     var a = normText(itemName);
-    if(!a) return false;
-    for(var i=0;i<specialNames.length;i++){
-      var b = normText(specialNames[i]);
-      if(b && (a.indexOf(b)>=0 || b.indexOf(a)>=0)) return true;
-    }
-    return false;
+    if(!a || !specialRows || !specialRows.length) return null;
+    for(var i=0;i<specialRows.length;i++){ if(normText(specialRows[i].name)===a) return specialRows[i]; }
+    var best=null, bestLen=0;
+    specialRows.forEach(function(r){
+      var b = normText(r.name);
+      if(!b) return;
+      if(a.indexOf(b)>=0 || b.indexOf(a)>=0){
+        var len = Math.min(a.length, b.length);
+        if(len>bestLen){ bestLen=len; best=r; }
+      }
+    });
+    return best;
+  }
+  // CP 규격 텍스트(예: "170mA~240mA", "170 ~ 240 mA")에서 하한/상한을 추출
+  function parseSpecRange(text){
+    if(!text) return null;
+    var m = String(text).match(/(-?\d+(?:\.\d+)?)\s*([a-zA-Z%℃°]*)\s*[~\-∼～]\s*(-?\d+(?:\.\d+)?)\s*([a-zA-Z%℃°]*)/);
+    if(!m) return null;
+    var lo = parseFloat(m[1]), hi = parseFloat(m[3]);
+    if(isNaN(lo) || isNaN(hi)) return null;
+    if(lo>hi){ var t=lo; lo=hi; hi=t; }
+    return { lsl: lo, usl: hi, unit: (m[4]||m[2]||'') };
+  }
+  // 선택된 측정항목이 CP 특별특성 항목과 매칭되면 규격 상/하한을 UCL/LCL에 자동 지정
+  function applySpecOverride(){
+    $('#spc-ucl').value=''; $('#spc-lcl').value='';
+    var match = findSpecialMatch($('#spc-item').value, SPECIAL_ITEMS);
+    var parsed = match ? parseSpecRange(match.standard) : null;
+    SPEC_OVERRIDE = parsed ? { lsl:parsed.lsl, usl:parsed.usl, unit:parsed.unit, text:match.standard } : null;
+    specAuto = !!SPEC_OVERRIDE;
+    if(SPEC_OVERRIDE){ $('#spc-ucl').value = SPEC_OVERRIDE.usl; $('#spc-lcl').value = SPEC_OVERRIDE.lsl; }
+    updateSpecLabel();
   }
 
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -59,18 +86,24 @@ window.initSpcTab = function initSpcTab() {
     var items = META.filter(function(m){ return m.model_name===model; });
     var note = '';
     if(SPECIAL_ITEMS && SPECIAL_ITEMS.length){
-      var special = items.filter(function(i){ return matchesSpecial(i.item_name, SPECIAL_ITEMS); });
+      var special = items.filter(function(i){ return !!findSpecialMatch(i.item_name, SPECIAL_ITEMS); });
       if(special.length){ items = special; note = ' · <span style="color:#2563eb">CP 특별특성 항목만 표시 ('+special.length+'개)</span>'; }
       else { note = ' · <span style="color:#dc2626">CP 특별특성과 매칭되는 측정항목 없음 — 전체 표시</span>'; }
     }
     $('#spc-item').innerHTML = items.map(function(i){ return '<option value="'+esc(i.item_name)+'">'+esc(i.item_name)+' ('+esc(i.unit||'')+')</option>'; }).join('');
     var carEl = $('#spc-car');
     carEl.innerHTML = (car ? '· 아이템: ' + esc(car) : '') + note;
-    updateSpecLabel();
+    applySpecOverride();
   }
   function updateSpecLabel(){
     var it = META.find(function(m){ return m.model_name===$('#spc-model').value && m.item_name===$('#spc-item').value; });
-    $('#spc-spec').textContent = it ? ('규격 '+(it.lsl!=null?it.lsl:'–')+' ~ '+(it.usl!=null?it.usl:'–')+' '+(it.unit||'')) : '';
+    var base = it ? ('규격 '+(it.lsl!=null?it.lsl:'–')+' ~ '+(it.usl!=null?it.usl:'–')+' '+(it.unit||'')) : '';
+    if(SPEC_OVERRIDE){
+      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b> · UCL/LCL 자동 지정 ('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+')'
+        + (base ? ' <span style="color:#94a3b8">'+esc(base)+'</span>' : '');
+    } else {
+      $('#spc-spec').textContent = base;
+    }
   }
 
   function tiles(d, ucl, lcl){
@@ -192,6 +225,14 @@ window.initSpcTab = function initSpcTab() {
   function render(){
     if(!DATA){ return; }
     var d=DATA;
+    if(SPEC_OVERRIDE){
+      // CP 특별특성 규격 상/하한으로 LSL/USL·Cp·Cpk를 재계산 (장비DB 규격 대신 CP 공식 규격 사용)
+      d = Object.assign({}, DATA, { lsl: SPEC_OVERRIDE.lsl, usl: SPEC_OVERRIDE.usl });
+      if(d.sigma){
+        d.cp  = +(((d.usl-d.lsl)/(6*d.sigma)).toFixed(2));
+        d.cpk = +(Math.min(d.usl-d.cl, d.cl-d.lsl)/(3*d.sigma)).toFixed(2);
+      }
+    }
     var mu=parseFloat($('#spc-ucl').value), ml=parseFloat($('#spc-lcl').value);
     var ucl=!isNaN(mu)?mu:d.ucl, lcl=!isNaN(ml)?ml:d.lcl;
     $('#spc-chart-title').textContent='X̄ 관리도 — '+$('#spc-item').value;
@@ -200,7 +241,7 @@ window.initSpcTab = function initSpcTab() {
     drawCapChart(d);
     $('#spc-foot').innerHTML='모델 '+esc(d.model||$('#spc-model').value)+' · 부분군 '+d.n+'개씩 '+d.sub.length+'군 · 표본 '+(d.samples||'')+' · Cp '+(d.cp!=null?d.cp:'–')+' / Cpk '+(d.cpk!=null?d.cpk:'–')
       +(oos?' · <span style="color:#dc2626">빨간점=관리한계 이탈('+oos+'군)</span>':'')
-      +((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':'');
+      +(specAuto?' · <span style="color:#2563eb">CP 규격기준 관리한계 자동적용</span>':((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':''));
   }
 
   async function loadSeries(){
@@ -230,10 +271,11 @@ window.initSpcTab = function initSpcTab() {
     $('#spc-model').value = guessModel(models);
     fillItems();
     // 이벤트
-    $('#spc-model').onchange=function(){ $('#spc-ucl').value=''; $('#spc-lcl').value=''; fillItems(); loadSeries(); };
-    $('#spc-item').onchange=function(){ $('#spc-ucl').value=''; $('#spc-lcl').value=''; updateSpecLabel(); loadSeries(); };
+    $('#spc-model').onchange=function(){ fillItems(); loadSeries(); };
+    $('#spc-item').onchange=function(){ applySpecOverride(); loadSeries(); };
     $('#spc-n').onchange=loadSeries;
-    $('#spc-ucl').oninput=render; $('#spc-lcl').oninput=render;
+    $('#spc-ucl').oninput=function(){ specAuto=false; render(); };
+    $('#spc-lcl').oninput=function(){ specAuto=false; render(); };
     loadSeries();
   }
   init();
