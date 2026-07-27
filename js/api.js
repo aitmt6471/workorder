@@ -122,10 +122,10 @@ const AIT_API = (() => {
     // payload = { sheet_id, check_date, worker, results:[{item_id,phase,check_time,result,remark}] }
 
     /* ── SPC(X-bar 관리도) — 기능검사기 측정값(대시보드 MySQL) ── */
-    // n8n: ait/spc/meta → [{model_name,item_name,unit,n,lsl,usl}]
-    getSpcMeta:       (model) => _get('ait/spc/meta', model ? { model } : {}),
+    // n8n: ait/spc/meta → [{line_id,model_name,item_name,unit,n,lsl,usl}]
+    getSpcMeta:       (line) => _get('ait/spc/meta', line ? { line } : {}),
     // n8n: ait/spc/series → {cl,ucl,lcl,sigma,cp,cpk,sub:[{i,mean,range,t}], ...}
-    getSpcSeries:     (model, item, n = 5, groups = 80) => _get('ait/spc/series', { model, item, n, groups }),
+    getSpcSeries:     (model, item, n = 5, groups = 80, line) => _get('ait/spc/series', { model, item, n, groups, line }),
 
     /* ── 마스터샘플 ────────────────────────────── */
     getMsSamples:     (carId)   => _get('ait/ms/samples', { carId }),
@@ -428,8 +428,8 @@ const AIT_API = (() => {
     labelInfo:             (label, wh)             => _real.labelInfo(label, wh),
     stockMove:             (payload)               => _real.stockMove(payload),
     /* SPC */
-    getSpcMeta:            (model)                          => _real.getSpcMeta(model),
-    getSpcSeries:          (model, item, n, groups)          => _real.getSpcSeries(model, item, n, groups),
+    getSpcMeta:            (line)                           => _real.getSpcMeta(line),
+    getSpcSeries:          (model, item, n, groups, line)    => _real.getSpcSeries(model, item, n, groups, line),
     numCircle
   };
 })();

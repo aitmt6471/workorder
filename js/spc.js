@@ -4,9 +4,19 @@
    ══════════════════════════════════════════════════════════════ */
 window.initSpcTab = function initSpcTab() {
   var $ = function(s){ return document.querySelector(s); };
-  var META = [], DATA = null, SPECIAL_ITEMS = null, SPEC_OVERRIDE = null, specAuto = false;
+  var META = [], DATA = null, SPECIAL_ITEMS = null, SPEC_OVERRIDE = null, specAuto = false, LINE_ID = null;
   var car = window.currentCar || '';
   $('#spc-car').textContent = car ? '· 아이템: ' + car : '';
+
+  // 차종의 linename(OC/OD)을 검사기DB의 line_id(LINE_01=OD라인, LINE_02=OC라인)로 변환
+  // (dashboard.line_master 기준 — OC/OD가 같은 품번을 공유해 라인 구분 없이는 데이터가 섞인다)
+  var LINE_NAME_MAP = { 'OC':'LINE_02', 'OD':'LINE_01' };
+  function resolveLineId(){
+    var cpMeta = (typeof _cpMetaGet === 'function') ? _cpMetaGet(car) : null;
+    var wsCar = (window._aitCars || []).find(function(c){ return String(c.id) === String(window.currentCarId); });
+    var ln = String((cpMeta && cpMeta.linename) || (wsCar && wsCar.linename) || '').trim().toUpperCase();
+    return LINE_NAME_MAP[ln] || null;
+  }
 
   // CP 특별특성(char_special: C/숫자/문자/기호 등 마킹된 행)의 관리항목명+규격을 추출
   function normText(s){ return String(s||'').toLowerCase().replace(/\s+/g,''); }
@@ -92,7 +102,7 @@ window.initSpcTab = function initSpcTab() {
     }
     $('#spc-item').innerHTML = items.map(function(i){ return '<option value="'+esc(i.item_name)+'">'+esc(i.item_name)+' ('+esc(i.unit||'')+')</option>'; }).join('');
     var carEl = $('#spc-car');
-    carEl.innerHTML = (car ? '· 아이템: ' + esc(car) : '') + note;
+    carEl.innerHTML = (car ? '· 아이템: ' + esc(car) : '') + (LINE_ID ? (' · 라인: '+esc(LINE_ID)) : ' · 라인 매핑 안됨(OC/OD만 지원)') + note;
     applySpecOverride();
   }
   function updateSpecLabel(){
@@ -249,7 +259,7 @@ window.initSpcTab = function initSpcTab() {
     if(!model||!item) return;
     msg('불러오는 중…');
     try{
-      DATA = await AIT_API.getSpcSeries(model, item, n, 80);
+      DATA = await AIT_API.getSpcSeries(model, item, n, 80, LINE_ID);
       if(!DATA || DATA.error || !DATA.sub){ msg('데이터가 없습니다: '+((DATA&&DATA.error)||''),'bad'); DATA=null; $('#spc-svg').innerHTML=''; $('#spc-tiles').innerHTML=''; return; }
       msg('');
       render();
@@ -257,11 +267,15 @@ window.initSpcTab = function initSpcTab() {
   }
 
   async function init(){
+    LINE_ID = resolveLineId();
     try{
-      var results = await Promise.all([ AIT_API.getSpcMeta(), loadSpecialItems() ]);
+      var results = await Promise.all([ AIT_API.getSpcMeta(LINE_ID), loadSpecialItems() ]);
       META = results[0];
       SPECIAL_ITEMS = results[1];
-      if(!Array.isArray(META)||!META.length){ msg('측정항목이 없습니다. (n8n ait/spc/meta 응답 비어있음)','bad'); return; }
+      if(!Array.isArray(META)||!META.length){
+        msg(LINE_ID ? ('측정항목이 없습니다. ('+car+' 라인의 검사기 데이터가 dashboard DB에 없습니다)') : '측정항목이 없습니다. (n8n ait/spc/meta 응답 비어있음)','bad');
+        return;
+      }
     }catch(e){
       msg('⚠ SPC 메타 조회 실패 — n8n 엔드포인트 <b>ait/spc/meta · ait/spc/series</b> 를 배포해야 합니다.<br><span style="font-size:11px">'+esc(String(e))+'</span>','bad');
       return;
