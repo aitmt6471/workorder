@@ -66,14 +66,13 @@ window.initSpcTab = function initSpcTab() {
     if(lo>hi){ var t=lo; lo=hi; hi=t; }
     return { lsl: lo, usl: hi, unit: (m[4]||m[2]||'') };
   }
-  // 선택된 측정항목이 CP 특별특성 항목과 매칭되면 규격 상/하한을 UCL/LCL에 자동 지정
+  // 선택된 측정항목이 CP 특별특성 항목과 매칭되면 규격 상/하한을 구해둔다.
+  // 실제 UCL/LCL 반영은 render()에서 "통계 관리한계를 규격 안쪽으로 클램프"하는 방식으로 처리한다.
   function applySpecOverride(){
     $('#spc-ucl').value=''; $('#spc-lcl').value='';
     var match = findSpecialMatch($('#spc-item').value, SPECIAL_ITEMS);
     var parsed = match ? parseSpecRange(match.standard) : null;
     SPEC_OVERRIDE = parsed ? { lsl:parsed.lsl, usl:parsed.usl, unit:parsed.unit, text:match.standard } : null;
-    specAuto = !!SPEC_OVERRIDE;
-    if(SPEC_OVERRIDE){ $('#spc-ucl').value = SPEC_OVERRIDE.usl; $('#spc-lcl').value = SPEC_OVERRIDE.lsl; }
     updateSpecLabel();
   }
 
@@ -100,14 +99,12 @@ window.initSpcTab = function initSpcTab() {
   }
 
   function fillItems(){
+    // 특별특성 항목 필터링은 서버(ait/spc/meta, carId 전달)가 DB단에서 이미 처리해서 META에 담아 준다.
     var model = $('#spc-model').value;
     var items = META.filter(function(m){ return m.model_name===model; });
-    var note = '';
-    if(SPECIAL_ITEMS && SPECIAL_ITEMS.length){
-      var special = items.filter(function(i){ return !!findSpecialMatch(i.item_name, SPECIAL_ITEMS); });
-      if(special.length){ items = special; note = ' · <span style="color:#2563eb">CP 특별특성 항목만 표시 ('+special.length+'개)</span>'; }
-      else { note = ' · <span style="color:#dc2626">CP 특별특성과 매칭되는 측정항목 없음 — 전체 표시</span>'; }
-    }
+    var note = (SPECIAL_ITEMS && SPECIAL_ITEMS.length)
+      ? ' · <span style="color:#2563eb">CP 특별특성 항목만 표시 (서버 필터링, '+items.length+'개)</span>'
+      : '';
     $('#spc-item').innerHTML = items.map(function(i){ return '<option value="'+esc(i.item_name)+'">'+esc(i.item_name)+' ('+esc(i.unit||'')+')</option>'; }).join('');
     var carEl = $('#spc-car');
     carEl.innerHTML = (car ? '· 아이템: ' + esc(car) : '') + (LINE_ID ? (' · 라인: '+esc(LINE_ID)) : ' · 라인 매핑 안됨(OC/OD만 지원)') + note;
@@ -117,7 +114,7 @@ window.initSpcTab = function initSpcTab() {
     var it = META.find(function(m){ return m.model_name===$('#spc-model').value && m.item_name===$('#spc-item').value; });
     var base = it ? ('규격 '+(it.lsl!=null?it.lsl:'–')+' ~ '+(it.usl!=null?it.usl:'–')+' '+(it.unit||'')) : '';
     if(SPEC_OVERRIDE){
-      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b> · UCL/LCL 자동 지정 ('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+')'
+      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b> · 관리한계는 규격('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+') 안쪽으로 제한'
         + (base ? ' <span style="color:#94a3b8">'+esc(base)+'</span>' : '');
     } else {
       $('#spc-spec').textContent = base;
@@ -252,14 +249,21 @@ window.initSpcTab = function initSpcTab() {
       }
     }
     var mu=parseFloat($('#spc-ucl').value), ml=parseFloat($('#spc-lcl').value);
-    var ucl=!isNaN(mu)?mu:d.ucl, lcl=!isNaN(ml)?ml:d.lcl;
+    // 통계로 계산된 관리한계가 규격 밖으로 나가면 규격 안쪽으로 잘라준다 (관리한계는 규격보다 넓어질 수 없음)
+    var autoUcl = d.ucl, autoLcl = d.lcl, clamped = false;
+    if(SPEC_OVERRIDE){
+      if(SPEC_OVERRIDE.usl!=null && autoUcl>SPEC_OVERRIDE.usl){ autoUcl = SPEC_OVERRIDE.usl; clamped = true; }
+      if(SPEC_OVERRIDE.lsl!=null && autoLcl<SPEC_OVERRIDE.lsl){ autoLcl = SPEC_OVERRIDE.lsl; clamped = true; }
+    }
+    var ucl=!isNaN(mu)?mu:autoUcl, lcl=!isNaN(ml)?ml:autoLcl;
+    specAuto = clamped && isNaN(mu) && isNaN(ml);
     $('#spc-chart-title').textContent='X̄ 관리도 — '+$('#spc-item').value;
     var oos=tiles(d,ucl,lcl);
     drawChart(d,ucl,lcl);
     drawCapChart(d);
     $('#spc-foot').innerHTML='모델 '+esc(d.model||$('#spc-model').value)+' · 부분군 '+d.n+'개씩 '+d.sub.length+'군 · 표본 '+(d.samples||'')+' · Cp '+(d.cp!=null?d.cp:'–')+' / Cpk '+(d.cpk!=null?d.cpk:'–')
       +(oos?' · <span style="color:#dc2626">빨간점=관리한계 이탈('+oos+'군)</span>':'')
-      +(specAuto?' · <span style="color:#2563eb">CP 규격기준 관리한계 자동적용</span>':((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':''));
+      +(specAuto?' · <span style="color:#2563eb">관리한계가 규격 밖으로 나가 규격 안쪽으로 제한됨</span>':((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':''));
   }
 
   async function loadSeries(){
@@ -277,7 +281,7 @@ window.initSpcTab = function initSpcTab() {
   async function init(){
     LINE_ID = resolveLineId();
     try{
-      var results = await Promise.all([ AIT_API.getSpcMeta(LINE_ID), loadSpecialItems() ]);
+      var results = await Promise.all([ AIT_API.getSpcMeta(LINE_ID, window.currentCarId), loadSpecialItems() ]);
       META = results[0];
       SPECIAL_ITEMS = results[1];
       if(!Array.isArray(META)||!META.length){

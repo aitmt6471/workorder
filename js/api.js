@@ -122,8 +122,8 @@ const AIT_API = (() => {
     // payload = { sheet_id, check_date, worker, results:[{item_id,phase,check_time,result,remark}] }
 
     /* ── SPC(X-bar 관리도) — 기능검사기 측정값(대시보드 MySQL) ── */
-    // n8n: ait/spc/meta → [{line_id,model_name,item_name,unit,n,lsl,usl}]
-    getSpcMeta:       (line) => _get('ait/spc/meta', line ? { line } : {}),
+    // n8n: ait/spc/meta → [{line_id,model_name,item_name,unit,n,lsl,usl}] (carId 주면 CP 특별특성 항목만 DB단에서 필터링)
+    getSpcMeta:       (line, carId) => _get('ait/spc/meta', Object.assign({}, line ? { line } : {}, carId ? { carId } : {})),
     // n8n: ait/spc/series → {cl,ucl,lcl,sigma,cp,cpk,sub:[{i,mean,range,t}], ...}
     getSpcSeries:     (model, item, n = 5, groups = 80, line) => _get('ait/spc/series', { model, item, n, groups, line }),
 
@@ -428,7 +428,7 @@ const AIT_API = (() => {
     labelInfo:             (label, wh)             => _real.labelInfo(label, wh),
     stockMove:             (payload)               => _real.stockMove(payload),
     /* SPC */
-    getSpcMeta:            (line)                           => _real.getSpcMeta(line),
+    getSpcMeta:            (line, carId)                    => _real.getSpcMeta(line, carId),
     getSpcSeries:          (model, item, n, groups, line)    => _real.getSpcSeries(model, item, n, groups, line),
     numCircle
   };
