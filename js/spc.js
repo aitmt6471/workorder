@@ -114,7 +114,7 @@ window.initSpcTab = function initSpcTab() {
     var it = META.find(function(m){ return m.model_name===$('#spc-model').value && m.item_name===$('#spc-item').value; });
     var base = it ? ('규격 '+(it.lsl!=null?it.lsl:'–')+' ~ '+(it.usl!=null?it.usl:'–')+' '+(it.unit||'')) : '';
     if(SPEC_OVERRIDE){
-      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b> · 관리한계는 규격('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+') 안쪽으로 제한'
+      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b> · UCL/LCL = 규격상/하한('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+')'
         + (base ? ' <span style="color:#94a3b8">'+esc(base)+'</span>' : '');
     } else {
       $('#spc-spec').textContent = base;
@@ -249,21 +249,18 @@ window.initSpcTab = function initSpcTab() {
       }
     }
     var mu=parseFloat($('#spc-ucl').value), ml=parseFloat($('#spc-lcl').value);
-    // 통계로 계산된 관리한계가 규격 밖으로 나가면 규격 안쪽으로 잘라준다 (관리한계는 규격보다 넓어질 수 없음)
-    var autoUcl = d.ucl, autoLcl = d.lcl, clamped = false;
-    if(SPEC_OVERRIDE){
-      if(SPEC_OVERRIDE.usl!=null && autoUcl>SPEC_OVERRIDE.usl){ autoUcl = SPEC_OVERRIDE.usl; clamped = true; }
-      if(SPEC_OVERRIDE.lsl!=null && autoLcl<SPEC_OVERRIDE.lsl){ autoLcl = SPEC_OVERRIDE.lsl; clamped = true; }
-    }
+    // CP 특별특성 항목은 통계 계산 대신 규격 상/하한을 그대로 UCL/LCL로 사용
+    var autoUcl = (SPEC_OVERRIDE && SPEC_OVERRIDE.usl!=null) ? SPEC_OVERRIDE.usl : d.ucl;
+    var autoLcl = (SPEC_OVERRIDE && SPEC_OVERRIDE.lsl!=null) ? SPEC_OVERRIDE.lsl : d.lcl;
     var ucl=!isNaN(mu)?mu:autoUcl, lcl=!isNaN(ml)?ml:autoLcl;
-    specAuto = clamped && isNaN(mu) && isNaN(ml);
+    specAuto = !!SPEC_OVERRIDE && isNaN(mu) && isNaN(ml);
     $('#spc-chart-title').textContent='X̄ 관리도 — '+$('#spc-item').value;
     var oos=tiles(d,ucl,lcl);
     drawChart(d,ucl,lcl);
     drawCapChart(d);
     $('#spc-foot').innerHTML='모델 '+esc(d.model||$('#spc-model').value)+' · 부분군 '+d.n+'개씩 '+d.sub.length+'군 · 표본 '+(d.samples||'')+' · Cp '+(d.cp!=null?d.cp:'–')+' / Cpk '+(d.cpk!=null?d.cpk:'–')
       +(oos?' · <span style="color:#dc2626">빨간점=관리한계 이탈('+oos+'군)</span>':'')
-      +(specAuto?' · <span style="color:#2563eb">관리한계가 규격 밖으로 나가 규격 안쪽으로 제한됨</span>':((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':''));
+      +(specAuto?' · <span style="color:#2563eb">CP 규격기준 UCL/LCL 자동적용</span>':((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':''));
   }
 
   async function loadSeries(){
