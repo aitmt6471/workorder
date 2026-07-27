@@ -34,9 +34,9 @@ const AIT_API = (() => {
       return r;
     }).finally(() => clearTimeout(id));
   }
-  async function _get(path, params = {}) {
+  async function _get(path, params = {}, ms = 10000) {
     const qs = new URLSearchParams(params).toString();
-    const r  = await _fetchT(`${N8N}/${path}${qs ? '?' + qs : ''}`, { cache: 'no-store' });
+    const r  = await _fetchT(`${N8N}/${path}${qs ? '?' + qs : ''}`, { cache: 'no-store' }, ms);
     if (!r.ok) throw new Error(`GET ${path} ${r.status}`);
     const txt = await r.text();
     return txt ? JSON.parse(txt) : [];
@@ -123,7 +123,8 @@ const AIT_API = (() => {
 
     /* ── SPC(X-bar 관리도) — 기능검사기 측정값(대시보드 MySQL) ── */
     // n8n: ait/spc/meta → [{line_id,model_name,item_name,unit,n,lsl,usl}] (carId 주면 CP 특별특성 항목만 DB단에서 필터링)
-    getSpcMeta:       (line, carId) => _get('ait/spc/meta', Object.assign({}, line ? { line } : {}, carId ? { carId } : {})),
+    // 전체 검사기DB 집계 쿼리라 10~15초 걸릴 수 있어 타임아웃을 넉넉히 줌
+    getSpcMeta:       (line, carId) => _get('ait/spc/meta', Object.assign({}, line ? { line } : {}, carId ? { carId } : {}), 30000),
     // n8n: ait/spc/series → {cl,ucl,lcl,sigma,cp,cpk,sub:[{i,mean,range,t}], ...}
     getSpcSeries:     (model, item, n = 5, groups = 80, line) => _get('ait/spc/series', { model, item, n, groups, line }),
 
