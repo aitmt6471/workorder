@@ -143,13 +143,17 @@ window.initSpcTab = function initSpcTab() {
     var W=940, H=360, padL=64, padR=54, padT=16, padB=34;
     var pw=W-padL-padR, ph=H-padT-padB;
     var means = d.sub.map(function(s){ return s.mean; });
-    var lines = [d.cl, ucl, lcl].filter(function(v){ return v!=null; });
-    var ys = means.concat(lines);
-    if(d.usl!=null) ys.push(d.usl); if(d.lsl!=null) ys.push(d.lsl);
-    var lo=Math.min.apply(null,ys), hi=Math.max.apply(null,ys), pad=(hi-lo||1)*0.15;
-    // 규격선이 너무 멀면 제외하고 관리한계 중심으로
-    var clo=Math.min.apply(null,means.concat([ucl,lcl])), chi=Math.max.apply(null,means.concat([ucl,lcl]));
-    if((hi-lo)>(chi-clo)*6){ lo=clo; hi=chi; pad=(hi-lo||1)*0.3; }
+    var dataLo=Math.min.apply(null,means), dataHi=Math.max.apply(null,means);
+    var dataSpan = (dataHi-dataLo) || Math.abs(dataHi||1)*0.02 || 1;
+    var lines = [d.cl, ucl, lcl, d.usl, d.lsl].filter(function(v){ return v!=null; });
+    var allLo=Math.min.apply(null,means.concat(lines)), allHi=Math.max.apply(null,means.concat(lines));
+    var lo, hi, pad;
+    if((allHi-allLo) > dataSpan*8){
+      // 규격/관리한계가 실제 점의 변동폭보다 훨씬 넓으면(예: 규격기준 UCL/LCL) 점 변동이 보이도록 데이터 중심으로 확대
+      lo=dataLo; hi=dataHi; pad=(hi-lo||1)*0.3;
+    } else {
+      lo=allLo; hi=allHi; pad=(hi-lo||1)*0.15;
+    }
     lo-=pad; hi+=pad;
     var n=d.sub.length;
     function X(i){ return padL + (n<=1?0:(i/(n-1))*pw); }
