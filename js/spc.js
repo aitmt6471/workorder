@@ -66,10 +66,8 @@ window.initSpcTab = function initSpcTab() {
     if(lo>hi){ var t=lo; lo=hi; hi=t; }
     return { lsl: lo, usl: hi, unit: (m[4]||m[2]||'') };
   }
-  // 선택된 측정항목이 CP 특별특성 항목과 매칭되면 규격 상/하한을 구해둔다.
-  // 실제 UCL/LCL 반영은 render()에서 "통계 관리한계를 규격 안쪽으로 클램프"하는 방식으로 처리한다.
+  // 선택된 측정항목이 CP 특별특성 항목과 매칭되면 규격 상/하한(USL/LSL)을 구해둔다.
   function applySpecOverride(){
-    $('#spc-ucl').value=''; $('#spc-lcl').value='';
     var match = findSpecialMatch($('#spc-item').value, SPECIAL_ITEMS);
     var parsed = match ? parseSpecRange(match.standard) : null;
     SPEC_OVERRIDE = parsed ? { lsl:parsed.lsl, usl:parsed.usl, unit:parsed.unit, text:match.standard } : null;
@@ -114,45 +112,43 @@ window.initSpcTab = function initSpcTab() {
     var it = META.find(function(m){ return m.model_name===$('#spc-model').value && m.item_name===$('#spc-item').value; });
     var base = it ? ('검사기 규격 '+(it.lsl!=null?it.lsl:'–')+' ~ '+(it.usl!=null?it.usl:'–')+' '+(it.unit||'')) : '';
     if(SPEC_OVERRIDE){
-      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b> · USL/LSL = 규격상/하한('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+') · UCL/LCL은 별도(통계 관리한계)'
+      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b> · USL/LSL = 규격상/하한('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+')'
         + (base ? ' <span style="color:#94a3b8">'+esc(base)+'</span>' : '');
     } else {
       $('#spc-spec').textContent = base;
     }
   }
 
-  function tiles(d, ucl, lcl){
-    var oosCtrl = d.sub.filter(function(s){ return s.mean>ucl || s.mean<lcl; }).length;
-    var oosSpec = d.sub.filter(function(s){ return (d.usl!=null&&s.mean>d.usl) || (d.lsl!=null&&s.mean<d.lsl); }).length;
+  function tiles(d){
+    var oos = d.sub.filter(function(s){ return (d.usl!=null&&s.mean>d.usl) || (d.lsl!=null&&s.mean<d.lsl); }).length;
     var t = [
       ['중심선 X&#773;', d.cl!=null?(+d.cl).toFixed(3):'–', ''],
-      ['UCL(관리상한)', (+ucl).toFixed(3), '#dc2626'],
-      ['LCL(관리하한)', (+lcl).toFixed(3), '#dc2626'],
       ['USL(규격상한)', d.usl!=null?(+d.usl).toFixed(3):'–', '#f59e0b'],
       ['LSL(규격하한)', d.lsl!=null?(+d.lsl).toFixed(3):'–', '#f59e0b'],
       ['σ(추정)', d.sigma!=null?(+d.sigma).toFixed(3):'–', ''],
+      ['Cp', d.cp!=null?(+d.cp).toFixed(2):'–', (d.cp!=null && d.cp>=1.33)?'#16a34a':'#dc2626'],
       ['Cpk', d.cpk!=null?(+d.cpk).toFixed(2):'–', (d.cpk!=null && d.cpk>=1.33)?'#16a34a':'#dc2626'],
-      ['이탈 관리/규격', oosCtrl+' / '+oosSpec+' ('+d.sub.length+'군중)', (oosCtrl||oosSpec)?'#dc2626':'#16a34a']
+      ['규격이탈', oos+'/'+d.sub.length, oos?'#dc2626':'#16a34a']
     ];
     $('#spc-tiles').innerHTML = t.map(function(x){
       return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px">'
         +'<div style="font-size:11px;color:#64748b">'+x[0]+'</div>'
         +'<div style="font-size:19px;font-weight:800;margin-top:4px;color:'+(x[2]||'#1e293b')+'">'+x[1]+'</div></div>';
     }).join('');
-    return oosCtrl;
+    return oos;
   }
 
-  function drawChart(d, ucl, lcl){
+  function drawChart(d){
     var W=940, H=360, padL=64, padR=54, padT=16, padB=34;
     var pw=W-padL-padR, ph=H-padT-padB;
     var means = d.sub.map(function(s){ return s.mean; });
     var dataLo=Math.min.apply(null,means), dataHi=Math.max.apply(null,means);
     var dataSpan = (dataHi-dataLo) || Math.abs(dataHi||1)*0.02 || 1;
-    var lines = [d.cl, ucl, lcl, d.usl, d.lsl].filter(function(v){ return v!=null; });
+    var lines = [d.cl, d.usl, d.lsl].filter(function(v){ return v!=null; });
     var allLo=Math.min.apply(null,means.concat(lines)), allHi=Math.max.apply(null,means.concat(lines));
     var lo, hi, pad;
     if((allHi-allLo) > dataSpan*8){
-      // 규격/관리한계가 실제 점의 변동폭보다 훨씬 넓으면(예: 규격기준 UCL/LCL) 점 변동이 보이도록 데이터 중심으로 확대
+      // 규격(USL/LSL)이 실제 점의 변동폭보다 훨씬 넓으면 점 변동이 보이도록 데이터 중심으로 확대
       lo=dataLo; hi=dataHi; pad=(hi-lo||1)*0.3;
     } else {
       lo=allLo; hi=allHi; pad=(hi-lo||1)*0.15;
@@ -172,12 +168,11 @@ window.initSpcTab = function initSpcTab() {
       svg+='<text x="'+(W-padR+4)+'" y="'+(y+3)+'" font-size="10" fill="'+color+'">'+label+'</text>'; }
     hline(d.usl,'#f59e0b','2 3','USL'); hline(d.lsl,'#f59e0b','2 3','LSL');
     hline(d.cl,'#64748b',null,'CL');
-    hline(ucl,'#dc2626','5 4','UCL'); hline(lcl,'#dc2626','5 4','LCL');
     // 선
     var pts=d.sub.map(function(s,i){ return X(i)+','+Y(s.mean); }).join(' ');
     svg+='<polyline points="'+pts+'" fill="none" stroke="#2563eb" stroke-width="1.6"/>';
-    // 점
-    d.sub.forEach(function(s,i){ var out=s.mean>ucl||s.mean<lcl;
+    // 점 (규격 USL/LSL 이탈만 빨간색)
+    d.sub.forEach(function(s,i){ var out=(d.usl!=null&&s.mean>d.usl)||(d.lsl!=null&&s.mean<d.lsl);
       svg+='<circle cx="'+X(i)+'" cy="'+Y(s.mean)+'" r="'+(out?4:2.4)+'" fill="'+(out?'#dc2626':'#2563eb')+'"><title>부분군 '+s.i+': '+s.mean+' '+(d.unit||'')+'</title></circle>'; });
     // x 라벨(약 10개)
     var step=Math.max(1,Math.ceil(n/10));
@@ -255,18 +250,14 @@ window.initSpcTab = function initSpcTab() {
       d.cp  = +(((usl-lsl)/(6*d.sigma)).toFixed(2));
       d.cpk = +(Math.min(usl-d.cl, d.cl-lsl)/(3*d.sigma)).toFixed(2);
     }
-    var mu=parseFloat($('#spc-ucl').value), ml=parseFloat($('#spc-lcl').value);
-    // UCL/LCL(관리한계)은 항상 공정 데이터로 계산한 통계값(수동 입력 시 그 값) — USL/LSL(규격)과는 별개로 유지
-    var ucl=!isNaN(mu)?mu:d.ucl, lcl=!isNaN(ml)?ml:d.lcl;
     specAuto = !!SPEC_OVERRIDE;
     $('#spc-chart-title').textContent='X̄ 관리도 — '+$('#spc-item').value;
-    var oos=tiles(d,ucl,lcl);
-    drawChart(d,ucl,lcl);
+    var oos=tiles(d);
+    drawChart(d);
     drawCapChart(d);
     $('#spc-foot').innerHTML='모델 '+esc(d.model||$('#spc-model').value)+' · 부분군 '+d.n+'개씩 '+d.sub.length+'군 · 표본 '+(d.samples||'')+' · Cp '+(d.cp!=null?d.cp:'–')+' / Cpk '+(d.cpk!=null?d.cpk:'–')
-      +(oos?' · <span style="color:#dc2626">빨간점=관리한계(UCL/LCL) 이탈('+oos+'군)</span>':'')
-      +(specAuto?' · <span style="color:#2563eb">USL/LSL은 CP 규격 적용</span>':'')
-      +((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':'');
+      +(oos?' · <span style="color:#dc2626">빨간점=규격(USL/LSL) 이탈('+oos+'군)</span>':'')
+      +(specAuto?' · <span style="color:#2563eb">USL/LSL은 CP 규격 적용</span>':'');
   }
 
   async function loadSeries(){
@@ -303,8 +294,6 @@ window.initSpcTab = function initSpcTab() {
     $('#spc-model').onchange=function(){ fillItems(); loadSeries(); };
     $('#spc-item').onchange=function(){ applySpecOverride(); loadSeries(); };
     $('#spc-n').onchange=loadSeries;
-    $('#spc-ucl').oninput=function(){ specAuto=false; render(); };
-    $('#spc-lcl').oninput=function(){ specAuto=false; render(); };
     loadSeries();
   }
   init();
