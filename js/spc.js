@@ -34,7 +34,7 @@ window.initSpcTab = function initSpcTab() {
   }
   // CP 관리항목명과 검사기 측정항목명이 텍스트로 안 겹치는 경우를 위한 수동 별칭(정규화된 이름 기준)
   var CTRL_ITEM_ALIAS = {
-    'room소모전류': 'room전류(touch)'
+    'room소모전류': 'room(touch)on전류'
   };
   // itemName(측정항목명)과 가장 잘 맞는 CP 특별특성 행을 찾는다 (별칭 우선, 완전일치, 부분일치는 최장매칭)
   function findSpecialMatch(itemName, specialRows){
@@ -112,9 +112,9 @@ window.initSpcTab = function initSpcTab() {
   }
   function updateSpecLabel(){
     var it = META.find(function(m){ return m.model_name===$('#spc-model').value && m.item_name===$('#spc-item').value; });
-    var base = it ? ('규격 '+(it.lsl!=null?it.lsl:'–')+' ~ '+(it.usl!=null?it.usl:'–')+' '+(it.unit||'')) : '';
+    var base = it ? ('검사기 규격 '+(it.lsl!=null?it.lsl:'–')+' ~ '+(it.usl!=null?it.usl:'–')+' '+(it.unit||'')) : '';
     if(SPEC_OVERRIDE){
-      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b> · UCL/LCL = 규격상/하한('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+')'
+      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b> · USL/LSL = 규격상/하한('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+') · UCL/LCL은 별도(통계 관리한계)'
         + (base ? ' <span style="color:#94a3b8">'+esc(base)+'</span>' : '');
     } else {
       $('#spc-spec').textContent = base;
@@ -122,21 +122,24 @@ window.initSpcTab = function initSpcTab() {
   }
 
   function tiles(d, ucl, lcl){
-    var oos = d.sub.filter(function(s){ return s.mean>ucl || s.mean<lcl; }).length;
+    var oosCtrl = d.sub.filter(function(s){ return s.mean>ucl || s.mean<lcl; }).length;
+    var oosSpec = d.sub.filter(function(s){ return (d.usl!=null&&s.mean>d.usl) || (d.lsl!=null&&s.mean<d.lsl); }).length;
     var t = [
       ['중심선 X&#773;', d.cl!=null?(+d.cl).toFixed(3):'–', ''],
-      ['UCL', (+ucl).toFixed(3), '#dc2626'],
-      ['LCL', (+lcl).toFixed(3), '#dc2626'],
+      ['UCL(관리상한)', (+ucl).toFixed(3), '#dc2626'],
+      ['LCL(관리하한)', (+lcl).toFixed(3), '#dc2626'],
+      ['USL(규격상한)', d.usl!=null?(+d.usl).toFixed(3):'–', '#f59e0b'],
+      ['LSL(규격하한)', d.lsl!=null?(+d.lsl).toFixed(3):'–', '#f59e0b'],
       ['σ(추정)', d.sigma!=null?(+d.sigma).toFixed(3):'–', ''],
       ['Cpk', d.cpk!=null?(+d.cpk).toFixed(2):'–', (d.cpk!=null && d.cpk>=1.33)?'#16a34a':'#dc2626'],
-      ['관리이탈', oos+'/'+d.sub.length, oos?'#dc2626':'#16a34a']
+      ['이탈 관리/규격', oosCtrl+' / '+oosSpec+' ('+d.sub.length+'군중)', (oosCtrl||oosSpec)?'#dc2626':'#16a34a']
     ];
     $('#spc-tiles').innerHTML = t.map(function(x){
       return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px">'
         +'<div style="font-size:11px;color:#64748b">'+x[0]+'</div>'
         +'<div style="font-size:19px;font-weight:800;margin-top:4px;color:'+(x[2]||'#1e293b')+'">'+x[1]+'</div></div>';
     }).join('');
-    return oos;
+    return oosCtrl;
   }
 
   function drawChart(d, ucl, lcl){
@@ -244,27 +247,26 @@ window.initSpcTab = function initSpcTab() {
   function render(){
     if(!DATA){ return; }
     var d=DATA;
-    if(SPEC_OVERRIDE){
-      // CP 특별특성 규격 상/하한으로 LSL/USL·Cp·Cpk를 재계산 (장비DB 규격 대신 CP 공식 규격 사용)
-      d = Object.assign({}, DATA, { lsl: SPEC_OVERRIDE.lsl, usl: SPEC_OVERRIDE.usl });
-      if(d.sigma){
-        d.cp  = +(((d.usl-d.lsl)/(6*d.sigma)).toFixed(2));
-        d.cpk = +(Math.min(d.usl-d.cl, d.cl-d.lsl)/(3*d.sigma)).toFixed(2);
-      }
+    // USL/LSL(규격): CP 특별특성 규격이 있으면 그걸 사용, 없으면 검사기DB 규격 그대로
+    var usl = (SPEC_OVERRIDE && SPEC_OVERRIDE.usl!=null) ? SPEC_OVERRIDE.usl : d.usl;
+    var lsl = (SPEC_OVERRIDE && SPEC_OVERRIDE.lsl!=null) ? SPEC_OVERRIDE.lsl : d.lsl;
+    d = Object.assign({}, DATA, { lsl: lsl, usl: usl });
+    if(d.sigma && lsl!=null && usl!=null){
+      d.cp  = +(((usl-lsl)/(6*d.sigma)).toFixed(2));
+      d.cpk = +(Math.min(usl-d.cl, d.cl-lsl)/(3*d.sigma)).toFixed(2);
     }
     var mu=parseFloat($('#spc-ucl').value), ml=parseFloat($('#spc-lcl').value);
-    // CP 특별특성 항목은 통계 계산 대신 규격 상/하한을 그대로 UCL/LCL로 사용
-    var autoUcl = (SPEC_OVERRIDE && SPEC_OVERRIDE.usl!=null) ? SPEC_OVERRIDE.usl : d.ucl;
-    var autoLcl = (SPEC_OVERRIDE && SPEC_OVERRIDE.lsl!=null) ? SPEC_OVERRIDE.lsl : d.lcl;
-    var ucl=!isNaN(mu)?mu:autoUcl, lcl=!isNaN(ml)?ml:autoLcl;
-    specAuto = !!SPEC_OVERRIDE && isNaN(mu) && isNaN(ml);
+    // UCL/LCL(관리한계)은 항상 공정 데이터로 계산한 통계값(수동 입력 시 그 값) — USL/LSL(규격)과는 별개로 유지
+    var ucl=!isNaN(mu)?mu:d.ucl, lcl=!isNaN(ml)?ml:d.lcl;
+    specAuto = !!SPEC_OVERRIDE;
     $('#spc-chart-title').textContent='X̄ 관리도 — '+$('#spc-item').value;
     var oos=tiles(d,ucl,lcl);
     drawChart(d,ucl,lcl);
     drawCapChart(d);
     $('#spc-foot').innerHTML='모델 '+esc(d.model||$('#spc-model').value)+' · 부분군 '+d.n+'개씩 '+d.sub.length+'군 · 표본 '+(d.samples||'')+' · Cp '+(d.cp!=null?d.cp:'–')+' / Cpk '+(d.cpk!=null?d.cpk:'–')
-      +(oos?' · <span style="color:#dc2626">빨간점=관리한계 이탈('+oos+'군)</span>':'')
-      +(specAuto?' · <span style="color:#2563eb">CP 규격기준 UCL/LCL 자동적용</span>':((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':''));
+      +(oos?' · <span style="color:#dc2626">빨간점=관리한계(UCL/LCL) 이탈('+oos+'군)</span>':'')
+      +(specAuto?' · <span style="color:#2563eb">USL/LSL은 CP 규격 적용</span>':'')
+      +((!isNaN(mu)||!isNaN(ml))?' · <span style="color:#2563eb">UCL/LCL 수동 적용</span>':'');
   }
 
   async function loadSeries(){
