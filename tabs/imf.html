@@ -115,15 +115,8 @@
 
 <script>
 (function(){
+// 시트/항목 목록은 항상 DB가 기준(source of truth) — 이름별 localStorage 캐시로 들고 있지 않음
 let IMF_DATA = [];
-
-(function(){
-  try {
-    const car = typeof getCurrentCar==='function' ? getCurrentCar() : 'GN7 FL OHCL';
-    const ld = JSON.parse(localStorage.getItem(`ait_imf_data_${car}`) || 'null');
-    if (ld && ld.length > 0) IMF_DATA = ld;
-  } catch(e) {}
-})();
 
 /* ── 작업 A: IMF_ITEMS (항목 메타 DB 캐시) — "{sheetDbId}_{itemNo}" 키 ── */
 let IMF_ITEMS = {}; // { "sheetDbId_itemNo": { id, car_id, sheet_id, item_no, item_name, standard, method, cycle } }
@@ -185,27 +178,28 @@ async function _imfSyncAllItems() {
   }
 }
 
-/* ── 로컬 캐시가 비어있는 신규 기기: DB에 이미 있는 시트를 끌어와 채움 ── */
-async function _imfBootstrapSheets() {
+/* ── 시트 목록을 항상 DB에서 새로 불러옴 (로컬은 세션 중 렌더용 캐시일 뿐) ── */
+async function _imfLoadSheetsFromDb() {
   try {
-    const dbSheets = await AIT_API.getImfSheets(window.currentCarId);
-    if (dbSheets && dbSheets.length) {
-      IMF_DATA = dbSheets.map(s => ({
-        id: s.id, sheet: s.sheet_name || '', proc_no: s.proc_no || '', proc_name: s.proc_name || '',
-        location: s.location || '', manager: s.manager || '',
-        items: (s.items || []).filter(it => it.item_no != null).map(it => ({
-          no: it.item_no, name: it.item_name || '', std: it.standard || '', method: it.method || '', cycle: it.cycle || ''
-        }))
-      }));
-      imfSaveData();
-    }
+    const dbSheets = await AIT_API.getImfSheets(window.currentCarId) || [];
+    IMF_DATA = dbSheets.map(s => ({
+      id: s.id, sheet: s.sheet_name || '', proc_no: s.proc_no || '', proc_name: s.proc_name || '',
+      location: s.location || '', manager: s.manager || '',
+      items: (s.items || []).filter(it => it.item_no != null).map(it => ({
+        no: it.item_no, name: it.item_name || '', std: it.standard || '', method: it.method || '', cycle: it.cycle || ''
+      }))
+    }));
   } catch(e) { console.warn('imf 시트 서버 로드 실패', e); }
 }
 
-/* ── 로드 보장: 시트 id 없으면 동기화 후 항목 로드 ── */
+/* ── 로드 보장: DB에서 시트+항목 새로 로드 (재로드로 덮어쓰기 전, 아직 안 나간 항목편집을 먼저 반영) ── */
 async function _imfEnsureDb() {
-  if (IMF_DATA.length === 0 && window.currentCarId && !AIT_API.MOCK) await _imfBootstrapSheets();
-  if (IMF_DATA.some(s => !s.id)) await _imfSyncSheets();
+  if (window._imfItemSyncTimer) {
+    clearTimeout(window._imfItemSyncTimer);
+    window._imfItemSyncTimer = null;
+    await _imfSyncAllItems();
+  }
+  if (window.currentCarId && !AIT_API.MOCK) await _imfLoadSheetsFromDb();
   await _imfLoadItems();
   if (!_imfPointsLoaded) await _imfLoadPoints();
 }
@@ -268,9 +262,8 @@ let curSheet = 0, imfCurDay = new Date().getDate(), imfEditMode = false;
 function getCar(){ return typeof getCurrentCar==='function' ? getCurrentCar() : 'GN7 FL OHCL'; }
 function getPROC(){ return IMF_DATA[curSheet]; }
 
-/* ── 데이터 저장 ── */
+/* ── 편집 표시 — IMF_DATA는 더 이상 localStorage에 영구 저장하지 않음(DB가 기준) ── */
 function imfSaveData(){
-  localStorage.setItem(`ait_imf_data_${getCar()}`, JSON.stringify(IMF_DATA));
   if(typeof window._markPaneDirty === 'function') window._markPaneDirty('imf');
 }
 
@@ -360,36 +353,25 @@ window._imfSelSheet = function(idx){
   });
 };
 
-/* ── 전체 재렌더 ── */
+/* ── 전체 재렌더: 항상 DB에서 새로 불러온 뒤 그림 ── */
 function imfRenderAll(){
   imfUpdateVisibility();
   imfRenderSheetTabs();
-  if(IMF_DATA.length === 0 && window.currentCarId && !AIT_API.MOCK){
-    // 로컬 캐시가 비어있는 신규 기기: DB 부트스트랩 시도 후 재렌더
-    _imfEnsureDb().then(() => {
-      imfUpdateVisibility();
-      imfRenderSheetTabs();
-      if(IMF_DATA.length > 0){
-        renderImfProcInfo();
-        window.imfRenderDayPicker();
-        imfRenderCheckTable();
-        imfRenderPoints();
-        _imfLoadWorker();
-        if (!_imfHasLocalResults(curSheet, imfCurDay)) _imfLoadResultsFromDB(curSheet, imfCurDay);
-      }
-    });
-    return;
-  }
-  if(IMF_DATA.length > 0){
-    _imfEnsureDb().then(() => {
+  _imfEnsureDb().then(() => {
+    imfUpdateVisibility();
+    imfRenderSheetTabs();
+    if(IMF_DATA.length > 0){
+      if (curSheet >= IMF_DATA.length) curSheet = 0;
       renderImfProcInfo();
       window.imfRenderDayPicker();
       imfRenderCheckTable();
       imfRenderPoints();
       _imfLoadWorker();
       if (!_imfHasLocalResults(curSheet, imfCurDay)) _imfLoadResultsFromDB(curSheet, imfCurDay);
-    });
-  }
+    } else {
+      imfRenderPoints();
+    }
+  });
 }
 
 /* ── 점검자 로드 ── */
