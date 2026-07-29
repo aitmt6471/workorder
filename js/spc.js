@@ -155,21 +155,24 @@ window.initSpcTab = function initSpcTab() {
 
   function tiles(d){
     var oos = d.sub.filter(function(s){ return (d.usl!=null&&s.mean>d.usl) || (d.lsl!=null&&s.mean<d.lsl); }).length;
+    var minS = d.minSamples!=null ? d.minSamples : 300;
+    var suff = d.sufficientSamples!=null ? d.sufficientSamples : (d.samples>=minS);
     var t = [
       ['중심선 X&#773;', d.cl!=null?(+d.cl).toFixed(3):'–', ''],
       ['USL(규격상한)', d.usl!=null?(+d.usl).toFixed(3):'–', '#f59e0b'],
       ['LSL(규격하한)', d.lsl!=null?(+d.lsl).toFixed(3):'–', '#f59e0b'],
-      ['σ(추정)', d.sigma!=null?(+d.sigma).toFixed(3):'–', ''],
-      ['Cp', d.cp!=null?(+d.cp).toFixed(2):'–', (d.cp!=null && d.cp>=1.33)?'#16a34a':'#dc2626'],
-      ['Cpk', d.cpk!=null?(+d.cpk).toFixed(2):'–', (d.cpk!=null && d.cpk>=1.33)?'#16a34a':'#dc2626'],
-      ['규격이탈', oos+'/'+d.sub.length, oos?'#dc2626':'#16a34a']
+      ['σ(단기,추정)', d.sigma!=null?(+d.sigma).toFixed(3):'–', ''],
+      ['Cp / Cpk(단기)', (d.cp!=null?(+d.cp).toFixed(2):'–')+' / '+(d.cpk!=null?(+d.cpk).toFixed(2):'–'), (d.cpk!=null && d.cpk>=1.33)?'#16a34a':'#dc2626'],
+      ['Pp / Ppk(장기)', (d.pp!=null?(+d.pp).toFixed(2):'–')+' / '+(d.ppk!=null?(+d.ppk).toFixed(2):'–'), (d.ppk!=null && d.ppk>=1.33)?'#16a34a':'#dc2626'],
+      ['규격이탈', oos+'/'+d.sub.length, oos?'#dc2626':'#16a34a'],
+      ['표본수', (d.samples||0)+'/'+minS+'+', suff?'#16a34a':'#dc2626']
     ];
     $('#spc-tiles').innerHTML = t.map(function(x){
       return '<div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 14px">'
         +'<div style="font-size:11px;color:#64748b">'+x[0]+'</div>'
         +'<div style="font-size:19px;font-weight:800;margin-top:4px;color:'+(x[2]||'#1e293b')+'">'+x[1]+'</div></div>';
     }).join('');
-    return oos;
+    return { oos: oos, suff: suff, minS: minS };
   }
 
   function drawChart(d){
@@ -284,17 +287,24 @@ window.initSpcTab = function initSpcTab() {
       d.cp  = +(((usl-lsl)/(6*d.sigma)).toFixed(2));
       d.cpk = +(Math.min(usl-d.cl, d.cl-lsl)/(3*d.sigma)).toFixed(2);
     }
+    if(d.sigmaOverall && lsl!=null && usl!=null){
+      d.pp  = +(((usl-lsl)/(6*d.sigmaOverall)).toFixed(2));
+      d.ppk = +(Math.min(usl-d.cl, d.cl-lsl)/(3*d.sigmaOverall)).toFixed(2);
+    }
     specAuto = !!SPEC_OVERRIDE;
     var lastT = (d.sub && d.sub.length) ? d.sub[d.sub.length-1].t : null;
     var lastTStr = lastT ? String(lastT).replace('T',' ').slice(0,16) : '';
     $('#spc-chart-title').innerHTML = 'X̄ 관리도 — '+esc($('#spc-item').value)
       + (lastTStr ? ' <span style="font-weight:700;color:#16a34a;font-size:12px;margin-left:10px">&#9679; 최신 측정: '+esc(lastTStr)+'</span>' : '');
-    var oos=tiles(d);
+    var t=tiles(d);
     drawChart(d);
     drawCapChart(d);
-    $('#spc-foot').innerHTML='모델 '+esc(d.model||$('#spc-model').value)+' · 부분군 '+d.n+'개씩 '+d.sub.length+'군 · 표본 '+(d.samples||'')+' · Cp '+(d.cp!=null?d.cp:'–')+' / Cpk '+(d.cpk!=null?d.cpk:'–')
-      +(oos?' · <span style="color:#dc2626">빨간점=규격(USL/LSL) 이탈('+oos+'군)</span>':'')
-      +(specAuto?' · <span style="color:#2563eb">USL/LSL은 CP 규격 적용</span>':'');
+    $('#spc-foot').innerHTML='모델 '+esc(d.model||$('#spc-model').value)+' · 부분군 '+d.n+'개씩 '+d.sub.length+'군 · 표본 '+(d.samples||'')
+      +' · Cp/Cpk(단기) '+(d.cp!=null?d.cp:'–')+'/'+(d.cpk!=null?d.cpk:'–')
+      +' · Pp/Ppk(장기) '+(d.pp!=null?d.pp:'–')+'/'+(d.ppk!=null?d.ppk:'–')
+      +(t.oos?' · <span style="color:#dc2626">빨간점=규격(USL/LSL) 이탈('+t.oos+'군)</span>':'')
+      +(specAuto?' · <span style="color:#2563eb">USL/LSL은 CP 규격 적용</span>':'')
+      +(!t.suff?' · <span style="color:#dc2626">⚠ 표본 '+(d.samples||0)+'개 — 공정능력 판단 최소 기준('+t.minS+'개) 미달, 참고용</span>':'');
   }
 
   async function loadSeries(){
