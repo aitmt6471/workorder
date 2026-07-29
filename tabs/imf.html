@@ -183,8 +183,8 @@ async function _imfLoadSheetsFromDb() {
   try {
     const dbSheets = await AIT_API.getImfSheets(window.currentCarId) || [];
     IMF_DATA = dbSheets.map(s => ({
-      id: s.id, sheet: s.sheet_name || '', proc_no: s.proc_no || '', proc_name: s.proc_name || '',
-      location: s.location || '', manager: s.manager || '',
+      id: s.id, sheet: s.sheet_name || '', proc_no: _imfClean(s.proc_no), proc_name: _imfClean(s.proc_name),
+      location: _imfClean(s.location), manager: _imfClean(s.manager),
       items: (s.items || []).filter(it => it.item_no != null).map(it => ({
         no: it.item_no, name: it.item_name || '', std: it.standard || '', method: it.method || '', cycle: it.cycle || ''
       }))
@@ -403,30 +403,40 @@ window._imfSaveSheetName = function(idx, el){
     AIT_API.updateImfSheet(sid, { sheet_name: v }).catch(e => console.warn('imf sheet 이름 저장 실패', e));
 };
 
-/* ── 공정 정보 ── */
+/* ── "undefined"/"null" 텍스트로 잘못 저장된 값 방어 ── */
+function _imfClean(v){
+  if (v == null) return '';
+  const s = String(v).trim();
+  return (s === 'undefined' || s === 'null') ? '' : s;
+}
+
+/* ── 공정 정보 — DB(IMF_DATA) 기준으로 표시/저장, localStorage 안 씀 ── */
 function renderImfProcInfo(){
   const p = getPROC(); if(!p) return;
   const car = getCar();
-  const fieldMap = {'imf-proc-no':'proc_no','imf-proc-name':'proc_name','imf-location':'location','imf-manager':'manager'};
-  const setField = (id, k, fb) => {
+  const _imfLinename = JSON.parse(localStorage.getItem(`ait_cp_meta_${car}`) || '{}').linename || '';
+  const fieldMap = {
+    'imf-proc-no':   { key: 'proc_no',   fb: '-' },
+    'imf-proc-name': { key: 'proc_name', fb: '' },
+    'imf-location':  { key: 'location',  fb: _imfLinename || 'GN7 外' },
+    'imf-manager':   { key: 'manager',   fb: '—' }
+  };
+  Object.entries(fieldMap).forEach(([id, { key: f, fb }]) => {
     const el = document.getElementById(id); if(!el) return;
-    el.textContent = localStorage.getItem(k) || fb;
+    el.textContent = _imfClean(p[f]) || fb;
     el.contentEditable = imfEditMode ? 'true' : 'false';
     el.style.background = imfEditMode ? '#edf3ff' : '';
     el.style.cursor = imfEditMode ? 'text' : '';
     el.style.outline = 'none';
     el.onblur = () => {
-      const v = el.textContent.trim();
-      if(v) localStorage.setItem(k, v); else localStorage.removeItem(k);
-      const f = fieldMap[id]; if(f && getPROC()) getPROC()[f] = v;
+      const v = _imfClean(el.textContent);
+      if (getPROC()) getPROC()[f] = v;
       imfSaveData();
+      const sid = _imfSheetDbId(curSheet);
+      if (sid && window.currentCarId && !AIT_API.MOCK)
+        AIT_API.updateImfSheet(sid, { [f]: v }).catch(e => console.warn('imf 공정정보 저장 실패', e));
     };
-  };
-  setField('imf-proc-no',   `imf_proc_${car}_s${curSheet}_no`,       p.proc_no);
-  setField('imf-proc-name', `imf_proc_${car}_s${curSheet}_name`,     p.proc_name);
-  const _imfLinename = JSON.parse(localStorage.getItem(`ait_cp_meta_${car}`) || '{}').linename || '';
-  setField('imf-location',  `imf_proc_${car}_s${curSheet}_location`, p.location || _imfLinename || 'GN7 外');
-  setField('imf-manager',   `imf_proc_${car}_s${curSheet}_manager`,  p.manager  || '—');
+  });
 }
 
 /* ── 결과 키 ── */
