@@ -82,14 +82,15 @@ function _cpSwitchVariant(v) {
   if (typeof _loadCpRevForActive === 'function') _loadCpRevForActive();  // 탭별 개정이력 배지
 }
 
-/* 활성 차종 행만 표시(공통 탭은 공통행만, 차종 탭은 그 차종행만) */
+/* 공통 탭은 공통행만, 차종 탭은 공통행+그 차종 고유행을 함께 표시(인쇄와 동일한 union) */
 function _cpApplyVariantFilter() {
   const v = window._cpActiveVariant || CP_COMMON;
   const tbody = document.getElementById('cp-tbody');
   if (!tbody) return;
   tbody.querySelectorAll('tr.cp-group-hd, tr.cp-child').forEach(tr => {
     const rv = tr.dataset.variant || CP_COMMON;
-    tr.classList.toggle('cp-variant-hidden', rv !== v);
+    const show = (v === CP_COMMON) ? (rv === CP_COMMON) : (rv === CP_COMMON || rv === v);
+    tr.classList.toggle('cp-variant-hidden', !show);
   });
 }
 
