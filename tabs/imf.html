@@ -364,6 +364,21 @@ window._imfSelSheet = function(idx){
 function imfRenderAll(){
   imfUpdateVisibility();
   imfRenderSheetTabs();
+  if(IMF_DATA.length === 0 && window.currentCarId && !AIT_API.MOCK){
+    // 로컬 캐시가 비어있는 신규 기기: DB 부트스트랩 시도 후 재렌더
+    _imfEnsureDb().then(() => {
+      imfUpdateVisibility();
+      imfRenderSheetTabs();
+      if(IMF_DATA.length > 0){
+        renderImfProcInfo();
+        window.imfRenderDayPicker();
+        imfRenderCheckTable();
+        imfRenderPoints();
+        _imfLoadWorker();
+      }
+    });
+    return;
+  }
   if(IMF_DATA.length > 0){
     _imfEnsureDb().then(() => {
       renderImfProcInfo();
