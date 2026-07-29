@@ -375,6 +375,7 @@ function imfRenderAll(){
         imfRenderCheckTable();
         imfRenderPoints();
         _imfLoadWorker();
+        if (!_imfHasLocalResults(curSheet, imfCurDay)) _imfLoadResultsFromDB(curSheet, imfCurDay);
       }
     });
     return;
@@ -386,6 +387,7 @@ function imfRenderAll(){
       imfRenderCheckTable();
       imfRenderPoints();
       _imfLoadWorker();
+      if (!_imfHasLocalResults(curSheet, imfCurDay)) _imfLoadResultsFromDB(curSheet, imfCurDay);
     });
   }
 }
