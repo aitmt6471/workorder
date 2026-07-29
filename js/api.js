@@ -126,7 +126,7 @@ const AIT_API = (() => {
     // 전체 검사기DB 집계 쿼리라 10~15초 걸릴 수 있어 타임아웃을 넉넉히 줌
     getSpcMeta:       (line, carId) => _get('ait/spc/meta', Object.assign({}, line ? { line } : {}, carId ? { carId } : {}), 30000),
     // n8n: ait/spc/series → {cl,ucl,lcl,sigma,cp,cpk,sub:[{i,mean,range,t}], ...}
-    getSpcSeries:     (model, item, n = 5, groups = 80, line) => _get('ait/spc/series', { model, item, n, groups, line }),
+    getSpcSeries:     (model, item, n = 5, groups = 80, line, from, to) => _get('ait/spc/series', { model, item, n, groups, line, from, to }),
 
     /* ── 마스터샘플 ────────────────────────────── */
     getMsSamples:     (carId)   => _get('ait/ms/samples', { carId }),
@@ -430,7 +430,7 @@ const AIT_API = (() => {
     stockMove:             (payload)               => _real.stockMove(payload),
     /* SPC */
     getSpcMeta:            (line, carId)                    => _real.getSpcMeta(line, carId),
-    getSpcSeries:          (model, item, n, groups, line)    => _real.getSpcSeries(model, item, n, groups, line),
+    getSpcSeries:          (model, item, n, groups, line, from, to) => _real.getSpcSeries(model, item, n, groups, line, from, to),
     numCircle
   };
 })();

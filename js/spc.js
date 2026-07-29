@@ -4,7 +4,7 @@
    ══════════════════════════════════════════════════════════════ */
 window.initSpcTab = function initSpcTab() {
   var $ = function(s){ return document.querySelector(s); };
-  var META = [], DATA = null, SPECIAL_ITEMS = null, SPEC_OVERRIDE = null, specAuto = false, LINE_ID = null;
+  var META = [], DATA = null, SPECIAL_ITEMS = null, SPEC_OVERRIDE = null, specAuto = false, LINE_ID = null, spcEditMode = false;
   var car = window.currentCar || '';
   $('#spc-car').textContent = car ? '· 아이템: ' + car : '';
 
@@ -28,7 +28,7 @@ window.initSpcTab = function initSpcTab() {
       var rows = await AIT_API.getCpRows(carId);
       return (rows||[])
         .filter(function(r){ return !r.is_deleted && isSpecialMark(r.char_special); })
-        .map(function(r){ return { name: String(r.ctrl_item||'').trim(), standard: String(r.standard||'').trim() }; })
+        .map(function(r){ return { id: r.id, name: String(r.ctrl_item||'').trim(), standard: String(r.standard||'').trim() }; })
         .filter(function(x){ return !!x.name; });
     }catch(e){ console.warn('CP 특별특성 조회 실패', e); return []; }
   }
@@ -66,12 +66,46 @@ window.initSpcTab = function initSpcTab() {
     if(lo>hi){ var t=lo; lo=hi; hi=t; }
     return { lsl: lo, usl: hi, unit: (m[4]||m[2]||'') };
   }
+  // itemName과 매칭된 CP 특별특성 행과 이름이 동일한 다른 변종(variant) 행들의 id도 모두 모은다
+  // (같은 관리항목이 공통/NX5/CN8/GN7 PE 등 변종별로 중복 등록돼 있어, 규격 수정 시 전부 같이 갱신해야 함)
+  function findSpecialSiblingIds(match, specialRows){
+    if(!match) return [];
+    var target = normText(match.name);
+    return specialRows.filter(function(r){ return normText(r.name)===target; }).map(function(r){ return r.id; });
+  }
   // 선택된 측정항목이 CP 특별특성 항목과 매칭되면 규격 상/하한(USL/LSL)을 구해둔다.
   function applySpecOverride(){
     var match = findSpecialMatch($('#spc-item').value, SPECIAL_ITEMS);
     var parsed = match ? parseSpecRange(match.standard) : null;
-    SPEC_OVERRIDE = parsed ? { lsl:parsed.lsl, usl:parsed.usl, unit:parsed.unit, text:match.standard } : null;
+    SPEC_OVERRIDE = parsed ? { lsl:parsed.lsl, usl:parsed.usl, unit:parsed.unit, text:match.standard, ids:findSpecialSiblingIds(match, SPECIAL_ITEMS) } : null;
     updateSpecLabel();
+    _spcRenderSpecEdit();
+  }
+  // 편집 모드일 때 규격 상/하한 수정 입력창을 채우고 보이기/숨기기
+  function _spcRenderSpecEdit(){
+    var wrap = $('#spc-spec-edit');
+    if(!wrap) return;
+    if(spcEditMode && SPEC_OVERRIDE){
+      wrap.style.display = 'inline-flex';
+      $('#spc-lsl-edit').value = SPEC_OVERRIDE.lsl!=null ? SPEC_OVERRIDE.lsl : '';
+      $('#spc-usl-edit').value = SPEC_OVERRIDE.usl!=null ? SPEC_OVERRIDE.usl : '';
+    } else {
+      wrap.style.display = 'none';
+    }
+  }
+  async function _spcSaveSpecEdit(){
+    if(!SPEC_OVERRIDE || !SPEC_OVERRIDE.ids || !SPEC_OVERRIDE.ids.length){ alert('CP 특별특성에 등록된 규격 항목이 아니라 저장할 곳이 없습니다.'); return; }
+    var lsl = parseFloat($('#spc-lsl-edit').value), usl = parseFloat($('#spc-usl-edit').value);
+    if(isNaN(lsl) || isNaN(usl) || lsl>=usl){ alert('규격하한/상한 값을 올바르게 입력하세요 (하한 < 상한)'); return; }
+    var unit = SPEC_OVERRIDE.unit || '';
+    var text = lsl + unit + '~' + usl + unit;
+    try{
+      await Promise.all(SPEC_OVERRIDE.ids.map(function(id){ return AIT_API.updateCpRow(id, { standard: text }); }));
+      SPECIAL_ITEMS = await loadSpecialItems();
+      applySpecOverride();
+      if(DATA) render();
+      msg('규격을 저장했습니다: ' + text);
+    }catch(e){ alert('저장 실패: ' + e); }
   }
 
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
@@ -262,10 +296,11 @@ window.initSpcTab = function initSpcTab() {
 
   async function loadSeries(){
     var model=$('#spc-model').value, item=$('#spc-item').value, n=parseInt($('#spc-n').value,10)||5;
+    var from=$('#spc-date-from').value||undefined, to=$('#spc-date-to').value||undefined;
     if(!model||!item) return;
     msg('불러오는 중…');
     try{
-      DATA = await AIT_API.getSpcSeries(model, item, n, 80, LINE_ID);
+      DATA = await AIT_API.getSpcSeries(model, item, n, 80, LINE_ID, from, to);
       if(!DATA || DATA.error || !DATA.sub){ msg('데이터가 없습니다: '+((DATA&&DATA.error)||''),'bad'); DATA=null; $('#spc-svg').innerHTML=''; $('#spc-tiles').innerHTML=''; return; }
       msg('');
       render();
@@ -294,7 +329,15 @@ window.initSpcTab = function initSpcTab() {
     $('#spc-model').onchange=function(){ fillItems(); loadSeries(); };
     $('#spc-item').onchange=function(){ applySpecOverride(); loadSeries(); };
     $('#spc-n').onchange=loadSeries;
+    $('#spc-date-from').onchange=loadSeries;
+    $('#spc-date-to').onchange=loadSeries;
+    $('#spc-date-clear-btn').onclick=function(){ $('#spc-date-from').value=''; $('#spc-date-to').value=''; loadSeries(); };
+    $('#spc-spec-save-btn').onclick=_spcSaveSpecEdit;
     loadSeries();
   }
+  window.spcSetEditable = function(on){
+    spcEditMode = !!on;
+    _spcRenderSpecEdit();
+  };
   init();
 };

@@ -3,6 +3,8 @@
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
     <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">📈 SPC · X&#772; 관리도</span>
     <span id="spc-car" style="font-size:12px;color:#64748b"></span>
+    <span style="flex:1"></span>
+    <button class="btn btn-ghost btn-sm" id="spc-edit-btn" onclick="toggleTabEditMode('spc',this)">&#x270F; 편집 모드</button>
   </div>
 
   <!-- 컨트롤 -->
@@ -16,7 +18,18 @@
     <label style="font-size:12px;color:#374151">부분군<span style="cursor:help;color:#94a3b8;margin-left:2px" title="연속된 측정값을 n개씩 묶은 단위. 부분군 평균들로 공정중심(X̄̄)을, 부분군 범위(최댓값-최솟값)들의 평균으로 공정 표준편차(σ)를 추정해 Cp/Cpk 계산에 사용합니다.">ⓘ</span>
       <input id="spc-n" type="number" min="2" max="10" value="5" style="width:46px;margin-left:4px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px">
     </label>
+    <label style="font-size:12px;color:#374151">기간
+      <input id="spc-date-from" type="date" style="margin-left:4px;padding:5px 6px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px">
+      ~
+      <input id="spc-date-to" type="date" style="padding:5px 6px;border:1px solid #cbd5e1;border-radius:7px;font-size:12px">
+      <button class="btn btn-ghost btn-sm" id="spc-date-clear-btn" style="padding:4px 8px;font-size:11px" title="기간 필터 해제">전체</button>
+    </label>
     <span id="spc-spec" style="font-size:12px;color:#64748b"></span>
+    <span id="spc-spec-edit" style="display:none;font-size:12px;color:#374151;align-items:center;gap:4px">
+      규격하한(LSL) <input id="spc-lsl-edit" type="number" step="0.001" style="width:70px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px">
+      규격상한(USL) <input id="spc-usl-edit" type="number" step="0.001" style="width:70px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px">
+      <button class="btn btn-primary btn-sm" id="spc-spec-save-btn" style="padding:4px 10px;font-size:11px">저장</button>
+    </span>
   </div>
 
   <!-- 지표 타일 -->

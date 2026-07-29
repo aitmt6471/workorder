@@ -1,6 +1,6 @@
 /* ── 역할 기반 접근 제어 ── */
 const ROLE_PERMS = {
-  admin:         ['cp','ws','daily','imf','ms','spec','insp','qpoint'],
+  admin:         ['cp','ws','daily','imf','ms','spec','insp','qpoint','spc'],
   cp_editor:     ['cp','ws','daily','ms','insp'],
   qpoint_editor: ['qpoint'],
   viewer:        [],
@@ -193,6 +193,7 @@ async function toggleTabEditMode(pane, btn) {
     if (pane === 'ms' && typeof window.msSetEditable === 'function') window.msSetEditable(true);
     if (pane === 'insp' && typeof window.inspSetEditable === 'function') window.inspSetEditable(true);
     if (pane === 'spec' && typeof window.specSetEditable === 'function') window.specSetEditable(true);
+    if (pane === 'spc' && typeof window.spcSetEditable === 'function') window.spcSetEditable(true);
   }
 }
 
@@ -659,6 +660,17 @@ function _wsSaveDoneCleanup() {
 function saveDocument(pane) {
   if (pane === 'ws') {          // 작표는 CP와 개정이력을 공유하므로 전용 확인모달(서브개정) 플로우 사용
     _openWsReviseModal(getCurrentCar(), snapshotPane('ws'));
+    return;
+  }
+  if (pane === 'spc') {         // SPC는 개정관리 문서가 아니라 항목별로 즉시 저장되므로 편집모드만 종료
+    const paneEl = document.getElementById('pane-spc');
+    if (paneEl) {
+      paneEl.classList.remove('edit-mode');
+      const editBtn = paneEl.querySelector('[id$="-edit-btn"]');
+      if (editBtn) { editBtn.textContent = '✏ 편집 모드'; editBtn.classList.remove('btn-primary'); editBtn.classList.add('btn-ghost'); }
+    }
+    if (typeof window.spcSetEditable === 'function') window.spcSetEditable(false);
+    _syncSidebarReset();
     return;
   }
   try {
