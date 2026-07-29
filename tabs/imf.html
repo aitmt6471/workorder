@@ -185,8 +185,26 @@ async function _imfSyncAllItems() {
   }
 }
 
+/* ── 로컬 캐시가 비어있는 신규 기기: DB에 이미 있는 시트를 끌어와 채움 ── */
+async function _imfBootstrapSheets() {
+  try {
+    const dbSheets = await AIT_API.getImfSheets(window.currentCarId);
+    if (dbSheets && dbSheets.length) {
+      IMF_DATA = dbSheets.map(s => ({
+        id: s.id, sheet: s.sheet_name || '', proc_no: s.proc_no || '', proc_name: s.proc_name || '',
+        location: s.location || '', manager: s.manager || '',
+        items: (s.items || []).filter(it => it.item_no != null).map(it => ({
+          no: it.item_no, name: it.item_name || '', std: it.standard || '', method: it.method || '', cycle: it.cycle || ''
+        }))
+      }));
+      imfSaveData();
+    }
+  } catch(e) { console.warn('imf 시트 서버 로드 실패', e); }
+}
+
 /* ── 로드 보장: 시트 id 없으면 동기화 후 항목 로드 ── */
 async function _imfEnsureDb() {
+  if (IMF_DATA.length === 0 && window.currentCarId && !AIT_API.MOCK) await _imfBootstrapSheets();
   if (IMF_DATA.some(s => !s.id)) await _imfSyncSheets();
   await _imfLoadItems();
   if (!_imfPointsLoaded) await _imfLoadPoints();
