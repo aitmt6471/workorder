@@ -285,7 +285,10 @@ window.initSpcTab = function initSpcTab() {
       d.cpk = +(Math.min(usl-d.cl, d.cl-lsl)/(3*d.sigma)).toFixed(2);
     }
     specAuto = !!SPEC_OVERRIDE;
-    $('#spc-chart-title').textContent='X̄ 관리도 — '+$('#spc-item').value;
+    var lastT = (d.sub && d.sub.length) ? d.sub[d.sub.length-1].t : null;
+    var lastTStr = lastT ? String(lastT).replace('T',' ').slice(0,16) : '';
+    $('#spc-chart-title').innerHTML = 'X̄ 관리도 — '+esc($('#spc-item').value)
+      + (lastTStr ? ' <span style="font-weight:700;color:#16a34a;font-size:12px;margin-left:10px">&#9679; 최신 측정: '+esc(lastTStr)+'</span>' : '');
     var oos=tiles(d);
     drawChart(d);
     drawCapChart(d);
