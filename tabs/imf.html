@@ -794,21 +794,25 @@ async function _imfLoadPoints(){
   } catch(e){ console.warn('imf points 로드 실패', e); }
 }
 
-/* 구버전 localStorage 데이터 1회 DB 이관 */
-function _imfMigratePoints(){
-  IMF_DATA.forEach((s, idx) => {
+/* 구버전 localStorage 데이터 1회 DB 이관 — 서버 저장 성공 확인 후에만 로컬 백업 삭제 */
+async function _imfMigratePoints(){
+  for (let idx = 0; idx < IMF_DATA.length; idx++) {
+    const s = IMF_DATA[idx];
     const k = `imf_points_${getCar()}_s${idx}`;
-    if (!s.id) return;
-    if (!(IMF_POINTS[s.id] || []).length) {
-      let old = [];
-      try { old = JSON.parse(localStorage.getItem(k) || '[]'); } catch(e){}
-      if (old.length) {
-        IMF_POINTS[s.id] = old.map(p => ({ caption: p.caption||'', fileId: p.fileId||'', url: p.url||'' }));
-        _imfSyncPoints(idx);
-      }
+    if (!s.id) continue;
+    if ((IMF_POINTS[s.id] || []).length) continue;
+    let old = [];
+    try { old = JSON.parse(localStorage.getItem(k) || '[]'); } catch(e){}
+    if (!old.length) continue;
+    const pts = old.map(p => ({ caption: p.caption||'', fileId: p.fileId||'', url: p.url||'' }));
+    try {
+      await AIT_API.syncImfPoints(window.currentCarId, s.id, pts);
+      IMF_POINTS[s.id] = pts;
+      localStorage.removeItem(k);
+    } catch(e) {
+      console.warn('imf points 이관 실패 — 로컬 백업 유지', e);
     }
-    localStorage.removeItem(k);
-  });
+  }
 }
 
 function _imfGetPoints(idx){
