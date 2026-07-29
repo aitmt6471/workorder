@@ -23,11 +23,11 @@
   <button id="imf-add-tab-btn" style="display:none;padding:6px 12px;font-size:11px;font-weight:600;border:1px dashed #3b82f6;border-bottom:none;border-radius:6px 6px 0 0;cursor:pointer;background:#eff6ff;color:#1e40af;white-space:nowrap" onclick="window.imfAddSheet()">&#xFF0B; 탭 추가</button>
 </div>
 
-<!-- 빈 상태 -->
+<!-- 빈 상태 / 로딩 상태 -->
 <div id="imf-empty-state" style="display:none;padding:60px 20px;text-align:center;background:#f9fafb">
   <div style="font-size:32px;margin-bottom:12px">📋</div>
-  <div style="font-size:15px;font-weight:600;color:#374151;margin-bottom:6px">등록된 시트가 없습니다</div>
-  <div style="font-size:12px;color:#6b7280;margin-bottom:20px">편집 모드에서 <strong>탭 추가</strong> 버튼으로 시트를 추가하세요</div>
+  <div id="imf-empty-msg" style="font-size:15px;font-weight:600;color:#374151;margin-bottom:6px">등록된 시트가 없습니다</div>
+  <div id="imf-empty-sub" style="font-size:12px;color:#6b7280;margin-bottom:20px">편집 모드에서 <strong>탭 추가</strong> 버튼으로 시트를 추가하세요</div>
   <div id="imf-empty-edit-hint" style="display:none">
     <button onclick="window.imfAddSheet()" style="padding:8px 20px;background:#3b82f6;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">&#xFF0B; 시트 추가</button>
   </div>
@@ -259,6 +259,7 @@ async function _imfFlushResults() {
 window.addEventListener('beforeunload', () => { clearTimeout(_imfSaveTimer); _imfFlushResults(); });
 
 let curSheet = 0, imfCurDay = new Date().getDate(), imfEditMode = false;
+let _imfInitialLoad = true; // DB 최초 조회 끝나기 전엔 "등록된 시트 없음" 대신 로딩 문구
 function getCar(){ return typeof getCurrentCar==='function' ? getCurrentCar() : 'GN7 FL OHCL'; }
 function getPROC(){ return IMF_DATA[curSheet]; }
 
@@ -272,11 +273,21 @@ function imfUpdateVisibility(){
   const empty   = document.getElementById('imf-empty-state');
   const content = document.getElementById('imf-content');
   const hint    = document.getElementById('imf-empty-edit-hint');
+  const msgEl   = document.getElementById('imf-empty-msg');
+  const subEl   = document.getElementById('imf-empty-sub');
   if(!empty || !content) return;
   if(IMF_DATA.length === 0){
     empty.style.display   = '';
     content.style.display = 'none';
-    if(hint) hint.style.display = imfEditMode ? '' : 'none';
+    if(_imfInitialLoad){
+      if(msgEl) msgEl.textContent = '불러오는 중…';
+      if(subEl) subEl.style.display = 'none';
+      if(hint) hint.style.display = 'none';
+    } else {
+      if(msgEl) msgEl.textContent = '등록된 시트가 없습니다';
+      if(subEl) subEl.style.display = '';
+      if(hint) hint.style.display = imfEditMode ? '' : 'none';
+    }
   } else {
     empty.style.display   = 'none';
     content.style.display = '';
@@ -358,6 +369,7 @@ function imfRenderAll(){
   imfUpdateVisibility();
   imfRenderSheetTabs();
   _imfEnsureDb().then(() => {
+    _imfInitialLoad = false;
     imfUpdateVisibility();
     imfRenderSheetTabs();
     if(IMF_DATA.length > 0){
