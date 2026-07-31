@@ -28,7 +28,7 @@ window.initSpcTab = function initSpcTab() {
       var rows = await AIT_API.getCpRows(carId);
       return (rows||[])
         .filter(function(r){ return !r.is_deleted && isSpecialMark(r.char_special); })
-        .map(function(r){ return { id: r.id, name: String(r.ctrl_item||'').trim(), standard: String(r.standard||'').trim() }; })
+        .map(function(r){ return { id: r.id, name: String(r.ctrl_item||'').trim(), standard: String(r.standard||'').trim(), ucl: r.ucl, lcl: r.lcl }; })
         .filter(function(x){ return !!x.name; });
     }catch(e){ console.warn('CP 특별특성 조회 실패', e); return []; }
   }
@@ -73,15 +73,23 @@ window.initSpcTab = function initSpcTab() {
     var target = normText(match.name);
     return specialRows.filter(function(r){ return normText(r.name)===target; }).map(function(r){ return r.id; });
   }
-  // 선택된 측정항목이 CP 특별특성 항목과 매칭되면 규격 상/하한(USL/LSL)을 구해둔다.
+  function numOrNull(v){ var s=String(v==null?'':v).trim(); if(!s) return null; var n=parseFloat(s); return isNaN(n)?null:n; }
+  // 선택된 측정항목이 CP 특별특성 항목과 매칭되면 규격 상/하한(USL/LSL)과
+  // 관리기준(UCL/LCL, cp_rows.ucl/lcl 에 수동 저장한 값)을 구해둔다.
   function applySpecOverride(){
     var match = findSpecialMatch($('#spc-item').value, SPECIAL_ITEMS);
-    var parsed = match ? parseSpecRange(match.standard) : null;
-    SPEC_OVERRIDE = parsed ? { lsl:parsed.lsl, usl:parsed.usl, unit:parsed.unit, text:match.standard, ids:findSpecialSiblingIds(match, SPECIAL_ITEMS) } : null;
+    if(!match){ SPEC_OVERRIDE = null; updateSpecLabel(); _spcRenderSpecEdit(); return; }
+    var parsed = parseSpecRange(match.standard);
+    SPEC_OVERRIDE = {
+      lsl: parsed?parsed.lsl:null, usl: parsed?parsed.usl:null,
+      unit: parsed?parsed.unit:'', text: match.standard,
+      ucl: numOrNull(match.ucl), lcl: numOrNull(match.lcl),
+      ids: findSpecialSiblingIds(match, SPECIAL_ITEMS)
+    };
     updateSpecLabel();
     _spcRenderSpecEdit();
   }
-  // 편집 모드일 때 규격 상/하한 수정 입력창을 채우고 보이기/숨기기
+  // 편집 모드일 때 규격/관리기준 수정 입력창을 채우고 보이기/숨기기
   function _spcRenderSpecEdit(){
     var wrap = $('#spc-spec-edit');
     if(!wrap) return;
@@ -89,22 +97,48 @@ window.initSpcTab = function initSpcTab() {
       wrap.style.display = 'inline-flex';
       $('#spc-lsl-edit').value = SPEC_OVERRIDE.lsl!=null ? SPEC_OVERRIDE.lsl : '';
       $('#spc-usl-edit').value = SPEC_OVERRIDE.usl!=null ? SPEC_OVERRIDE.usl : '';
+      $('#spc-lcl-edit').value = SPEC_OVERRIDE.lcl!=null ? SPEC_OVERRIDE.lcl : '';
+      $('#spc-ucl-edit').value = SPEC_OVERRIDE.ucl!=null ? SPEC_OVERRIDE.ucl : '';
     } else {
       wrap.style.display = 'none';
     }
   }
   async function _spcSaveSpecEdit(){
     if(!SPEC_OVERRIDE || !SPEC_OVERRIDE.ids || !SPEC_OVERRIDE.ids.length){ alert('CP 특별특성에 등록된 규격 항목이 아니라 저장할 곳이 없습니다.'); return; }
-    var lsl = parseFloat($('#spc-lsl-edit').value), usl = parseFloat($('#spc-usl-edit').value);
-    if(isNaN(lsl) || isNaN(usl) || lsl>=usl){ alert('규격하한/상한 값을 올바르게 입력하세요 (하한 < 상한)'); return; }
-    var unit = SPEC_OVERRIDE.unit || '';
-    var text = lsl + unit + '~' + usl + unit;
+    var lslRaw = $('#spc-lsl-edit').value.trim(), uslRaw = $('#spc-usl-edit').value.trim();
+    var lclRaw = $('#spc-lcl-edit').value.trim(), uclRaw = $('#spc-ucl-edit').value.trim();
+    var payload = {}, notes = [];
+    // 규격(USL/LSL): 둘 다 입력했을 때만 CP standard 텍스트를 갱신한다(문장형 규격을 덮어쓰지 않도록)
+    if(lslRaw || uslRaw){
+      var lsl = parseFloat(lslRaw), usl = parseFloat(uslRaw);
+      if(isNaN(lsl) || isNaN(usl) || lsl>=usl){ alert('규격하한/상한을 둘 다 올바르게 입력하세요 (하한 < 상한)'); return; }
+      var unit = SPEC_OVERRIDE.unit || '';
+      payload.standard = lsl + unit + '~' + usl + unit;
+      notes.push('규격 ' + payload.standard);
+    }
+    // 관리기준(UCL/LCL): 비우면 삭제 → 서버 계산값(X̄-R 관리한계)으로 되돌아간다
+    if(lclRaw || uclRaw){
+      var lcl = parseFloat(lclRaw), ucl = parseFloat(uclRaw);
+      if(isNaN(lcl) || isNaN(ucl) || lcl>=ucl){ alert('관리하한(LCL)/관리상한(UCL)을 둘 다 올바르게 입력하세요 (LCL < UCL)'); return; }
+      payload.lcl = String(lcl); payload.ucl = String(ucl);
+      notes.push('관리기준 ' + lcl + '~' + ucl);
+    } else {
+      payload.lcl = ''; payload.ucl = '';
+      if(SPEC_OVERRIDE.lcl!=null || SPEC_OVERRIDE.ucl!=null) notes.push('관리기준 해제(자동계산)');
+    }
+    if(!notes.length){ alert('저장할 값이 없습니다.'); return; }
     try{
-      await Promise.all(SPEC_OVERRIDE.ids.map(function(id){ return AIT_API.updateCpRow(id, { standard: text }); }));
+      var wantUcl = payload.ucl!==undefined ? numOrNull(payload.ucl) : null;
+      await Promise.all(SPEC_OVERRIDE.ids.map(function(id){ return AIT_API.updateCpRow(id, payload); }));
       SPECIAL_ITEMS = await loadSpecialItems();
       applySpecOverride();
       if(DATA) render();
-      msg('규격을 저장했습니다: ' + text);
+      // 서버(n8n ait/cp/rows PUT)가 ucl/lcl 컬럼을 아직 저장하지 않으면 조용히 실패하므로 확인한다
+      if((SPEC_OVERRIDE ? SPEC_OVERRIDE.ucl : null) !== wantUcl){
+        msg('⚠ 관리기준(UCL/LCL)이 저장되지 않았습니다 — n8n ait/cp/rows 업데이트에 ucl/lcl 컬럼 반영이 필요합니다.','bad');
+        return;
+      }
+      msg('저장했습니다: ' + notes.join(' · '));
     }catch(e){ alert('저장 실패: ' + e); }
   }
 
@@ -146,7 +180,10 @@ window.initSpcTab = function initSpcTab() {
     var it = META.find(function(m){ return m.model_name===$('#spc-model').value && m.item_name===$('#spc-item').value; });
     var base = it ? ('검사기 규격 '+(it.lsl!=null?it.lsl:'–')+' ~ '+(it.usl!=null?it.usl:'–')+' '+(it.unit||'')) : '';
     if(SPEC_OVERRIDE){
-      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b> · USL/LSL = 규격상/하한('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+')'
+      var manual = (SPEC_OVERRIDE.lcl!=null && SPEC_OVERRIDE.ucl!=null);
+      $('#spc-spec').innerHTML = 'CP 규격(특별특성) <b>'+esc(SPEC_OVERRIDE.text)+'</b>'
+        + (SPEC_OVERRIDE.usl!=null ? ' · USL/LSL = 규격상/하한('+SPEC_OVERRIDE.lsl+' ~ '+SPEC_OVERRIDE.usl+')' : '')
+        + ' · <span style="color:#7c3aed">UCL/LCL = '+(manual ? '수동('+SPEC_OVERRIDE.lcl+' ~ '+SPEC_OVERRIDE.ucl+')' : '자동계산(X&#772;-R)')+'</span>'
         + (base ? ' <span style="color:#94a3b8">'+esc(base)+'</span>' : '');
     } else {
       $('#spc-spec').textContent = base;
@@ -155,12 +192,17 @@ window.initSpcTab = function initSpcTab() {
 
   function tiles(d){
     var oos = d.sub.filter(function(s){ return (d.usl!=null&&s.mean>d.usl) || (d.lsl!=null&&s.mean<d.lsl); }).length;
+    var ooc = d.sub.filter(function(s){ return (d.ucl!=null&&s.mean>d.ucl) || (d.lcl!=null&&s.mean<d.lcl); }).length;
     var minS = d.minSamples!=null ? d.minSamples : 300;
     var suff = d.sufficientSamples!=null ? d.sufficientSamples : (d.samples>=minS);
+    var cmSuffix = d.clManual ? '' : '<span style="color:#94a3b8">(자동)</span>';
     var t = [
       ['중심선 X&#773;', d.cl!=null?(+d.cl).toFixed(3):'–', ''],
       ['USL(규격상한)', d.usl!=null?(+d.usl).toFixed(3):'–', '#f59e0b'],
       ['LSL(규격하한)', d.lsl!=null?(+d.lsl).toFixed(3):'–', '#f59e0b'],
+      ['UCL(관리상한)'+cmSuffix, d.ucl!=null?(+d.ucl).toFixed(3):'–', '#7c3aed'],
+      ['LCL(관리하한)'+cmSuffix, d.lcl!=null?(+d.lcl).toFixed(3):'–', '#7c3aed'],
+      ['관리이탈', ooc+'/'+d.sub.length, ooc?'#7c3aed':'#16a34a'],
       ['σ(단기,추정)', d.sigma!=null?(+d.sigma).toFixed(3):'–', ''],
       ['Cp / Cpk(단기)', (d.cp!=null?(+d.cp).toFixed(2):'–')+' / '+(d.cpk!=null?(+d.cpk).toFixed(2):'–'), (d.cpk!=null && d.cpk>=1.33)?'#16a34a':'#dc2626'],
       ['Pp / Ppk(장기)', (d.pp!=null?(+d.pp).toFixed(2):'–')+' / '+(d.ppk!=null?(+d.ppk).toFixed(2):'–'), (d.ppk!=null && d.ppk>=1.33)?'#16a34a':'#dc2626'],
@@ -172,7 +214,7 @@ window.initSpcTab = function initSpcTab() {
         +'<div style="font-size:11px;color:#64748b">'+x[0]+'</div>'
         +'<div style="font-size:19px;font-weight:800;margin-top:4px;color:'+(x[2]||'#1e293b')+'">'+x[1]+'</div></div>';
     }).join('');
-    return { oos: oos, suff: suff, minS: minS };
+    return { oos: oos, ooc: ooc, suff: suff, minS: minS };
   }
 
   function drawChart(d){
@@ -181,7 +223,7 @@ window.initSpcTab = function initSpcTab() {
     var means = d.sub.map(function(s){ return s.mean; });
     var dataLo=Math.min.apply(null,means), dataHi=Math.max.apply(null,means);
     var dataSpan = (dataHi-dataLo) || Math.abs(dataHi||1)*0.02 || 1;
-    var lines = [d.cl, d.usl, d.lsl].filter(function(v){ return v!=null; });
+    var lines = [d.cl, d.usl, d.lsl, d.ucl, d.lcl].filter(function(v){ return v!=null; });
     var allLo=Math.min.apply(null,means.concat(lines)), allHi=Math.max.apply(null,means.concat(lines));
     var lo, hi, pad;
     if((allHi-allLo) > dataSpan*8){
@@ -204,13 +246,17 @@ window.initSpcTab = function initSpcTab() {
       svg+='<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="'+color+'" stroke-width="1.4"'+(dash?' stroke-dasharray="'+dash+'"':'')+'/>';
       svg+='<text x="'+(W-padR+4)+'" y="'+(y+3)+'" font-size="10" fill="'+color+'">'+label+'</text>'; }
     hline(d.usl,'#f59e0b','2 3','USL'); hline(d.lsl,'#f59e0b','2 3','LSL');
+    hline(d.ucl,'#7c3aed','5 3','UCL'); hline(d.lcl,'#7c3aed','5 3','LCL');
     hline(d.cl,'#64748b',null,'CL');
     // 선
     var pts=d.sub.map(function(s,i){ return X(i)+','+Y(s.mean); }).join(' ');
     svg+='<polyline points="'+pts+'" fill="none" stroke="#2563eb" stroke-width="1.6"/>';
-    // 점 (규격 USL/LSL 이탈만 빨간색)
-    d.sub.forEach(function(s,i){ var out=(d.usl!=null&&s.mean>d.usl)||(d.lsl!=null&&s.mean<d.lsl);
-      svg+='<circle cx="'+X(i)+'" cy="'+Y(s.mean)+'" r="'+(out?4:2.4)+'" fill="'+(out?'#dc2626':'#2563eb')+'"><title>부분군 '+s.i+': '+s.mean+' '+(d.unit||'')+'</title></circle>'; });
+    // 점 (규격 이탈=빨강, 관리한계 이탈=보라)
+    d.sub.forEach(function(s,i){
+      var out=(d.usl!=null&&s.mean>d.usl)||(d.lsl!=null&&s.mean<d.lsl);
+      var ooc=(d.ucl!=null&&s.mean>d.ucl)||(d.lcl!=null&&s.mean<d.lcl);
+      var color = out?'#dc2626':(ooc?'#7c3aed':'#2563eb');
+      svg+='<circle cx="'+X(i)+'" cy="'+Y(s.mean)+'" r="'+((out||ooc)?4:2.4)+'" fill="'+color+'"><title>부분군 '+s.i+': '+s.mean+' '+(d.unit||'')+'</title></circle>'; });
     // x 라벨(약 10개)
     var step=Math.max(1,Math.ceil(n/10));
     for(var i=0;i<n;i+=step){ svg+='<text x="'+X(i)+'" y="'+(H-padB+16)+'" text-anchor="middle" font-size="9" fill="#94a3b8">'+d.sub[i].i+'</text>'; }
@@ -282,7 +328,15 @@ window.initSpcTab = function initSpcTab() {
     // USL/LSL(규격): CP 특별특성 규격이 있으면 그걸 사용, 없으면 검사기DB 규격 그대로
     var usl = (SPEC_OVERRIDE && SPEC_OVERRIDE.usl!=null) ? SPEC_OVERRIDE.usl : d.usl;
     var lsl = (SPEC_OVERRIDE && SPEC_OVERRIDE.lsl!=null) ? SPEC_OVERRIDE.lsl : d.lsl;
-    d = Object.assign({}, DATA, { lsl: lsl, usl: usl });
+    // UCL/LCL(관리기준): CP에 수동 저장한 값이 있으면 그걸 쓰고, 없으면 서버의 X̄-R 관리한계(=CL±3σ/√n)
+    var clManual = !!(SPEC_OVERRIDE && SPEC_OVERRIDE.ucl!=null && SPEC_OVERRIDE.lcl!=null);
+    function autoCl(sign){
+      if(d.cl==null || !d.sigma) return null;
+      return +(d.cl + sign*3*d.sigma/Math.sqrt(d.n||5)).toFixed(3);
+    }
+    var ucl = clManual ? SPEC_OVERRIDE.ucl : (d.ucl!=null ? d.ucl : autoCl(1));
+    var lcl = clManual ? SPEC_OVERRIDE.lcl : (d.lcl!=null ? d.lcl : autoCl(-1));
+    d = Object.assign({}, DATA, { lsl: lsl, usl: usl, ucl: ucl, lcl: lcl, clManual: clManual });
     if(d.sigma && lsl!=null && usl!=null){
       d.cp  = +(((usl-lsl)/(6*d.sigma)).toFixed(2));
       d.cpk = +(Math.min(usl-d.cl, d.cl-lsl)/(3*d.sigma)).toFixed(2);
@@ -303,7 +357,9 @@ window.initSpcTab = function initSpcTab() {
       +' · Cp/Cpk(단기) '+(d.cp!=null?d.cp:'–')+'/'+(d.cpk!=null?d.cpk:'–')
       +' · Pp/Ppk(장기) '+(d.pp!=null?d.pp:'–')+'/'+(d.ppk!=null?d.ppk:'–')
       +(t.oos?' · <span style="color:#dc2626">빨간점=규격(USL/LSL) 이탈('+t.oos+'군)</span>':'')
+      +(t.ooc?' · <span style="color:#7c3aed">보라점=관리기준(UCL/LCL) 이탈('+t.ooc+'군)</span>':'')
       +(specAuto?' · <span style="color:#2563eb">USL/LSL은 CP 규격 적용</span>':'')
+      +' · <span style="color:#7c3aed">UCL/LCL '+(d.clManual?'수동 설정값':'자동계산(X̄-R)')+'</span>'
       +(!t.suff?' · <span style="color:#dc2626">⚠ 표본 '+(d.samples||0)+'개 — 공정능력 판단 최소 기준('+t.minS+'개) 미달, 참고용</span>':'');
   }
 

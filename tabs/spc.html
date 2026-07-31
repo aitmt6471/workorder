@@ -28,12 +28,15 @@
     <span id="spc-spec-edit" style="display:none;font-size:12px;color:#374151;align-items:center;gap:4px">
       규격하한(LSL) <input id="spc-lsl-edit" type="number" step="0.001" style="width:70px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px">
       규격상한(USL) <input id="spc-usl-edit" type="number" step="0.001" style="width:70px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px">
+      <span style="color:#7c3aed;margin-left:6px">관리하한(LCL)</span> <input id="spc-lcl-edit" type="number" step="0.001" placeholder="자동" style="width:70px;padding:4px 6px;border:1px solid #c4b5fd;border-radius:6px;font-size:12px">
+      <span style="color:#7c3aed">관리상한(UCL)</span> <input id="spc-ucl-edit" type="number" step="0.001" placeholder="자동" style="width:70px;padding:4px 6px;border:1px solid #c4b5fd;border-radius:6px;font-size:12px">
+      <span style="color:#94a3b8;font-size:11px" title="비워두면 X̄-R 관리도 공식(CL±A2·R̄)으로 자동 계산합니다.">ⓘ 비우면 자동계산</span>
       <button class="btn btn-primary btn-sm" id="spc-spec-save-btn" style="padding:4px 10px;font-size:11px">저장</button>
     </span>
   </div>
 
   <!-- 지표 타일 -->
-  <div id="spc-tiles" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px"></div>
+  <div id="spc-tiles" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px"></div>
 
   <!-- 차트 -->
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px">
