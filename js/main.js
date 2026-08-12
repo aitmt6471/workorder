@@ -112,21 +112,8 @@ function onCarChange(sel) {
   if (car) _syncCarMetaToLocal(car);
   // 개정이력 DB 갱신 (차종 전환 시)
   if (!AIT_API.MOCK && window.currentCarId) {
-    const _ncId = window.currentCarId, _ncName = window.currentCar;
-    [...new Set(['cp','ws','daily','imf','ms','spec'].map(p => _revGroupKey(p)))].forEach(pane => {
-      AIT_API.getRevisions(_ncId, pane).then(rows => {
-        const validRows = (rows || []).filter(r => r && r.id != null);
-        const rd = { rev: 0, history: [] };
-        validRows.forEach(r => {
-          const rev = parseInt(r.rev) || 0;
-          if (rev > rd.rev) rd.rev = rev;
-          rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane, dbId: r.id, rev_display: r.rev_display || '' });
-        });
-        rd.history.sort((a, b) => b.rev - a.rev);
-        saveRevDataFor(pane, _ncName, rd);
-        updateAllRevDisplays();
-      }).catch(() => {});
-    });
+    const _ncName = window.currentCar;
+    ['cp','ws','daily','imf','ms','spec'].forEach(p => _refreshPaneRevisions(p, _ncName));
   }
   // 모든 탭 캐시 초기화
   Object.keys(loaded).forEach(id => {
@@ -243,18 +230,26 @@ function saveRevData(carName, data) {
 
 /* ── 초중종물·마스터샘플 독립 개정 ── */
 const _STANDALONE_PANES = ['cp', 'ws', 'daily', 'imf', 'ms', 'insp', 'qpoint', 'spec'];
-// cp / ws / daily 는 동일한 개정 이력 공유
+// CP는 차종 탭별 개정이력 그룹을 가진다 ('cp' 또는 'cp@차종')
+function _cpGroupKey() {
+  const v = window._cpActiveVariant || '공통';
+  return v === '공통' ? 'cp' : 'cp@' + v;
+}
+// 작표·설비일상은 각자 독립된 개정이력 그룹(ws/daily)에 저장한다.
+// 단, CP가 실제로 개정되면(공통 'cp' 그룹) 그 이력은 작표·설비일상에도 그대로 보여야 하므로
+// 화면 표시는 _revFetchGroups()로 'cp' + 자기 그룹을 합쳐서 읽는다.
 function _revGroupKey(pane) {
-  if (pane === 'ws' || pane === 'daily') return 'cp';        // 작표·설비일상 = 공통 CP 개정 공유
-  if (pane === 'cp') {                                        // CP는 차종 탭별 개정이력
-    const v = window._cpActiveVariant || '공통';
-    return v === '공통' ? 'cp' : 'cp@' + v;
-  }
+  if (pane === 'cp') return _cpGroupKey();
+  if (pane === 'ws' || pane === 'daily') return pane;
   return pane;
 }
-/* 서브개정(rev_display가 "9-1" 형태) 여부 — CP 화면/인쇄에서는 이 항목들을 숨긴다.
-   작표·설비일상은 CP와 개정이력을 공유(_revGroupKey)하지만 서브개정은 두 문서 전용이라
-   CP 쪽 배지·이력모달·인쇄본에는 나타나면 안 된다. */
+// 표시(읽기)용으로 조회할 그룹 목록 — ws/daily는 공통 CP 개정을 같이 병합해서 보여준다
+function _revFetchGroups(pane) {
+  if (pane === 'ws' || pane === 'daily') return ['cp', pane];
+  return [_revGroupKey(pane)];
+}
+/* 서브개정(rev_display가 "9-1" 형태) 여부 — 예전 스키마에서는 작표수정이 'cp' 그룹에 그대로
+   저장됐다. 그 레거시 항목들이 CP 화면/인쇄에는 나타나면 안 되므로 CP 쪽에서만 걸러낸다. */
 function _isSubRev(h) {
   return /^\d+-\d+$/.test(String(h && h.rev_display || '').trim());
 }
@@ -285,21 +280,25 @@ function _revNextSub(rd) {
   const p = _revParseDisplay(latest.rev_display, latest.rev);
   return { base: p.base, sub: p.sub + 1 };
 }
-/* DB에서 그룹(주로 'cp')의 개정이력을 다시 읽어 메모리캐시 동기화 — ws 서브개정 저장 직후
-   서버가 부여한 실제 rev(서명 매칭용)로 로컬 낙관적 값을 덮어써 drift 방지 */
-function _refreshRevGroup(groupKey, carName) {
+/* DB에서 이 pane에 필요한 그룹들(ws/daily는 'cp'+자기 그룹)을 다시 읽어 메모리캐시 동기화
+   — 서브개정 저장 직후 서버가 부여한 실제 rev(서명 매칭용)로 로컬 낙관적 값을 덮어써 drift 방지 */
+function _refreshPaneRevisions(pane, carName) {
   if (AIT_API.MOCK || !window.currentCarId) return Promise.resolve();
-  return AIT_API.getRevisions(window.currentCarId, groupKey).then(rows => {
-    const valid = (rows || []).filter(r => r && r.id != null);
-    if (!valid.length) return;
+  const groups = _revFetchGroups(pane);
+  return Promise.all(groups.map(g =>
+    AIT_API.getRevisions(window.currentCarId, g).then(rows => ({ g, rows: rows || [] })).catch(() => ({ g, rows: [] }))
+  )).then(results => {
     const rd = { rev: 0, history: [] };
-    valid.forEach(r => {
-      const rev = parseInt(r.rev) || 0;
-      if (rev > rd.rev) rd.rev = rev;
-      rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: groupKey, dbId: r.id, rev_display: r.rev_display || '' });
+    results.forEach(({ g, rows }) => {
+      rows.filter(r => r && r.id != null).forEach(r => {
+        const rev = parseInt(r.rev) || 0;
+        if (rev > rd.rev) rd.rev = rev;
+        rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane, dbId: r.id, rev_display: r.rev_display || '', grp: g });
+      });
     });
+    if (!rd.history.length) return;
     rd.history.sort((a, b) => b.rev - a.rev);
-    _revMemStore[`${groupKey}:${carName}`] = rd;
+    saveRevDataFor(pane, carName, rd);
     updateAllRevDisplays();
   }).catch(() => {});
 }
@@ -344,7 +343,7 @@ function _loadCpRevForActive() {
     valid.forEach(r => {
       const rev = parseInt(r.rev) || 0;
       if (rev > rd.rev) rd.rev = rev;
-      rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: 'cp', dbId: r.id, rev_display: r.rev_display || '' });
+      rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: 'cp', dbId: r.id, rev_display: r.rev_display || '', grp: dt });
     });
     rd.history.sort((a, b) => b.rev - a.rev);
     _revMemStore[`${dt}:${carName}`] = rd;    // 경쟁상태 방지: 캡처한 키로 직접 저장
@@ -356,11 +355,11 @@ let _revModalPane = null;
 let _revDbMap = {};
 let _signsMap = {};
 
-function _signCell(rev, role, fileId, name, liveMode) {
+function _signCell(grp, rev, role, fileId, name, liveMode) {
   if (fileId) {
     const proxyUrl = `https://aitechn8n.ngrok.app/webhook/ait/sign-img?fileId=${fileId}`;
     const delBtn = liveMode
-      ? `<button onclick="event.stopPropagation();removeSign(${rev},'${role}')" title="서명 삭제"
+      ? `<button onclick="event.stopPropagation();removeSign('${grp}',${rev},'${role}')" title="서명 삭제"
            style="position:absolute;top:0;right:0;background:#ef4444;border:none;border-radius:3px;color:#fff;font-size:9px;padding:1px 4px;cursor:pointer;line-height:1.4">✕</button>`
       : '';
     return `<div style="position:relative;display:inline-block">
@@ -369,13 +368,13 @@ function _signCell(rev, role, fileId, name, liveMode) {
       ${delBtn}</div>`;
   }
   if (!liveMode) return `<span style="color:var(--text2)">—</span>`;
-  return `<button onclick="openSignModal(${rev},'${role}')"
+  return `<button onclick="openSignModal('${grp}',${rev},'${role}')"
     style="background:none;border:1px dashed #d1d5db;border-radius:4px;color:#9ca3af;font-size:11px;padding:3px 8px;cursor:pointer;white-space:nowrap">서명</button>`;
 }
 
-function removeSign(rev, role) {
+function removeSign(grp, rev, role) {
   if (getMyRole() !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
-  AIT_API.deleteSign(window.currentCarId, _revGroupKey(_revModalPane), rev, role)
+  AIT_API.deleteSign(window.currentCarId, grp, rev, role)
     .then(() => openRevModal(_revModalPane))
     .catch(e => alert('삭제 실패: ' + (e.message || e)));
 }
@@ -395,15 +394,16 @@ function openRevModal(pane) {
     tbody.innerHTML = entries.length === 0
       ? `<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:20px">개정 이력이 없습니다</td></tr>`
       : entries.map(({ h, idx }) => {
-        const sg = _signsMap[h.rev] || {};
+        const grp = h.grp || _revGroupKey(pane);
+        const sg = _signsMap[`${grp}:${h.rev}`] || {};
         const au = sg.author   || {}, rv = sg.reviewer || {}, ap = sg.approver || {};
         return `<tr>
           <td class="td-center"><span class="rev-num">Rev.${h.rev_display || h.rev}</span></td>
           <td class="td-center">${h.date}</td>
           <td>${h.desc}</td>
-          <td class="td-center">${_signCell(h.rev,'author',  au.fileId||'', au.name||h.user||'', liveMode)}</td>
-          <td class="td-center">${_signCell(h.rev,'reviewer',rv.fileId||'', rv.name||'',          liveMode)}</td>
-          <td class="td-center">${_signCell(h.rev,'approver',ap.fileId||'', ap.name||'',          liveMode)}</td>
+          <td class="td-center">${_signCell(grp, h.rev,'author',  au.fileId||'', au.name||h.user||'', liveMode)}</td>
+          <td class="td-center">${_signCell(grp, h.rev,'reviewer',rv.fileId||'', rv.name||'',          liveMode)}</td>
+          <td class="td-center">${_signCell(grp, h.rev,'approver',ap.fileId||'', ap.name||'',          liveMode)}</td>
           <td class="td-center"><button onclick="deleteRevEntry(${idx})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;padding:2px 4px" title="이력 삭제">🗑</button></td>
         </tr>`;
       }).join('');
@@ -421,32 +421,35 @@ function openRevModal(pane) {
   }
 
   // DB에서 이력+서명 로드 → localStorage 동기화 후 렌더링
+  // ws/daily는 공통 CP 그룹 + 자기 그룹을 함께 조회해 병합한다 (_revFetchGroups)
   if (!AIT_API.MOCK && window.currentCarId) {
-    Promise.all([
-      AIT_API.getRevisions(window.currentCarId, _revGroupKey(pane)),
-      AIT_API.getRevisionSigns(window.currentCarId, _revGroupKey(pane))
-    ]).then(([rows, signs]) => {
+    const groups = _revFetchGroups(pane);
+    Promise.all(groups.map(g => Promise.all([
+      AIT_API.getRevisions(window.currentCarId, g),
+      AIT_API.getRevisionSigns(window.currentCarId, g)
+    ]).then(([rows, signs]) => ({ g, rows: rows || [], signs: signs || [] }))))
+    .then(results => {
       _revDbMap = {};
       _signsMap = {};
-      const validRows = (rows || []).filter(r => r && r.id != null);
-      if (validRows.length) {
-        const rd = { rev: 0, history: [] };
-        validRows.forEach(r => {
+      const rd = { rev: 0, history: [] };
+      results.forEach(({ g, rows, signs }) => {
+        rows.filter(r => r && r.id != null).forEach(r => {
           const rev = parseInt(r.rev) || 0;
           if (rev > rd.rev) rd.rev = rev;
-          _revDbMap[rev] = r;
-          rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane, dbId: r.id, rev_display: r.rev_display || '' });
+          _revDbMap[`${g}:${rev}`] = r;
+          rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane, dbId: r.id, rev_display: r.rev_display || '', grp: g });
         });
+        signs.forEach(s => {
+          const rev = parseInt(s.rev);
+          const key = `${g}:${rev}`;
+          if (!_signsMap[key]) _signsMap[key] = {};
+          _signsMap[key][s.role] = { name: s.signer_name || '', fileId: s.sign_file_id || '' };
+        });
+      });
+      if (rd.history.length) {
         rd.history.sort((a, b) => b.rev - a.rev);
         saveRevDataFor(pane, carName, rd);
         updateAllRevDisplays();
-      }
-      if (signs && signs.length) {
-        signs.forEach(s => {
-          const rev = parseInt(s.rev);
-          if (!_signsMap[rev]) _signsMap[rev] = {};
-          _signsMap[rev][s.role] = { name: s.signer_name || '', fileId: s.sign_file_id || '' };
-        });
       }
       _renderRevModal();
     }).catch(() => _renderRevModal());
@@ -488,10 +491,11 @@ function closeRevModal() {
 }
 
 /* ── 전자서명 모달 ── */
-let _signRev = null, _signRole = null, _signCanvasReady = false;
+let _signGrp = null, _signRev = null, _signRole = null, _signCanvasReady = false;
 let _signCallback = null; // Q-Point 등 외부 컨텍스트용 콜백
 
-function openSignModal(rev, role) {
+function openSignModal(grp, rev, role) {
+  _signGrp = grp;
   _signRev = rev;
   _signRole = role;
   const labels = { author: '작성자', reviewer: '검토자', approver: '승인자' };
@@ -537,7 +541,7 @@ function signSave() {
     _fn = (_revModalPane||'cp') + '_' + _safeCar + '_r' + String(_signRev||0) + '_' + (_signRole||'x') + '.png';
   }
   _fn = _fn.replace(/[^a-zA-Z0-9가-힣._-]/g,'_');
-  AIT_API.signRevision(window.currentCarId, _revGroupKey(_revModalPane), _signRev, _signRole, name, base64, _fn)
+  AIT_API.signRevision(window.currentCarId, _signGrp || _revGroupKey(_revModalPane), _signRev, _signRole, name, base64, _fn)
     .then(() => { closeSignModal(); openRevModal(_revModalPane); })
     .catch(e => { alert('저장 실패: ' + (e.message || e)); if (btn) btn.disabled = false; });
 }
@@ -595,21 +599,25 @@ function snapshotPane(pane) {
   return src.textContent.replace(/\s+/g, ' ').trim();
 }
 
-/* ── 작표(WS) 전용 개정 확인모달 — CP와 개정이력을 공유(_revGroupKey('ws')==='cp')하므로
-   작표만 고쳤을 때는 정식 개정(Rev.N+1) 대신 서브개정(Rev.N-1, N-2...)을 붙인다. ── */
+/* ── 작표(WS)·설비일상(daily) 전용 개정 확인모달 ── 이 둘은 CP와 개정이력을 공유하지 않고
+   각자 독립된 그룹(ws/daily)에 저장하되, CP가 실제로 개정되면 그 이력은 같이 보여야 하므로
+   화면에서는 'cp' 그룹과 병합해서 표시한다(getRevDataFor → _revFetchGroups). 이 문서만 고쳤을 때는
+   정식 개정(Rev.N+1) 대신 서브개정(Rev.N-1, N-2...)을 자기 그룹에 붙인다. ── */
+const _SUBREV_LABELS = { ws: { doc: '작업표준서', tag: '작표수정' }, daily: { doc: '설비일상점검표', tag: '설비일상수정' } };
 let _wsRevModalCtx = null;
-function _openWsReviseModal(carName, current) {
-  const rd = getRevDataFor('ws', carName);
+function _openSubReviseModal(pane, carName, current) {
+  const rd = getRevDataFor(pane, carName);
+  const lbl = _SUBREV_LABELS[pane] || { doc: pane, tag: '수정' };
   const g = id => document.getElementById(id);
-  g('ws-rev-modal-sub').textContent = carName;
+  g('ws-rev-modal-sub').textContent = carName + ' — ' + lbl.doc;
   if (rd.history.length === 0) {
     g('ws-rev-modal-msg').innerHTML = `최초 저장입니다. 개정이력을 등록하시겠습니까?<br>등록 시 <b>Rev.0</b>(최초 작성)으로 시작합니다.`;
   } else {
     const next = _revNextSub(rd);
-    g('ws-rev-modal-msg').innerHTML = `작업표준서를 변경했습니다. 개정이력을 등록하시겠습니까?<br>등록 시 <b>Rev.${next.base}-${next.sub}</b> (작표수정)으로 기록됩니다.`;
+    g('ws-rev-modal-msg').innerHTML = `${lbl.doc}를 변경했습니다. 개정이력을 등록하시겠습니까?<br>등록 시 <b>Rev.${next.base}-${next.sub}</b> (${lbl.tag})으로 기록됩니다.`;
   }
   g('ws-rev-modal-desc').value = '';
-  _wsRevModalCtx = { carName, current };
+  _wsRevModalCtx = { pane, carName, current };
   document.getElementById('ws-rev-modal').classList.add('open');
   setTimeout(() => g('ws-rev-modal-desc').focus(), 60);
 }
@@ -622,10 +630,12 @@ function _wsRevModalConfirm(doRevise) {
   if (!ctx) return;
   document.getElementById('ws-rev-modal').classList.remove('open');
   _wsRevModalCtx = null;
-  const { carName, current } = ctx;
+  const { pane, carName, current } = ctx;
+  const lbl = _SUBREV_LABELS[pane] || { doc: pane, tag: '수정' };
+  const ownGrp = _revGroupKey(pane);
 
   if (doRevise) {
-    const rd = getRevDataFor('ws', carName);
+    const rd = getRevDataFor(pane, carName);
     const descInput = (document.getElementById('ws-rev-modal-desc').value || '').trim();
     const today = new Date();
     const dateStr = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
@@ -635,31 +645,42 @@ function _wsRevModalConfirm(doRevise) {
     } else {
       const next = _revNextSub(rd);
       revInt = next.base; revDisplay = `${next.base}-${next.sub}`;
-      noteText = (descInput || '내용 변경') + ' (작표수정)';
+      noteText = (descInput || '내용 변경') + ` (${lbl.tag})`;
     }
     rd.rev = revInt;
-    rd.history.unshift({ rev: revInt, date: dateStr, user: '', desc: noteText, docs: '작업표준서', rev_display: revDisplay });
-    saveRevDataFor('ws', carName, rd);
+    rd.history.unshift({ rev: revInt, date: dateStr, user: '', desc: noteText, docs: lbl.doc, rev_display: revDisplay, grp: ownGrp });
+    saveRevDataFor(pane, carName, rd);
     updateAllRevDisplays();
     if (!AIT_API.MOCK && window.currentCarId) {
-      AIT_API.addRevision(window.currentCarId, _revGroupKey('ws'), {
+      AIT_API.addRevision(window.currentCarId, ownGrp, {
         rev_date: dateStr, note: noteText, author: '', rev_display: revDisplay
-      }).then(() => _refreshRevGroup('cp', carName))   // 서버가 부여한 실제 rev로 재동기화(서명 매칭용)
+      }).then(() => _refreshPaneRevisions(pane, carName))   // 서버가 부여한 실제 rev로 재동기화(서명 매칭용)
         .catch(e => console.warn('개정이력 DB 저장 실패', e));
     }
     window.showToast && window.showToast(`✅ Rev.${revDisplay} 개정 등록 완료`, 'success');
   }
 
-  snapshots.ws = current;
-  _saveCarContent('ws', carName);
-  _wsSaveDoneCleanup();
+  snapshots[pane] = current;
+  _saveCarContent(pane, carName);
+  if (pane === 'daily' && !AIT_API.MOCK) {   // daily는 _saveCarContent가 localStorage만 처리 — DB 동기화 별도 필요
+    const dailyList = typeof window._dailyGetEquip === 'function' ? window._dailyGetEquip() : null;
+    if (dailyList && dailyList.length && window.currentCarId) {
+      window.showSaving && window.showSaving();
+      AIT_API.syncDailyEquip(window.currentCarId, dailyList)
+        .then(() => { window.hideSaving && window.hideSaving(); window.showToast && window.showToast('설비일상점검표 저장 완료', 'success'); })
+        .catch(e => { window.hideSaving && window.hideSaving(); window.showToast && window.showToast('설비일상점검표 저장 실패: ' + (e?.message || String(e)), 'error'); });
+    } else {
+      window.showToast && window.showToast('설비일상점검표 저장 완료', 'success');
+    }
+  }
+  _subSaveDoneCleanup(pane);
 }
-function _wsSaveDoneCleanup() {
-  const paneEl = document.getElementById('pane-ws');
+function _subSaveDoneCleanup(pane) {
+  const paneEl = document.getElementById('pane-' + pane);
   if (!paneEl) return;
   paneEl.classList.remove('edit-mode');
   _syncSidebarReset();
-  const editBtn = paneEl.querySelector('[id$="-edit-btn"]') || document.getElementById('ws-edit-btn');
+  const editBtn = paneEl.querySelector('[id$="-edit-btn"]') || document.getElementById(pane + '-edit-btn');
   if (editBtn) {
     editBtn.textContent = '✏ 편집 모드';
     editBtn.classList.remove('btn-primary');
@@ -667,12 +688,13 @@ function _wsSaveDoneCleanup() {
     editBtn.style.background = '';
     editBtn.style.color = '';
   }
-  setWsEditable(paneEl, false);
+  if (pane === 'ws') setWsEditable(paneEl, false);
+  if (pane === 'daily' && typeof window.dailySetEditable === 'function') window.dailySetEditable(false);
 }
 
 function saveDocument(pane) {
-  if (pane === 'ws') {          // 작표는 CP와 개정이력을 공유하므로 전용 확인모달(서브개정) 플로우 사용
-    _openWsReviseModal(getCurrentCar(), snapshotPane('ws'));
+  if (pane === 'ws' || pane === 'daily') {   // 작표·설비일상은 독립 개정이력(서브개정) 전용 확인모달 플로우 사용
+    _openSubReviseModal(pane, getCurrentCar(), snapshotPane(pane));
     return;
   }
   if (pane === 'spc') {         // SPC는 개정관리 문서가 아니라 항목별로 즉시 저장되므로 편집모드만 종료
@@ -705,13 +727,13 @@ function saveDocument(pane) {
         const today = new Date();
         const dateStr = `${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
         rd.rev = newRev;
-        rd.history.unshift({ rev: newRev, date: dateStr, user: '', desc: desc || '내용 변경', docs: paneLabels[pane] || pane, rev_display: revDisplay });
+        rd.history.unshift({ rev: newRev, date: dateStr, user: '', desc: desc || '내용 변경', docs: paneLabels[pane] || pane, rev_display: revDisplay, grp: _revGroupKey(pane) });
         saveRevDataFor(pane, carName, rd);
         updateAllRevDisplays();
         if (!AIT_API.MOCK && window.currentCarId) {
           AIT_API.addRevision(window.currentCarId, _revGroupKey(pane), {
             rev_date: dateStr, note: desc || '내용 변경', author: '', rev_display: revDisplay
-          }).then(() => _refreshRevGroup(_revGroupKey(pane), carName))   // 작표 서브개정과 섞여도 rev drift 없이 동기화
+          }).then(() => _refreshPaneRevisions(pane, carName))   // 서버가 부여한 실제 rev로 재동기화(서명 매칭용)
             .catch(e => console.warn('개정이력 DB 저장 실패', e));
         }
         alert(`✅ Rev.${newRev}${revDisplay ? ' (' + revDisplay + ')' : ''} 개정 완료\n개정일: ${dateStr}`);
@@ -799,24 +821,6 @@ function saveDocument(pane) {
             window.showToast && window.showToast('CP 저장 실패: ' + (e?.message || String(e)), 'error');
           });
       }
-      if (pane === 'daily') {
-        // localStorage 저장은 _saveCarContent에서 처리됨
-        const dailyList = typeof window._dailyGetEquip === 'function' ? window._dailyGetEquip() : null;
-        if (dailyList && dailyList.length && window.currentCarId) {
-          window.showSaving && window.showSaving();
-          AIT_API.syncDailyEquip(window.currentCarId, dailyList)
-            .then(() => {
-              window.hideSaving && window.hideSaving();
-              window.showToast && window.showToast('설비일상점검표 저장 완료', 'success');
-            })
-            .catch(e => {
-              window.hideSaving && window.hideSaving();
-              window.showToast && window.showToast('설비일상점검표 저장 실패: ' + (e?.message || String(e)), 'error');
-            });
-        } else {
-          window.showToast && window.showToast('설비일상점검표 저장 완료', 'success');
-        }
-      }
       if (pane === 'ms' && typeof window._msSyncToDb === 'function' && window.currentCarId) {
         window.showSaving && window.showSaving();
         window._msSyncToDb()
@@ -868,8 +872,6 @@ function saveDocument(pane) {
         editBtn.classList.add('btn-ghost');
       }
       if (pane === 'cp') setCpEditable(paneEl, false);
-      if (pane === 'ws') setWsEditable(paneEl, false);
-      if (pane === 'daily' && typeof window.dailySetEditable === 'function') window.dailySetEditable(false);
       if (pane === 'imf' && typeof window.imfSetEditable === 'function') window.imfSetEditable(false);
       if (pane === 'ms' && typeof window.msSetEditable === 'function') window.msSetEditable(false);
       if (pane === 'insp' && typeof window.inspSetEditable === 'function') window.inspSetEditable(false);
@@ -1040,28 +1042,7 @@ async function initCars() {
     }
     // 개정이력 DB → localStorage 초기 동기화
     if (!AIT_API.MOCK && cur.id) {
-      [...new Set(['cp','ws','daily','imf','ms','spec'].map(p => _revGroupKey(p)))].forEach(pane => {
-        AIT_API.getRevisions(cur.id, pane).then(rows => {
-          const validRows = (rows || []).filter(r => r && r.id != null);
-          if (!validRows.length) return;
-          const rd = { rev: 0, history: [] };
-          _revDbMap = {};
-          validRows.forEach(r => {
-            const rev = parseInt(r.rev) || 0;
-            if (rev > rd.rev) rd.rev = rev;
-            _revDbMap[rev] = r;
-            rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane,
-              dbId: r.id, rev_display: r.rev_display || '',
-              authorSign: r.author_sign || '',
-              reviewerName: r.reviewer_name || '', reviewerSign: r.reviewer_sign || '',
-              approverName: r.approver_name || '', approverSign: r.approver_sign || ''
-            });
-          });
-          rd.history.sort((a, b) => b.rev - a.rev);
-          saveRevDataFor(pane, window.currentCar, rd);
-          updateAllRevDisplays();
-        }).catch(() => {});
-      });
+      ['cp','ws','daily','imf','ms','spec'].forEach(p => _refreshPaneRevisions(p, window.currentCar));
     }
   }
 }
