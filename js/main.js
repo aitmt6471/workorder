@@ -252,6 +252,16 @@ function _revGroupKey(pane) {
   }
   return pane;
 }
+/* 서브개정(rev_display가 "9-1" 형태) 여부 — CP 화면/인쇄에서는 이 항목들을 숨긴다.
+   작표·설비일상은 CP와 개정이력을 공유(_revGroupKey)하지만 서브개정은 두 문서 전용이라
+   CP 쪽 배지·이력모달·인쇄본에는 나타나면 안 된다. */
+function _isSubRev(h) {
+  return /^\d+-\d+$/.test(String(h && h.rev_display || '').trim());
+}
+function _cpVisibleEntries(history) {
+  return history.map((h, idx) => ({ h, idx })).filter(({ h }) => !_isSubRev(h));
+}
+
 /* 작표만 변경했을 때 붙는 서브 개정(Rev.9-1, 9-2...) — 표시용 rev_display 문자열을 파싱.
    "9-1" → {base:9,sub:1} / "9" → {base:9,sub:0} / 커스텀 코드(AAB 등)·빈값 → fallbackRev를 base로 사용 */
 function _revParseDisplay(disp, fallbackRev) {
@@ -309,10 +319,12 @@ function saveRevDataFor(pane, carName, data) {
 function updateRevDisplay(pane) {
   const carName = getCurrentCar();
   const rd = _STANDALONE_PANES.includes(pane) ? getRevDataFor(pane, carName) : getRevData(carName);
+  const hist = pane === 'cp' ? rd.history.filter(h => !_isSubRev(h)) : rd.history;
   const badge = document.getElementById(pane + '-rev-badge');
   const dateEl = document.getElementById(pane + '-rev-date');
-  if (badge) badge.textContent = rd.history[0]?.rev_display || `Rev. ${rd.rev}`;
-  if (dateEl) dateEl.textContent = `개정일: ${rd.history[0]?.date || '-'}`;
+  const latest = hist[0];
+  if (badge) badge.textContent = latest ? `Rev.${latest.rev_display || latest.rev}` : `Rev. ${rd.rev}`;
+  if (dateEl) dateEl.textContent = `개정일: ${latest?.date || '-'}`;
 }
 
 function updateAllRevDisplays() {
@@ -379,9 +391,10 @@ function openRevModal(pane) {
     document.getElementById('rev-modal-car').textContent = carName + (label ? ` — ${label}` : '');
     const tbody = document.getElementById('rev-modal-tbody');
     const liveMode = !AIT_API.MOCK;
-    tbody.innerHTML = rd.history.length === 0
+    const entries = pane === 'cp' ? _cpVisibleEntries(rd.history) : rd.history.map((h, idx) => ({ h, idx }));
+    tbody.innerHTML = entries.length === 0
       ? `<tr><td colspan="7" style="text-align:center;color:var(--text2);padding:20px">개정 이력이 없습니다</td></tr>`
-      : rd.history.map((h, i) => {
+      : entries.map(({ h, idx }) => {
         const sg = _signsMap[h.rev] || {};
         const au = sg.author   || {}, rv = sg.reviewer || {}, ap = sg.approver || {};
         return `<tr>
@@ -391,7 +404,7 @@ function openRevModal(pane) {
           <td class="td-center">${_signCell(h.rev,'author',  au.fileId||'', au.name||h.user||'', liveMode)}</td>
           <td class="td-center">${_signCell(h.rev,'reviewer',rv.fileId||'', rv.name||'',          liveMode)}</td>
           <td class="td-center">${_signCell(h.rev,'approver',ap.fileId||'', ap.name||'',          liveMode)}</td>
-          <td class="td-center"><button onclick="deleteRevEntry(${i})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;padding:2px 4px" title="이력 삭제">🗑</button></td>
+          <td class="td-center"><button onclick="deleteRevEntry(${idx})" style="background:none;border:none;cursor:pointer;color:#ef4444;font-size:13px;padding:2px 4px" title="이력 삭제">🗑</button></td>
         </tr>`;
       }).join('');
     // 서명 이미지 비동기 로드 (n8n proxy → base64 data URL)
