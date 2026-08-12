@@ -256,6 +256,14 @@ function _isSubRev(h) {
 function _cpVisibleEntries(history) {
   return history.map((h, idx) => ({ h, idx })).filter(({ h }) => !_isSubRev(h));
 }
+/* 마이그레이션 이전(구버전) 레거시 데이터 전용: 예전엔 작표·설비일상 서브개정이 전부 'cp' 그룹에
+   "(작표수정)"/"(설비일상수정)" 태그만 붙여서 같이 저장됐다. 병합 표시 시 그 태그가 상대 문서
+   것이면 걸러낸다 — 새로 생성되는 항목은 애초에 자기 그룹(ws/daily)에만 저장되므로 해당 없음. */
+function _isForeignPaneNote(pane, note) {
+  const otherPane = pane === 'ws' ? 'daily' : pane === 'daily' ? 'ws' : null;
+  const otherTag = otherPane && _SUBREV_LABELS[otherPane] && _SUBREV_LABELS[otherPane].tag;
+  return !!otherTag && String(note || '').includes(`(${otherTag})`);
+}
 
 /* 작표만 변경했을 때 붙는 서브 개정(Rev.9-1, 9-2...) — 표시용 rev_display 문자열을 파싱.
    "9-1" → {base:9,sub:1} / "9" → {base:9,sub:0} / 커스텀 코드(AAB 등)·빈값 → fallbackRev를 base로 사용 */
@@ -290,7 +298,7 @@ function _refreshPaneRevisions(pane, carName) {
   )).then(results => {
     const rd = { rev: 0, history: [] };
     results.forEach(({ g, rows }) => {
-      rows.filter(r => r && r.id != null).forEach(r => {
+      rows.filter(r => r && r.id != null && !_isForeignPaneNote(pane, r.note)).forEach(r => {
         const rev = parseInt(r.rev) || 0;
         if (rev > rd.rev) rd.rev = rev;
         rd.history.push({ rev, date: r.rev_date || '', user: r.author || '', desc: r.note || '', docs: pane, dbId: r.id, rev_display: r.rev_display || '', grp: g });
@@ -433,7 +441,7 @@ function openRevModal(pane) {
       _signsMap = {};
       const rd = { rev: 0, history: [] };
       results.forEach(({ g, rows, signs }) => {
-        rows.filter(r => r && r.id != null).forEach(r => {
+        rows.filter(r => r && r.id != null && !_isForeignPaneNote(pane, r.note)).forEach(r => {
           const rev = parseInt(r.rev) || 0;
           if (rev > rd.rev) rd.rev = rev;
           _revDbMap[`${g}:${rev}`] = r;
