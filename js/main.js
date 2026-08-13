@@ -731,7 +731,7 @@ function saveDocument(pane) {
       if (desc === null) {
         doRevise = false; // 설명 입력 취소 → 개정 없이 저장만 진행
       } else {
-        const revDisplay = prompt(`표시 리비전 코드 입력 (선택사항)\n비우면 숫자 Rev.${newRev} 그대로 사용\n예: AAB, 001, AAA`) || '';
+        const revDisplay = (prompt(`표시 리비전 코드 입력 (선택사항)\n비우면 숫자 Rev.${newRev} 그대로 사용\n예: AAB, 001, AAA`) || '').trim() || String(newRev);
         const today = new Date();
         const dateStr = `${today.getFullYear()}.${String(today.getMonth()+1).padStart(2,'0')}.${String(today.getDate()).padStart(2,'0')}`;
         rd.rev = newRev;
@@ -741,8 +741,10 @@ function saveDocument(pane) {
         if (!AIT_API.MOCK && window.currentCarId) {
           AIT_API.addRevision(window.currentCarId, _revGroupKey(pane), {
             rev_date: dateStr, note: desc || '내용 변경', author: '', rev_display: revDisplay
-          }).then(() => _refreshPaneRevisions(pane, carName))   // 서버가 부여한 실제 rev로 재동기화(서명 매칭용)
-            .catch(e => console.warn('개정이력 DB 저장 실패', e));
+          }).then(() => {
+            _refreshPaneRevisions(pane, carName);   // 서버가 부여한 실제 rev로 재동기화(서명 매칭용)
+            if (pane === 'cp') { _refreshPaneRevisions('ws', carName); _refreshPaneRevisions('daily', carName); }
+          }).catch(e => console.warn('개정이력 DB 저장 실패', e));
         }
         alert(`✅ Rev.${newRev}${revDisplay ? ' (' + revDisplay + ')' : ''} 개정 완료\n개정일: ${dateStr}`);
       }
