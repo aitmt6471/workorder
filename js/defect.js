@@ -1,12 +1,27 @@
 /* ══════════════════════════════════════════════════════════════
-   부적합품현황 탭 모듈 (하위 탭: 현황 / 대시보드)
+   부적합품현황 탭 모듈 (하위 탭: 현황 / 추이현황)
    tabs/defect.html 이 로드될 때 initDefectTab() 을 호출한다.
    ══════════════════════════════════════════════════════════════ */
+// ponytail: 08.불량리워크잔량처리 시스템 DB(master_defect_type.category)의 2026-09-08 스냅샷.
+// ait/defect/status·trend-by-type 웹훅이 category를 안 내려줘서 임시로 하드코딩함 —
+// 관리자가 불량유형을 새로 등록/변경하면 이 표가 어긋난다. 웹훅 응답에 category 필드가
+// 추가되면(master_defect_type JOIN) 이 맵은 지우고 서버값을 쓰도록 바꿀 것.
+const DEFECT_CATEGORY_MAP = {
+  '01.외관(VISION)': '기능', '07.WHITE LED(약어WL)(VISION)': '기능',
+  '1. REVERSE CURRENT(VISION)': '기능', '기능': '기능', '기타': '기능', '비전+기능': '기능',
+  'ETCS 바코드불량': '외관', 'MAP렌즈 설체결': '외관', 'TIR렌즈 설체결': '외관',
+  '돌돌이': '외관', '라벨이종': '외관', '랜즈 이물': '외관', '백화': '외관',
+  '부직포 누락': '외관', '스크래치': '외관', '작업불량': '외관', '찍힘': '외관',
+  '부품불량': '외관', 'PART_DEFECT': '외관', '흑점': '외관', '오조립': '외관',
+  '비전': '외관', '외관': '외관'
+};
+
 window.initDefectTab = function initDefectTab() {
   const paneEl = document.getElementById('pane-defect');
   if (!paneEl) return;
 
   let view = 'status';
+  let cat = 'all';
   let gran = 'day';
 
   function pad(n) { return String(n).padStart(2, '0'); }
@@ -24,6 +39,7 @@ window.initDefectTab = function initDefectTab() {
 
   const lineBadge = paneEl.querySelector('#defect-line-badge');
   const dateInput = paneEl.querySelector('#defect-date');
+  const catTabs   = paneEl.querySelector('#defect-cat-tabs');
   const granTabs  = paneEl.querySelector('#defect-gran-tabs');
   const viewStatus    = paneEl.querySelector('#defect-view-status');
   const viewDashboard = paneEl.querySelector('#defect-view-dashboard');
@@ -36,8 +52,15 @@ window.initDefectTab = function initDefectTab() {
     viewStatus.style.display = v === 'status' ? '' : 'none';
     viewDashboard.style.display = v === 'dashboard' ? '' : 'none';
     dateInput.style.display = v === 'status' ? '' : 'none';
+    catTabs.style.display = v === 'status' ? 'flex' : 'none';
     granTabs.style.display = v === 'dashboard' ? 'flex' : 'none';
     window._defectRefresh();
+  };
+  window._defectSetCat = function (c, btn) {
+    cat = c;
+    paneEl.querySelectorAll('#defect-cat-tabs .proc-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    window._defectLoad();
   };
   window._defectRefresh = function () {
     if (view === 'status') window._defectLoad();
@@ -61,6 +84,7 @@ window.initDefectTab = function initDefectTab() {
     const groups = new Map(); // key -> { key, defect_type_code, detail_text, rows: [] }
     rows.forEach(r => {
       if (r.status === 'FALSE_DEFECT') return; // 가성불량 제외
+      if (cat !== 'all' && (DEFECT_CATEGORY_MAP[r.defect_type_code] || '기타') !== cat) return;
       const key = `${r.defect_type_code || ''}|${r.detail_text || ''}`;
       if (!groups.has(key)) groups.set(key, { key, defect_type_code: r.defect_type_code, detail_text: r.detail_text, rows: [] });
       groups.get(key).rows.push(r);
@@ -84,13 +108,13 @@ window.initDefectTab = function initDefectTab() {
       const rep = g.rows.find(r => photoList(r.photo_urls).length > 0) || g.rows[0];
       const photos = photoList(rep.photo_urls).map(u => AIT_API.normalizePhotoUrl(u));
       const photoHtml = photos[0]
-        ? `<img src="${esc(photos[0].replace(/=w\d+/,'=w400'))}" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="window.openLightbox('${esc(photos[0])}','${esc(g.detail_text||'')}')">`
-        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f3f4f6;color:#9ca3af">
+        ? `<img src="${esc(photos[0].replace(/=w\d+/,'=w800'))}" style="max-width:100%;max-height:100%;object-fit:contain;cursor:pointer" onclick="window.openLightbox('${esc(photos[0])}','${esc(g.detail_text||'')}')">`
+        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#9ca3af">
              <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
            </div>`;
       const top = g.rows[0];
       return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
-        <div style="width:100%;aspect-ratio:4/3;background:#f3f4f6;overflow:hidden">${photoHtml}</div>
+        <div style="width:100%;aspect-ratio:4/3;background:#f3f4f6;overflow:hidden;display:flex;align-items:center;justify-content:center">${photoHtml}</div>
         <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;flex:1">
           <div style="font-size:13px;font-weight:800;color:#dc2626;line-height:1.35">${esc(g.detail_text || g.defect_type_code || '(미분류)')}</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;color:#374151">
@@ -228,9 +252,10 @@ window.initDefectTab = function initDefectTab() {
     }
   };
 
-  /* ── 대시보드: 불량유형별 일자별 누적건수 표 ── */
+  /* ── 대시보드: 불량유형별 일자별 누적건수 표 + 파레토 ── */
   const TYPE_TABLE_DAYS = 30;
   const typeTable = paneEl.querySelector('#dash-type-table');
+  const paretoEl = paneEl.querySelector('#dash-pareto');
 
   function last30Days() {
     const out = [];
@@ -242,9 +267,8 @@ window.initDefectTab = function initDefectTab() {
     return out;
   }
 
-  function renderTypeTable(rows) {
+  function buildTypeGroups(rows) {
     const days = last30Days();
-    if (!rows || !rows.length) { typeTable.innerHTML = ''; return; }
     const groups = new Map(); // key -> { label, byDay: {day:cnt} }
     rows.forEach(r => {
       const key = `${r.defect_type_code || ''}|${r.detail_text || ''}`;
@@ -258,8 +282,12 @@ window.initDefectTab = function initDefectTab() {
       return { label: g.label, cumByDay, total: cum };
     });
     list.sort((a, b) => b.total - a.total); // 건수 많은 유형이 위로
-    const maxVal = Math.max.apply(null, list.map(g => g.total).concat([1]));
+    return { days, list };
+  }
 
+  function renderTypeTable(days, list) {
+    if (!list.length) { typeTable.innerHTML = ''; return; }
+    const maxVal = Math.max.apply(null, list.map(g => g.total).concat([1]));
     const headCells = days.map(d => {
       const [, mm, dd] = d.split('-');
       return `<th style="padding:5px 6px;font-size:10px;font-weight:600;color:#fff;text-align:center">${mm}-${dd}</th>`;
@@ -275,15 +303,39 @@ window.initDefectTab = function initDefectTab() {
     typeTable.innerHTML = `<thead><tr style="background:#1e3264"><th style="padding:5px 8px;text-align:left;color:#fff;position:sticky;left:0;background:#1e3264">불량유형</th>${headCells}</tr></thead><tbody>${bodyRows}</tbody>`;
   }
 
+  function renderPareto(list) {
+    if (!list.length) { paretoEl.innerHTML = ''; return; }
+    const grandTotal = list.reduce((s, g) => s + g.total, 0) || 1;
+    const maxVal = list[0].total || 1;
+    let cum = 0;
+    paretoEl.innerHTML = list.map(g => {
+      cum += g.total;
+      const pct = (g.total / grandTotal * 100);
+      const cumPct = (cum / grandTotal * 100);
+      const barPct = (g.total / maxVal * 100).toFixed(1);
+      return `<div style="display:flex;align-items:center;gap:10px;padding:4px 0">
+        <div style="width:200px;flex-shrink:0;font-size:11.5px;color:#374151;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(g.label)}">${esc(g.label)}</div>
+        <div style="flex:1;background:#f1f5f9;border-radius:4px;height:16px;position:relative;overflow:hidden">
+          <div style="width:${barPct}%;background:#2563eb;height:100%;border-radius:4px"></div>
+        </div>
+        <div style="width:110px;flex-shrink:0;text-align:right;font-size:11px;color:#1e293b"><b>${g.total}건</b> <span style="color:#9ca3af">(${pct.toFixed(1)}%)</span></div>
+        <div style="width:70px;flex-shrink:0;text-align:right;font-size:10.5px;color:#94a3b8">누적 ${cumPct.toFixed(0)}%</div>
+      </div>`;
+    }).join('');
+  }
+
   window._dashLoadByType = async function () {
     const line = resolveLine();
-    if (!line || !AIT_API.getDefectTrendByType) { typeTable.innerHTML = ''; return; }
+    if (!line || !AIT_API.getDefectTrendByType) { typeTable.innerHTML = ''; paretoEl.innerHTML = ''; return; }
     try {
       const rows = await AIT_API.getDefectTrendByType(line, TYPE_TABLE_DAYS);
-      renderTypeTable(rows);
+      const { days, list } = buildTypeGroups(rows || []);
+      renderTypeTable(days, list);
+      renderPareto(list);
     } catch (e) {
       console.warn('불량유형별 추이 로드 실패', e);
       typeTable.innerHTML = '';
+      paretoEl.innerHTML = '';
     }
   };
 

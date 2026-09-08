@@ -1,4 +1,4 @@
-<!-- 부적합품현황 (하위 탭: 현황 / 대시보드) -->
+<!-- 부적합품현황 (하위 탭: 현황 / 추이현황) -->
 <div class="tab-toolbar">
   <div style="display:flex;align-items:center;gap:8px">
     <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">부적합품현황</span>
@@ -6,9 +6,14 @@
   </div>
   <div id="defect-subtabs" style="display:flex;gap:4px">
     <button data-view="status" class="proc-btn active" onclick="window._defectSetView('status',this)">현황</button>
-    <button data-view="dashboard" class="proc-btn" onclick="window._defectSetView('dashboard',this)">대시보드</button>
+    <button data-view="dashboard" class="proc-btn" onclick="window._defectSetView('dashboard',this)">추이현황</button>
   </div>
   <div style="flex:1"></div>
+  <div id="defect-cat-tabs" style="display:flex;gap:4px">
+    <button data-cat="all" class="proc-btn active" onclick="window._defectSetCat('all',this)">전체</button>
+    <button data-cat="외관" class="proc-btn" onclick="window._defectSetCat('외관',this)">외관</button>
+    <button data-cat="기능" class="proc-btn" onclick="window._defectSetCat('기능',this)">기능</button>
+  </div>
   <input id="defect-date" type="date" onchange="window._defectLoad()"
     style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit">
   <div id="defect-gran-tabs" style="display:none;gap:4px">
@@ -25,13 +30,18 @@
   <div id="defect-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px"></div>
 </div>
 
-<!-- 대시보드 -->
+<!-- 추이현황 -->
 <div id="defect-view-dashboard" style="padding:16px;display:none">
   <div id="dash-empty" style="display:none;text-align:center;padding:60px 0;color:#9ca3af;font-size:13px"></div>
   <div id="dash-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px"></div>
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px">
     <div id="dash-chart-title" style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">누적 발생건수 추이</div>
     <div style="width:100%;overflow-x:auto"><svg id="dash-svg" viewBox="0 0 940 340" style="width:100%;min-width:640px;height:auto;display:block"></svg></div>
+  </div>
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;margin-top:14px">
+    <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:2px">불량유형 파레토 (외관+기능 통합, 최근 30일)</div>
+    <div style="font-size:11px;color:#9ca3af;margin-bottom:10px">가장 많이 발생한 불량유형 순 · 누적 비율(%)</div>
+    <div id="dash-pareto"></div>
   </div>
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;margin-top:14px">
     <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">불량유형별 일자별 누적건수 (최근 30일)</div>
