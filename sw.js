@@ -19,8 +19,8 @@ self.addEventListener('push', (e) => {
     const body = line ? `${line}의 새 출고요청이 도착했습니다.` : '새 출고요청이 도착했습니다.';
     await self.registration.showNotification('출고요청', {
       body,
-      icon: 'ait-logo.png',
-      badge: 'ait-logo.png',
+      icon: 'AIT_로고_투명배경.png',
+      badge: 'AIT_로고_투명배경.png',
       vibrate: [120, 60, 120],
       data: { url: 'shipping.html' }
     });

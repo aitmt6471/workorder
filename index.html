@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>공정문서 관리시스템</title>
   <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=20260908customermode1">
+<link rel="stylesheet" href="style.css?v=20260908defectsubtab1">
 <script>
   (function() {
     const token = localStorage.getItem('ait_token');
@@ -26,7 +26,7 @@
   <!-- ── 좌측 사이드바 ── -->
   <aside class="sidebar">
     <div class="sidebar-logo">
-      <img src="ait-logo.png" alt="AIT" class="sidebar-logo-img">
+      <img src="AIT_로고_투명배경.png" alt="AIT" class="sidebar-logo-img">
       <div class="sidebar-logo-text">공정문서<br>관리시스템</div>
     </div>
 
@@ -36,10 +36,6 @@
     </div>
 
     <nav class="sidebar-nav">
-      <div class="nav-item" data-tab="dashboard" onclick="showTab('dashboard',this)">
-        <span class="nav-icon">📶</span>
-        <span class="nav-label">대시보드</span>
-      </div>
       <div class="nav-item active" data-tab="cp" onclick="showTab('cp',this)">
         <span class="nav-icon">📋</span>
         <span class="nav-label">CP (관리계획서)</span>
@@ -101,7 +97,6 @@
 
   <!-- ── 메인 콘텐츠 ── -->
   <main class="main-content">
-    <div id="pane-dashboard" class="pane"></div>
     <div id="pane-cp" class="pane active"></div>
     <div id="pane-ws" class="pane"></div>
     <div id="pane-daily" class="pane"></div>
@@ -423,7 +418,7 @@
       <div>
         <div style="font-size:13px;font-weight:700;color:#1e3264;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid #e5e7eb">고객모드</div>
         <label style="display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer">
-          <span style="font-size:12.5px;color:#374151">활성화 시 고객 앞에서 부적합품현황 · 대시보드 탭을 숨깁니다</span>
+          <span style="font-size:12.5px;color:#374151">활성화 시 고객 앞에서 부적합품현황 탭을 숨깁니다</span>
           <input type="checkbox" id="settings-customer-mode" onchange="toggleCustomerMode(this.checked)" style="width:36px;height:20px;accent-color:#1e3264;flex-shrink:0">
         </label>
       </div>
@@ -437,16 +432,15 @@
 
 <script src="js/api.js?v=20260729a"></script>
 <script src="js/cp.js?v=20260729variantfix1"></script>
-<script src="js/main.js?v=20260908customermode1"></script>
+<script src="js/main.js?v=20260908defectsubtab1"></script>
 <script src="js/ws.js?v=20260523a"></script>
 <script src="js/spc.js?v=20260731ucl1"></script>
 <script src="js/print_cp_gentex.js?v=20260812revsplit1"></script>
-<script src="js/dashboard.js?v=20260908a"></script>
-<script src="js/defect.js?v=20260908a"></script>
+<script src="js/defect.js?v=20260908b"></script>
 
 <!-- 탭 콘텐츠 fetch 로드 -->
 <script>
-const TABS = ['dashboard','cp','ws','daily','imf','spc','ms','spec','insp','qpoint','defect'];
+const TABS = ['cp','ws','daily','imf','spc','ms','spec','insp','qpoint','defect'];
 const loaded = {};
 async function loadTab(id) {
   if (loaded[id]) return;

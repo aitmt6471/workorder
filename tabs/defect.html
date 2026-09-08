@@ -1,16 +1,26 @@
-<!-- 부적합품현황 -->
+<!-- 부적합품현황 (하위 탭: 현황 / 대시보드) -->
 <div class="tab-toolbar">
   <div style="display:flex;align-items:center;gap:8px">
     <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">부적합품현황</span>
     <span id="defect-line-badge" style="font-size:12px;color:#6b7280"></span>
   </div>
+  <div id="defect-subtabs" style="display:flex;gap:4px">
+    <button data-view="status" class="proc-btn active" onclick="window._defectSetView('status',this)">현황</button>
+    <button data-view="dashboard" class="proc-btn" onclick="window._defectSetView('dashboard',this)">대시보드</button>
+  </div>
   <div style="flex:1"></div>
   <input id="defect-date" type="date" onchange="window._defectLoad()"
     style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit">
-  <button class="btn btn-ghost btn-sm" onclick="window._defectLoad()">🔄 새로고침</button>
+  <div id="defect-gran-tabs" style="display:none;gap:4px">
+    <button data-gran="day"   class="proc-btn active" onclick="window._dashSetGran('day',this)">일별</button>
+    <button data-gran="month" class="proc-btn" onclick="window._dashSetGran('month',this)">월별</button>
+    <button data-gran="year"  class="proc-btn" onclick="window._dashSetGran('year',this)">연도별</button>
+  </div>
+  <button class="btn btn-ghost btn-sm" onclick="window._defectRefresh()">🔄 새로고침</button>
 </div>
 
-<div style="padding:0 16px 16px">
+<!-- 현황 -->
+<div id="defect-view-status" style="padding:0 16px 16px">
   <div id="defect-empty" style="display:none;text-align:center;padding:60px 0;color:#9ca3af;font-size:13px"></div>
   <div style="overflow-x:auto">
     <table id="defect-table" style="border-collapse:collapse;font-size:12px;width:100%;min-width:960px">
@@ -30,6 +40,16 @@
       </thead>
       <tbody id="defect-tbody"></tbody>
     </table>
+  </div>
+</div>
+
+<!-- 대시보드 -->
+<div id="defect-view-dashboard" style="padding:16px;display:none">
+  <div id="dash-empty" style="display:none;text-align:center;padding:60px 0;color:#9ca3af;font-size:13px"></div>
+  <div id="dash-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px"></div>
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px">
+    <div id="dash-chart-title" style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">누적 발생건수 추이</div>
+    <div style="width:100%;overflow-x:auto"><svg id="dash-svg" viewBox="0 0 940 340" style="width:100%;min-width:640px;height:auto;display:block"></svg></div>
   </div>
 </div>
 

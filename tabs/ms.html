@@ -1226,7 +1226,7 @@ window.print_ms = async function() {
     if(_rd){try{revDate=new Date(_rd).toLocaleDateString('ko-KR');}catch(_){revDate=String(_rd).slice(0,10);}}
   } catch(e){}
   const _signCell=(imgUrl,name)=>{const img=imgUrl?`<img src="${imgUrl}" style="max-height:24px;max-width:44px;object-fit:contain;display:block;margin:0 auto" onerror="this.style.display='none'">`:'';return(img||name)?`<div style="font-size:7px;color:#374151">${name}</div>${img}`:'';};
-  const logoUrl=window.location.origin+window.location.pathname.replace(/\/[^/]*$/,'/ait-logo.png');
+  const logoUrl=window.location.origin+window.location.pathname.replace(/\/[^/]*$/,'/AIT_로고_투명배경.png');
 
   if(!msData.length){alert('마스터샘플 데이터가 없습니다.');return;}
 

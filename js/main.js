@@ -98,7 +98,7 @@ function applyCustomerMode(enabled) {
   document.body.classList.toggle('ait-customer-mode', !!enabled);
   if (enabled) {
     const active = document.querySelector('.pane.active');
-    if (active && ['pane-dashboard', 'pane-defect'].includes(active.id)) {
+    if (active && active.id === 'pane-defect') {
       const nav = document.querySelector('.nav-item[data-tab="cp"]');
       if (nav) showTab('cp', nav);
     }

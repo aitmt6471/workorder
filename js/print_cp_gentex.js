@@ -106,7 +106,7 @@ window.print_cp_gentex = async function() {
 
   const dUrl = fid => (fid && typeof AIT_API.driveUrl === 'function') ? AIT_API.driveUrl(fid) : '';
   const safe = v   => (!v || v === 'null') ? '' : String(v);
-  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/ait-logo.png');
+  const logoUrl = window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/AIT_로고_투명배경.png');
 
   // ── 갑지 (print_cp와 동일 구조, 라벨만 영문) ─────────────────────────────
   const stageBox = (label, val) =>

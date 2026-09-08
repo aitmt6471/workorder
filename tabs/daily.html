@@ -1229,7 +1229,7 @@ window.print_daily = async function() {
     if(_rd){try{revDate=new Date(_rd).toLocaleDateString('ko-KR');}catch(_){revDate=String(_rd).slice(0,10);}}
   } catch(e){}
   const _signCell=(imgUrl,name)=>{const img=imgUrl?`<img src="${imgUrl}" style="max-height:24px;max-width:44px;object-fit:contain;display:block;margin:0 auto" onerror="this.style.display='none'">`:'';return(img||name)?`<div style="font-size:7px;color:#374151">${name}</div>${img}`:'';};
-  const logoUrl=window.location.origin+window.location.pathname.replace(/\/[^/]*$/,'/ait-logo.png');
+  const logoUrl=window.location.origin+window.location.pathname.replace(/\/[^/]*$/,'/AIT_로고_투명배경.png');
 
   const TD  = (v,style='')=>`<td style="border:1px solid #b8c4d8;padding:2px 3px;font-size:8px;vertical-align:middle;text-align:center;${style}">${v}</td>`;
   const TDL = (v,style='')=>`<td style="border:1px solid #b8c4d8;padding:2px 4px;font-size:8px;vertical-align:middle;${style}">${v}</td>`;
