@@ -210,7 +210,7 @@ const AIT_API = (() => {
     getDailyEquipPhotos:  (carId, equipId) => _get('ait/daily/equip/photos', { carId, equipId }),
     syncDailyEquipPhotos: (carId, equipId, photos) => _post('ait/daily/equip/photos/sync', { carId, equipId, photos }),
     driveUrl:         (fileId)  => `https://lh3.googleusercontent.com/d/${fileId}=w1200`,
-    normalizePhotoUrl:(url)     => { if(!url) return url; const m=url.match(/(?:lh3\.googleusercontent\.com\/d\/|drive\.google\.com\/(?:uc\?.*[?&]id=|thumbnail\?.*[?&]id=))([^?&\s=]+)/); return m ? `https://lh3.googleusercontent.com/d/${m[1]}=w1200` : url; },
+    normalizePhotoUrl:(url)     => { if(!url) return url; const m=url.match(/(?:lh3\.googleusercontent\.com\/d\/|drive\.google\.com\/(?:uc\?.*[?&]id=|thumbnail\?.*[?&]id=|file\/d\/))([^?&\s=\/]+)/); return m ? `https://lh3.googleusercontent.com/d/${m[1]}=w1200` : url; },
 
     /* ── 커스텀 항목 메타 ─────────────────────── */
     getDailyItems:    (carId)        => _get('ait/daily/items', { carId }),
@@ -233,6 +233,7 @@ const AIT_API = (() => {
     /* ── 부적합품현황 / 대시보드 ─────────────── */
     getDefectStatus:  (line, date)        => _get('ait/defect/status', { line, date }),
     getDefectTrend:   (line, granularity) => _get('ait/defect/trend', { line, granularity }),
+    getDefectTrendByType: (line, days)    => _get('ait/defect/trend-by-type', { line, days }),
 
     /* ── 고객모드 ──────────────────────────────── */
     getCustomerMode:  ()        => _get('ait/settings/customer-mode'),
@@ -384,7 +385,7 @@ const AIT_API = (() => {
     getDailyEquipPhotos:  (cId, eId)         => _real.getDailyEquipPhotos(cId, eId),
     syncDailyEquipPhotos: (cId, eId, photos) => _real.syncDailyEquipPhotos(cId, eId, photos),
     driveUrl:           (fileId)     => `https://lh3.googleusercontent.com/d/${fileId}=w1200`,
-    normalizePhotoUrl:  (url)        => { if(!url) return url; const m=url.match(/(?:lh3\.googleusercontent\.com\/d\/|drive\.google\.com\/(?:uc\?.*[?&]id=|thumbnail\?.*[?&]id=))([^?&\s=]+)/); return m ? `https://lh3.googleusercontent.com/d/${m[1]}=w1200` : url; },
+    normalizePhotoUrl:  (url)        => { if(!url) return url; const m=url.match(/(?:lh3\.googleusercontent\.com\/d\/|drive\.google\.com\/(?:uc\?.*[?&]id=|thumbnail\?.*[?&]id=|file\/d\/))([^?&\s=\/]+)/); return m ? `https://lh3.googleusercontent.com/d/${m[1]}=w1200` : url; },
     getCpMeta:          (carId)        => _real.getCpMeta(carId),
     saveCpMeta:         (carId, data)  => _real.saveCpMeta(carId, data),
     getWsMgmt:          (carId)        => _real.getWsMgmt(carId),
@@ -406,6 +407,7 @@ const AIT_API = (() => {
     /* 부적합품현황 / 대시보드 */
     getDefectStatus:    (line, date)        => _real.getDefectStatus(line, date),
     getDefectTrend:     (line, granularity) => _real.getDefectTrend(line, granularity),
+    getDefectTrendByType: (line, days)      => _real.getDefectTrendByType(line, days),
     /* 고객모드 */
     getCustomerMode:    ()          => _real.getCustomerMode(),
     setCustomerMode:    (enabled)   => _real.setCustomerMode(enabled),

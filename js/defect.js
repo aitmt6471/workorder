@@ -41,10 +41,10 @@ window.initDefectTab = function initDefectTab() {
   };
   window._defectRefresh = function () {
     if (view === 'status') window._defectLoad();
-    else window._dashLoad();
+    else { window._dashLoad(); window._dashLoadByType(); }
   };
 
-  /* ── 현황 (일자별 목록) ── */
+  /* ── 현황 (사진 카드 그리드, 불량유형별 그룹) ── */
   function photoList(raw) {
     if (!raw) return [];
     if (Array.isArray(raw)) return raw;
@@ -54,57 +54,77 @@ window.initDefectTab = function initDefectTab() {
     return s.split(',').map(u => u.trim()).filter(Boolean);
   }
 
-  const tbody = paneEl.querySelector('#defect-tbody');
+  const cardsEl = paneEl.querySelector('#defect-cards');
   const emptyEl = paneEl.querySelector('#defect-empty');
-  const table = paneEl.querySelector('#defect-table');
 
-  function renderStatus(rows) {
-    if (!rows || !rows.length) {
-      table.style.display = 'none';
+  function groupForCards(rows) {
+    const groups = new Map(); // key -> { key, defect_type_code, detail_text, rows: [] }
+    rows.forEach(r => {
+      if (r.status === 'FALSE_DEFECT') return; // 가성불량 제외
+      const key = `${r.defect_type_code || ''}|${r.detail_text || ''}`;
+      if (!groups.has(key)) groups.set(key, { key, defect_type_code: r.defect_type_code, detail_text: r.detail_text, rows: [] });
+      groups.get(key).rows.push(r);
+    });
+    const list = Array.from(groups.values());
+    list.forEach(g => g.rows.sort((a, b) => String(b.occurred_at || '').localeCompare(String(a.occurred_at || ''))));
+    list.sort((a, b) => String(b.rows[0]?.occurred_at || '').localeCompare(String(a.rows[0]?.occurred_at || '')));
+    return list;
+  }
+
+  function renderCards(rows) {
+    const groups = groupForCards(rows);
+    if (!groups.length) {
+      cardsEl.innerHTML = '';
       emptyEl.style.display = '';
       emptyEl.textContent = '해당 날짜에 등록된 부적합품이 없습니다.';
       return;
     }
-    table.style.display = '';
     emptyEl.style.display = 'none';
-    tbody.innerHTML = rows.map(r => {
-      const photos = photoList(r.photo_urls).map(u => AIT_API.normalizePhotoUrl(u));
-      const thumb = photos[0]
-        ? `<img src="${esc(photos[0].replace(/=w\d+/,'=w200'))}" style="width:44px;height:44px;object-fit:cover;border-radius:4px;cursor:pointer" onclick="window.openLightbox('${esc(photos[0])}','${esc(r.part_no||'')}')">`
-        : '<span style="color:#d1d5db">-</span>';
-      const statusColor = r.status === '완료' || r.status === 'done' ? '#16a34a' : (r.status === '진행중' || r.status === 'processing' ? '#d97706' : '#6b7280');
-      return `<tr style="border-bottom:1px solid #f0f0f0">
-        <td style="padding:7px 6px;white-space:nowrap;text-align:center">${esc(r.occurred_at || '')}</td>
-        <td style="padding:7px 6px;white-space:nowrap;text-align:center;font-weight:600">${esc(r.part_no || '')}</td>
-        <td style="padding:7px 6px;white-space:nowrap;text-align:center">${esc(r.product_model || '')}</td>
-        <td style="padding:7px 6px;white-space:nowrap;text-align:center">${esc(r.color || '')}</td>
-        <td style="padding:7px 6px;white-space:nowrap;text-align:center">${esc(r.vehicle_model || '')}</td>
-        <td style="padding:7px 6px;white-space:nowrap;text-align:center">${esc(r.defect_type_code || '')}</td>
-        <td style="padding:7px 6px">${esc(r.detail_text || '')}</td>
-        <td style="padding:7px 6px;text-align:center">${thumb}</td>
-        <td style="padding:7px 6px;white-space:nowrap;text-align:center;color:${statusColor};font-weight:600">${esc(r.status || '')}</td>
-        <td style="padding:7px 6px;white-space:nowrap;text-align:center;color:#6b7280">${esc(r.source_type || '')}</td>
-      </tr>`;
+    cardsEl.innerHTML = groups.map(g => {
+      const rep = g.rows.find(r => photoList(r.photo_urls).length > 0) || g.rows[0];
+      const photos = photoList(rep.photo_urls).map(u => AIT_API.normalizePhotoUrl(u));
+      const photoHtml = photos[0]
+        ? `<img src="${esc(photos[0].replace(/=w\d+/,'=w400'))}" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="window.openLightbox('${esc(photos[0])}','${esc(g.detail_text||'')}')">`
+        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:#f3f4f6;color:#9ca3af">
+             <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+           </div>`;
+      const top = g.rows[0];
+      return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="width:100%;aspect-ratio:4/3;background:#f3f4f6;overflow:hidden">${photoHtml}</div>
+        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;flex:1">
+          <div style="font-size:13px;font-weight:800;color:#dc2626;line-height:1.35">${esc(g.detail_text || g.defect_type_code || '(미분류)')}</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;color:#374151">
+            <div><span style="color:#9ca3af">품번</span> ${esc(top.part_no || '-')}</div>
+            <div><span style="color:#9ca3af">품명</span> ${esc(top.product_model || '-')}</div>
+            <div><span style="color:#9ca3af">색상</span> ${esc(top.color || '-')}</div>
+            <div><span style="color:#9ca3af">차종</span> ${esc(top.vehicle_model || '-')}</div>
+          </div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:6px;border-top:1px dashed #e5e7eb">
+            <span style="font-size:10.5px;color:#6b7280">${esc(top.occurred_at || '')}</span>
+            <span style="font-size:10.5px;font-weight:700;color:#fff;background:#1e3264;border-radius:10px;padding:2px 8px">누적 ${g.rows.length}건</span>
+          </div>
+        </div>
+      </div>`;
     }).join('');
   }
 
   window._defectLoad = async function () {
     const line = resolveLine();
     lineBadge.textContent = line ? `· 라인: ${line}` : '· 라인 미등록 아이템';
-    if (!line) { renderStatus([]); emptyEl.textContent = '이 아이템에는 라인(linename)이 등록되어 있지 않습니다.'; return; }
+    if (!line) { cardsEl.innerHTML = ''; emptyEl.style.display = ''; emptyEl.textContent = '이 아이템에는 라인(linename)이 등록되어 있지 않습니다.'; return; }
     const date = dateInput.value || todayStr();
     try {
       const rows = await AIT_API.getDefectStatus(line, date);
-      renderStatus(rows);
+      renderCards(rows);
     } catch (e) {
       console.warn('부적합품현황 로드 실패', e);
-      table.style.display = 'none';
+      cardsEl.innerHTML = '';
       emptyEl.style.display = '';
       emptyEl.textContent = '데이터 로드 실패: ' + (e.message || String(e));
     }
   };
 
-  /* ── 대시보드 (일/월/연 누적 추이) ── */
+  /* ── 대시보드: 총합 추이 (일/월/연 누적) ── */
   function labelFor(period) {
     if (!period) return '';
     const parts = String(period).split('-');
@@ -205,6 +225,65 @@ window.initDefectTab = function initDefectTab() {
       console.warn('대시보드 로드 실패', e);
       dashSvg.innerHTML = ''; dashTiles.innerHTML = '';
       dashEmpty.style.display = ''; dashEmpty.textContent = '데이터 로드 실패: ' + (e.message || String(e));
+    }
+  };
+
+  /* ── 대시보드: 불량유형별 일자별 누적건수 표 ── */
+  const TYPE_TABLE_DAYS = 30;
+  const typeTable = paneEl.querySelector('#dash-type-table');
+
+  function last30Days() {
+    const out = [];
+    const now = new Date();
+    for (let i = TYPE_TABLE_DAYS - 1; i >= 0; i--) {
+      const d = new Date(now); d.setDate(now.getDate() - i);
+      out.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
+    }
+    return out;
+  }
+
+  function renderTypeTable(rows) {
+    const days = last30Days();
+    if (!rows || !rows.length) { typeTable.innerHTML = ''; return; }
+    const groups = new Map(); // key -> { label, byDay: {day:cnt} }
+    rows.forEach(r => {
+      const key = `${r.defect_type_code || ''}|${r.detail_text || ''}`;
+      if (!groups.has(key)) groups.set(key, { label: r.detail_text || r.defect_type_code || '(미분류)', byDay: {} });
+      const g = groups.get(key);
+      g.byDay[r.day] = (g.byDay[r.day] || 0) + (parseInt(r.cnt) || 0);
+    });
+    const list = Array.from(groups.values()).map(g => {
+      let cum = 0;
+      const cumByDay = days.map(d => (cum += (g.byDay[d] || 0)));
+      return { label: g.label, cumByDay, total: cum };
+    });
+    list.sort((a, b) => b.total - a.total); // 건수 많은 유형이 위로
+    const maxVal = Math.max.apply(null, list.map(g => g.total).concat([1]));
+
+    const headCells = days.map(d => {
+      const [, mm, dd] = d.split('-');
+      return `<th style="padding:5px 6px;font-size:10px;font-weight:600;color:#fff;text-align:center">${mm}-${dd}</th>`;
+    }).join('');
+    const bodyRows = list.map(g => {
+      const cells = g.cumByDay.map(v => {
+        const alpha = v > 0 ? Math.min(0.35, 0.08 + (v / maxVal) * 0.27) : 0;
+        const bg = v > 0 ? `background:rgba(37,99,235,${alpha.toFixed(2)})` : '';
+        return `<td style="padding:5px 6px;text-align:center;color:#1e293b;${bg}">${v > 0 ? v : ''}</td>`;
+      }).join('');
+      return `<tr><td style="padding:5px 8px;font-weight:600;color:#374151;white-space:nowrap;position:sticky;left:0;background:#fff;border-right:1px solid #e5e7eb">${esc(g.label)}</td>${cells}</tr>`;
+    }).join('');
+    typeTable.innerHTML = `<thead><tr style="background:#1e3264"><th style="padding:5px 8px;text-align:left;color:#fff;position:sticky;left:0;background:#1e3264">불량유형</th>${headCells}</tr></thead><tbody>${bodyRows}</tbody>`;
+  }
+
+  window._dashLoadByType = async function () {
+    const line = resolveLine();
+    if (!line || !AIT_API.getDefectTrendByType) { typeTable.innerHTML = ''; return; }
+    try {
+      const rows = await AIT_API.getDefectTrendByType(line, TYPE_TABLE_DAYS);
+      renderTypeTable(rows);
+    } catch (e) {
+      console.warn('불량유형별 추이 로드 실패', e);
+      typeTable.innerHTML = '';
     }
   };
 

@@ -19,28 +19,10 @@
   <button class="btn btn-ghost btn-sm" onclick="window._defectRefresh()">🔄 새로고침</button>
 </div>
 
-<!-- 현황 -->
+<!-- 현황 (사진 카드 그리드) -->
 <div id="defect-view-status" style="padding:0 16px 16px">
   <div id="defect-empty" style="display:none;text-align:center;padding:60px 0;color:#9ca3af;font-size:13px"></div>
-  <div style="overflow-x:auto">
-    <table id="defect-table" style="border-collapse:collapse;font-size:12px;width:100%;min-width:960px">
-      <thead>
-        <tr style="background:#1e3264;color:#fff">
-          <th style="padding:8px 6px;white-space:nowrap">발생시각</th>
-          <th style="padding:8px 6px;white-space:nowrap">품번</th>
-          <th style="padding:8px 6px;white-space:nowrap">제품모델</th>
-          <th style="padding:8px 6px;white-space:nowrap">색상</th>
-          <th style="padding:8px 6px;white-space:nowrap">차종</th>
-          <th style="padding:8px 6px;white-space:nowrap">불량유형</th>
-          <th style="padding:8px 6px;text-align:left">상세내용</th>
-          <th style="padding:8px 6px;white-space:nowrap">사진</th>
-          <th style="padding:8px 6px;white-space:nowrap">상태</th>
-          <th style="padding:8px 6px;white-space:nowrap">등록경로</th>
-        </tr>
-      </thead>
-      <tbody id="defect-tbody"></tbody>
-    </table>
-  </div>
+  <div id="defect-cards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px"></div>
 </div>
 
 <!-- 대시보드 -->
@@ -50,6 +32,12 @@
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px">
     <div id="dash-chart-title" style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">누적 발생건수 추이</div>
     <div style="width:100%;overflow-x:auto"><svg id="dash-svg" viewBox="0 0 940 340" style="width:100%;min-width:640px;height:auto;display:block"></svg></div>
+  </div>
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;margin-top:14px">
+    <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">불량유형별 일자별 누적건수 (최근 30일)</div>
+    <div style="width:100%;overflow-x:auto">
+      <table id="dash-type-table" style="border-collapse:collapse;font-size:11px;white-space:nowrap"></table>
+    </div>
   </div>
 </div>
 
