@@ -35,19 +35,22 @@
   <div id="dash-empty" style="display:none;text-align:center;padding:60px 0;color:#9ca3af;font-size:13px"></div>
   <div id="dash-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px"></div>
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px">
-    <div id="dash-chart-title" style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">누적 발생건수 추이</div>
+    <div id="dash-chart-title" style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">발생건수 추이</div>
     <div style="width:100%;overflow-x:auto"><svg id="dash-svg" viewBox="0 0 940 340" style="width:100%;min-width:640px;height:auto;display:block"></svg></div>
   </div>
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;margin-top:14px">
-    <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:2px">불량유형 파레토 (외관+기능 통합, 최근 30일)</div>
-    <div style="font-size:11px;color:#9ca3af;margin-bottom:10px">가장 많이 발생한 불량유형 순 · 누적 비율(%)</div>
-    <div id="dash-pareto"></div>
-  </div>
-  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;margin-top:14px">
-    <div style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">불량유형별 일자별 누적건수 (최근 30일)</div>
-    <div style="width:100%;overflow-x:auto">
-      <table id="dash-type-table" style="border-collapse:collapse;font-size:11px;white-space:nowrap"></table>
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px">
+      <div>
+        <div id="dash-pareto-title" style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:2px">불량유형 파레토</div>
+        <div style="font-size:11px;color:#9ca3af">가장 많이 발생한 불량유형 순 · 누적 비율(%)</div>
+      </div>
+      <div id="dash-pareto-cat-tabs" style="display:flex;gap:4px;flex-shrink:0">
+        <button data-pcat="all" class="proc-btn active" onclick="window._dashSetParetoCat('all',this)">전체</button>
+        <button data-pcat="외관" class="proc-btn" onclick="window._dashSetParetoCat('외관',this)">외관</button>
+        <button data-pcat="기능" class="proc-btn" onclick="window._dashSetParetoCat('기능',this)">기능</button>
+      </div>
     </div>
+    <div id="dash-pareto"></div>
   </div>
 </div>
 

@@ -177,36 +177,29 @@ window.initDefectTab = function initDefectTab() {
   }
 
   function drawChart(rows) {
-    const W = 940, H = 340, padL = 54, padR = 24, padT = 16, padB = 40;
+    const W = 940, H = 340, padL = 44, padR = 24, padT = 16, padB = 40;
     const pw = W - padL - padR, ph = H - padT - padB;
     const n = rows.length;
-    let cum = 0;
-    const cumVals = rows.map(r => (cum += (parseInt(r.cnt) || 0)));
     const cnts = rows.map(r => parseInt(r.cnt) || 0);
     const maxCnt = Math.max.apply(null, cnts.concat([1]));
-    const maxCum = Math.max.apply(null, cumVals.concat([1]));
 
     function X(i) { return padL + (n <= 1 ? pw / 2 : (i / (n - 1)) * pw); }
-    function Ybar(c) { return padT + (1 - c / maxCum) * ph; }
-    function barW() { return Math.max(2, (pw / Math.max(n, 1)) * 0.5); }
+    function Ybar(c) { return padT + (1 - c / maxCnt) * ph; }
+    function barW() { return Math.max(3, (pw / Math.max(n, 1)) * 0.6); }
 
     let svgHtml = '';
     for (let k = 0; k <= 4; k++) {
-      const v = maxCum * k / 4, y = Ybar(v);
+      const v = maxCnt * k / 4, y = Ybar(v);
       svgHtml += `<line x1="${padL}" y1="${y}" x2="${W - padR}" y2="${y}" stroke="#eef2f7"/>`;
       svgHtml += `<text x="${padL - 6}" y="${y + 3}" text-anchor="end" font-size="10" fill="#94a3b8">${Math.round(v)}</text>`;
     }
     const bw = barW();
     rows.forEach((r, i) => {
       const c = cnts[i];
-      const barH = maxCnt ? (c / maxCnt) * ph * 0.55 : 0;
+      const barH = maxCnt ? (c / maxCnt) * ph : 0;
       const x = X(i) - bw / 2, y = padT + ph - barH;
-      svgHtml += `<rect x="${x}" y="${y}" width="${bw}" height="${barH}" fill="#bfdbfe"><title>${labelFor(r.period)}: ${c}건</title></rect>`;
-    });
-    const pts = cumVals.map((v, i) => `${X(i)},${Ybar(v)}`).join(' ');
-    svgHtml += `<polyline points="${pts}" fill="none" stroke="#1e3264" stroke-width="2"/>`;
-    cumVals.forEach((v, i) => {
-      svgHtml += `<circle cx="${X(i)}" cy="${Ybar(v)}" r="2.6" fill="#1e3264"><title>${labelFor(rows[i].period)} 누적: ${v}건</title></circle>`;
+      svgHtml += `<rect x="${x}" y="${y}" width="${bw}" height="${barH}" fill="#60a5fa" rx="2"><title>${labelFor(r.period)}: ${c}건</title></rect>`;
+      if (c > 0) svgHtml += `<text x="${X(i)}" y="${y - 4}" text-anchor="middle" font-size="9" fill="#475569">${c}</text>`;
     });
     const step = Math.max(1, Math.ceil(n / 12));
     for (let i = 0; i < n; i += step) {
@@ -221,6 +214,7 @@ window.initDefectTab = function initDefectTab() {
     paneEl.querySelectorAll('#defect-gran-tabs .proc-btn').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
     window._dashLoad();
+    window._dashLoadByType();
   };
 
   window._dashLoad = async function () {
@@ -243,7 +237,7 @@ window.initDefectTab = function initDefectTab() {
       const total = rows.reduce((s, r) => s + (parseInt(r.cnt) || 0), 0);
       const maxRow = rows.reduce((m, r) => (parseInt(r.cnt) || 0) > (parseInt(m?.cnt) || -1) ? r : m, null);
       renderTiles(rows, total, maxRow);
-      dashChartTitle.textContent = `누적 발생건수 추이 — ${gran === 'day' ? '일별' : gran === 'month' ? '월별' : '연도별'}`;
+      dashChartTitle.textContent = `발생건수 추이 — ${gran === 'day' ? '일별' : gran === 'month' ? '월별' : '연도별'}`;
       drawChart(rows);
     } catch (e) {
       console.warn('대시보드 로드 실패', e);
@@ -252,59 +246,30 @@ window.initDefectTab = function initDefectTab() {
     }
   };
 
-  /* ── 대시보드: 불량유형별 일자별 누적건수 표 + 파레토 ── */
-  const TYPE_TABLE_DAYS = 30;
-  const typeTable = paneEl.querySelector('#dash-type-table');
+  /* ── 추이현황: 불량유형 파레토 (외관/기능 필터 + 일/월/연 기간창) ── */
+  // gran(상단 일별/월별/연도별)에 맞춰 파레토 집계 기간창도 함께 늘어난다.
+  const PARETO_DAYS = { day: 30, month: 365, year: 1095 };
+  const PARETO_WINDOW_LABEL = { day: '최근 30일', month: '최근 12개월', year: '최근 3년' };
+  let paretoCat = 'all';
   const paretoEl = paneEl.querySelector('#dash-pareto');
+  const paretoTitleEl = paneEl.querySelector('#dash-pareto-title');
+  let _paretoRawRows = [];
 
-  function last30Days() {
-    const out = [];
-    const now = new Date();
-    for (let i = TYPE_TABLE_DAYS - 1; i >= 0; i--) {
-      const d = new Date(now); d.setDate(now.getDate() - i);
-      out.push(`${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`);
-    }
-    return out;
-  }
-
-  function buildTypeGroups(rows) {
-    const days = last30Days();
-    const groups = new Map(); // key -> { label, byDay: {day:cnt} }
+  function buildTypeTotals(rows, filterCat) {
+    const groups = new Map(); // key -> { label, type_code, total }
     rows.forEach(r => {
+      if (filterCat !== 'all' && (DEFECT_CATEGORY_MAP[r.defect_type_code] || '기타') !== filterCat) return;
       const key = `${r.defect_type_code || ''}|${r.detail_text || ''}`;
-      if (!groups.has(key)) groups.set(key, { label: r.detail_text || r.defect_type_code || '(미분류)', byDay: {} });
-      const g = groups.get(key);
-      g.byDay[r.day] = (g.byDay[r.day] || 0) + (parseInt(r.cnt) || 0);
+      if (!groups.has(key)) groups.set(key, { label: r.detail_text || r.defect_type_code || '(미분류)', total: 0 });
+      groups.get(key).total += (parseInt(r.cnt) || 0);
     });
-    const list = Array.from(groups.values()).map(g => {
-      let cum = 0;
-      const cumByDay = days.map(d => (cum += (g.byDay[d] || 0)));
-      return { label: g.label, cumByDay, total: cum };
-    });
-    list.sort((a, b) => b.total - a.total); // 건수 많은 유형이 위로
-    return { days, list };
+    return Array.from(groups.values()).sort((a, b) => b.total - a.total); // 건수 많은 유형이 위로
   }
 
-  function renderTypeTable(days, list) {
-    if (!list.length) { typeTable.innerHTML = ''; return; }
-    const maxVal = Math.max.apply(null, list.map(g => g.total).concat([1]));
-    const headCells = days.map(d => {
-      const [, mm, dd] = d.split('-');
-      return `<th style="padding:5px 6px;font-size:10px;font-weight:600;color:#fff;text-align:center">${mm}-${dd}</th>`;
-    }).join('');
-    const bodyRows = list.map(g => {
-      const cells = g.cumByDay.map(v => {
-        const alpha = v > 0 ? Math.min(0.35, 0.08 + (v / maxVal) * 0.27) : 0;
-        const bg = v > 0 ? `background:rgba(37,99,235,${alpha.toFixed(2)})` : '';
-        return `<td style="padding:5px 6px;text-align:center;color:#1e293b;${bg}">${v > 0 ? v : ''}</td>`;
-      }).join('');
-      return `<tr><td style="padding:5px 8px;font-weight:600;color:#374151;white-space:nowrap;position:sticky;left:0;background:#fff;border-right:1px solid #e5e7eb">${esc(g.label)}</td>${cells}</tr>`;
-    }).join('');
-    typeTable.innerHTML = `<thead><tr style="background:#1e3264"><th style="padding:5px 8px;text-align:left;color:#fff;position:sticky;left:0;background:#1e3264">불량유형</th>${headCells}</tr></thead><tbody>${bodyRows}</tbody>`;
-  }
-
-  function renderPareto(list) {
-    if (!list.length) { paretoEl.innerHTML = ''; return; }
+  function renderPareto() {
+    const list = buildTypeTotals(_paretoRawRows, paretoCat);
+    paretoTitleEl.textContent = `불량유형 파레토 (${paretoCat === 'all' ? '외관+기능 통합' : paretoCat}, ${PARETO_WINDOW_LABEL[gran]})`;
+    if (!list.length) { paretoEl.innerHTML = '<div style="color:#9ca3af;font-size:12px;padding:8px 0">표시할 데이터가 없습니다.</div>'; return; }
     const grandTotal = list.reduce((s, g) => s + g.total, 0) || 1;
     const maxVal = list[0].total || 1;
     let cum = 0;
@@ -324,17 +289,21 @@ window.initDefectTab = function initDefectTab() {
     }).join('');
   }
 
+  window._dashSetParetoCat = function (c, btn) {
+    paretoCat = c;
+    paneEl.querySelectorAll('#dash-pareto-cat-tabs .proc-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    renderPareto();
+  };
+
   window._dashLoadByType = async function () {
     const line = resolveLine();
-    if (!line || !AIT_API.getDefectTrendByType) { typeTable.innerHTML = ''; paretoEl.innerHTML = ''; return; }
+    if (!line || !AIT_API.getDefectTrendByType) { paretoEl.innerHTML = ''; return; }
     try {
-      const rows = await AIT_API.getDefectTrendByType(line, TYPE_TABLE_DAYS);
-      const { days, list } = buildTypeGroups(rows || []);
-      renderTypeTable(days, list);
-      renderPareto(list);
+      _paretoRawRows = (await AIT_API.getDefectTrendByType(line, PARETO_DAYS[gran])) || [];
+      renderPareto();
     } catch (e) {
       console.warn('불량유형별 추이 로드 실패', e);
-      typeTable.innerHTML = '';
       paretoEl.innerHTML = '';
     }
   };
