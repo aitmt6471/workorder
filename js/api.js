@@ -230,6 +230,14 @@ const AIT_API = (() => {
     getQpointList:    (carId)        => _get('ait/qpoint/list', { carId }),
     saveQpointList:   (carId, list)  => _post('ait/qpoint/save', { carId, list }),
 
+    /* ── 부적합품현황 / 대시보드 ─────────────── */
+    getDefectStatus:  (line, date)        => _get('ait/defect/status', { line, date }),
+    getDefectTrend:   (line, granularity) => _get('ait/defect/trend', { line, granularity }),
+
+    /* ── 고객모드 ──────────────────────────────── */
+    getCustomerMode:  ()        => _get('ait/settings/customer-mode'),
+    setCustomerMode:  (enabled) => _post('ait/settings/customer-mode', { enabled }),
+
     /* ── 하위 호환: 기존 api.js 메서드명 유지 ──── */
     async getImfMeta(car) {
       const sheets = await this.getImfSheets(car);
@@ -395,6 +403,12 @@ const AIT_API = (() => {
     saveInspDoc:        (carId, doc)    => _real.saveInspDoc(carId, doc),
     getQpointList:      (carId)         => _real.getQpointList(carId),
     saveQpointList:     (carId, list)   => _real.saveQpointList(carId, list),
+    /* 부적합품현황 / 대시보드 */
+    getDefectStatus:    (line, date)        => _real.getDefectStatus(line, date),
+    getDefectTrend:     (line, granularity) => _real.getDefectTrend(line, granularity),
+    /* 고객모드 */
+    getCustomerMode:    ()          => _real.getCustomerMode(),
+    setCustomerMode:    (enabled)   => _real.setCustomerMode(enabled),
     /* 사양표 */
     getSpecCatalog:     ()                         => _real.getSpecCatalog(),
     getSpecMes:         (date, carModel, lineName) => _real.getSpecMes(date, carModel, lineName),

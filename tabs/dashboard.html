@@ -1,0 +1,28 @@
+<!-- 대시보드 -->
+<div class="tab-toolbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">부적합품 추이 대시보드</span>
+    <span id="dash-line-badge" style="font-size:12px;color:#6b7280"></span>
+  </div>
+  <div style="flex:1"></div>
+  <div id="dash-gran-tabs" style="display:flex;gap:4px">
+    <button data-gran="day"   class="proc-btn active" onclick="window._dashSetGran('day',this)">일별</button>
+    <button data-gran="month" class="proc-btn" onclick="window._dashSetGran('month',this)">월별</button>
+    <button data-gran="year"  class="proc-btn" onclick="window._dashSetGran('year',this)">연도별</button>
+  </div>
+  <button class="btn btn-ghost btn-sm" onclick="window._dashLoad()">🔄 새로고침</button>
+</div>
+
+<div style="padding:16px">
+  <div id="dash-empty" style="display:none;text-align:center;padding:60px 0;color:#9ca3af;font-size:13px"></div>
+  <div id="dash-tiles" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px"></div>
+  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px">
+    <div id="dash-chart-title" style="font-size:13px;font-weight:700;color:#1e293b;margin-bottom:8px">누적 발생건수 추이</div>
+    <div style="width:100%;overflow-x:auto"><svg id="dash-svg" viewBox="0 0 940 340" style="width:100%;min-width:640px;height:auto;display:block"></svg></div>
+  </div>
+</div>
+
+<script>
+if (typeof initDashboardTab === 'function') initDashboardTab();
+else console.error('js/dashboard.js 가 로드되지 않았습니다.');
+</script>

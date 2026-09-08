@@ -1,0 +1,39 @@
+<!-- 부적합품현황 -->
+<div class="tab-toolbar">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span style="font-size:15px;font-weight:900;color:#1e3264;letter-spacing:2px">부적합품현황</span>
+    <span id="defect-line-badge" style="font-size:12px;color:#6b7280"></span>
+  </div>
+  <div style="flex:1"></div>
+  <input id="defect-date" type="date" onchange="window._defectLoad()"
+    style="border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit">
+  <button class="btn btn-ghost btn-sm" onclick="window._defectLoad()">🔄 새로고침</button>
+</div>
+
+<div style="padding:0 16px 16px">
+  <div id="defect-empty" style="display:none;text-align:center;padding:60px 0;color:#9ca3af;font-size:13px"></div>
+  <div style="overflow-x:auto">
+    <table id="defect-table" style="border-collapse:collapse;font-size:12px;width:100%;min-width:960px">
+      <thead>
+        <tr style="background:#1e3264;color:#fff">
+          <th style="padding:8px 6px;white-space:nowrap">발생시각</th>
+          <th style="padding:8px 6px;white-space:nowrap">품번</th>
+          <th style="padding:8px 6px;white-space:nowrap">제품모델</th>
+          <th style="padding:8px 6px;white-space:nowrap">색상</th>
+          <th style="padding:8px 6px;white-space:nowrap">차종</th>
+          <th style="padding:8px 6px;white-space:nowrap">불량유형</th>
+          <th style="padding:8px 6px;text-align:left">상세내용</th>
+          <th style="padding:8px 6px;white-space:nowrap">사진</th>
+          <th style="padding:8px 6px;white-space:nowrap">상태</th>
+          <th style="padding:8px 6px;white-space:nowrap">등록경로</th>
+        </tr>
+      </thead>
+      <tbody id="defect-tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+if (typeof initDefectTab === 'function') initDefectTab();
+else console.error('js/defect.js 가 로드되지 않았습니다.');
+</script>

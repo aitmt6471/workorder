@@ -63,7 +63,8 @@ const ALL_DOC_TYPES = [
   { id: 'ms',     label: '마스터샘플' },
   { id: 'spec',   label: '사양표' },
   { id: 'insp',   label: '공정검사기준서' },
-  { id: 'qpoint', label: 'Q-Point' }
+  { id: 'qpoint', label: 'Q-Point' },
+  { id: 'defect', label: '부적합품현황' }
 ];
 function applyEnabledDocs(docs) {
   const enabled = docs || ALL_DOC_TYPES.map(d => d.id);
@@ -87,6 +88,40 @@ function applyEnabledDocs(docs) {
     }
   }
 }
+
+/* ── 고객모드 (부적합품현황 · 대시보드 탭 숨김) ──
+   CSS(body.ait-customer-mode)로 강제 숨김 — inline display(enabled_docs 등)와
+   충돌 없이 클래스만 토글하면 되므로 카드 캐시 상태를 건드릴 필요가 없다. */
+window._aitCustomerMode = false;
+function applyCustomerMode(enabled) {
+  window._aitCustomerMode = !!enabled;
+  document.body.classList.toggle('ait-customer-mode', !!enabled);
+  if (enabled) {
+    const active = document.querySelector('.pane.active');
+    if (active && ['pane-dashboard', 'pane-defect'].includes(active.id)) {
+      const nav = document.querySelector('.nav-item[data-tab="cp"]');
+      if (nav) showTab('cp', nav);
+    }
+  }
+}
+async function pollCustomerMode() {
+  try {
+    const r = await AIT_API.getCustomerMode();
+    applyCustomerMode(!!(r && r.enabled));
+  } catch(e) { console.warn('고객모드 조회 실패', e); }
+}
+async function toggleCustomerMode(checked) {
+  try {
+    await AIT_API.setCustomerMode(checked);
+    applyCustomerMode(checked);
+  } catch(e) {
+    alert('고객모드 변경 실패: ' + (e.message || String(e)));
+    const cb = document.getElementById('settings-customer-mode');
+    if (cb) cb.checked = !checked;
+  }
+}
+setInterval(pollCustomerMode, 15000);
+document.addEventListener('DOMContentLoaded', pollCustomerMode);
 
 /* ── 차종 변경 → 전체 탭 재로드 ── */
 function onCarChange(sel) {
@@ -939,6 +974,8 @@ function openSettingsModal() {
     if (!data.ok) { alert('비밀번호가 올바르지 않습니다.'); return; }
     document.getElementById('settings-new-pw').value = '';
     document.getElementById('settings-new-pw2').value = '';
+    const cmCb = document.getElementById('settings-customer-mode');
+    if (cmCb) cmCb.checked = !!window._aitCustomerMode;
     document.getElementById('settings-modal').classList.add('open');
   }).catch(() => alert('서버 연결 오류. 잠시 후 다시 시도하세요.'));
 }
