@@ -83,12 +83,17 @@ window.initDefectTab = function initDefectTab() {
   const emptyEl = paneEl.querySelector('#defect-empty');
 
   function groupForCards(rows) {
-    const groups = new Map(); // key -> { key, defect_type_code, detail_text, rows: [] }
+    const groups = new Map(); // key -> { key, defect_type_code, detail_text, source_type, rows: [] }
     rows.forEach(r => {
       if (r.status === 'FALSE_DEFECT') return; // 가성불량 제외
       if (cat !== 'all' && (DEFECT_CATEGORY_MAP[r.defect_type_code] || '기타') !== cat) return;
-      const key = `${r.defect_type_code || ''}|${r.detail_text || ''}`;
-      if (!groups.has(key)) groups.set(key, { key, defect_type_code: r.defect_type_code, detail_text: r.detail_text, rows: [] });
+      // source_type(공정/출하)도 키에 포함 — 같은 불량이라도 등록경로가 다르면 카드를 분리해
+      // 배지로 보여줄 때 섞이지 않게 한다.
+      const key = `${r.defect_type_code || ''}|${r.detail_text || ''}|${r.source_type || ''}`;
+      // typeKey: 전체 누적건수(ait/defect/trend-by-type)는 source_type 구분 없이 집계돼 내려오므로
+      // 그 조회 결과와 매칭할 때는 source_type을 뺀 키를 따로 쓴다.
+      const typeKey = `${r.defect_type_code || ''}|${r.detail_text || ''}`;
+      if (!groups.has(key)) groups.set(key, { key, typeKey, defect_type_code: r.defect_type_code, detail_text: r.detail_text, source_type: r.source_type, rows: [] });
       groups.get(key).rows.push(r);
     });
     const list = Array.from(groups.values());
@@ -110,7 +115,10 @@ window.initDefectTab = function initDefectTab() {
       const todayCount = g.rows.length;
       // 오늘(선택일) 건수는 항상 전체 누적건수에 포함돼 있어야 하므로, 맵에 없거나
       // 오늘 건수보다 작게 잡히면(캐시 지연 등) 오늘 건수를 하한으로 삼는다.
-      const allTimeCount = Math.max(allTimeMap?.get(g.key) || 0, todayCount);
+      const allTimeCount = Math.max(allTimeMap?.get(g.typeKey) || 0, todayCount);
+      const srcColor = g.source_type === '출하' ? { bg: '#fff7ed', fg: '#c2410c', bd: '#fed7aa' }
+        : g.source_type === '공정' ? { bg: '#eff6ff', fg: '#1d4ed8', bd: '#bfdbfe' }
+        : { bg: '#f3f4f6', fg: '#6b7280', bd: '#e5e7eb' };
       const rep = g.rows.find(r => photoList(r.photo_urls).length > 0) || g.rows[0];
       const photos = photoList(rep.photo_urls).map(u => AIT_API.normalizePhotoUrl(u));
       const photoHtml = photos[0]
@@ -122,7 +130,10 @@ window.initDefectTab = function initDefectTab() {
       return `<div style="background:#fff;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
         <div style="width:100%;aspect-ratio:4/3;background:#f3f4f6;overflow:hidden;display:flex;align-items:center;justify-content:center">${photoHtml}</div>
         <div style="padding:10px 12px;display:flex;flex-direction:column;gap:8px;flex:1">
-          <div style="font-size:13px;font-weight:800;color:#dc2626;line-height:1.35">${esc(g.detail_text || g.defect_type_code || '(미분류)')}</div>
+          <div style="display:flex;align-items:flex-start;gap:6px">
+            <span style="flex-shrink:0;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;background:${srcColor.bg};color:${srcColor.fg};border:1px solid ${srcColor.bd}">${esc(g.source_type || '미상')}</span>
+            <div style="font-size:13px;font-weight:800;color:#dc2626;line-height:1.35">${esc(g.detail_text || g.defect_type_code || '(미분류)')}</div>
+          </div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:11px;color:#374151">
             <div><span style="color:#9ca3af">품번</span> ${esc(top.part_no || '-')}</div>
             <div><span style="color:#9ca3af">품명</span> ${esc(top.product_model || '-')}</div>
