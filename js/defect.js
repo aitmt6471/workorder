@@ -2,20 +2,6 @@
    부적합품현황 탭 모듈 (하위 탭: 현황 / 누적현황)
    tabs/defect.html 이 로드될 때 initDefectTab() 을 호출한다.
    ══════════════════════════════════════════════════════════════ */
-// ponytail: 08.불량리워크잔량처리 시스템 DB(master_defect_type.category)의 2026-09-08 스냅샷.
-// ait/defect/status·trend-by-type 웹훅이 category를 안 내려줘서 임시로 하드코딩함 —
-// 관리자가 불량유형을 새로 등록/변경하면 이 표가 어긋난다. 웹훅 응답에 category 필드가
-// 추가되면(master_defect_type JOIN) 이 맵은 지우고 서버값을 쓰도록 바꿀 것.
-const DEFECT_CATEGORY_MAP = {
-  '01.외관(VISION)': '기능', '07.WHITE LED(약어WL)(VISION)': '기능',
-  '1. REVERSE CURRENT(VISION)': '기능', '기능': '기능', '기타': '기능', '비전+기능': '기능',
-  'ETCS 바코드불량': '외관', 'MAP렌즈 설체결': '외관', 'TIR렌즈 설체결': '외관',
-  '돌돌이': '외관', '라벨이종': '외관', '랜즈 이물': '외관', '백화': '외관',
-  '부직포 누락': '외관', '스크래치': '외관', '작업불량': '외관', '찍힘': '외관',
-  '부품불량': '외관', 'PART_DEFECT': '외관', '흑점': '외관', '오조립': '외관',
-  '비전': '외관', '외관': '외관'
-};
-
 window.initDefectTab = function initDefectTab() {
   const paneEl = document.getElementById('pane-defect');
   if (!paneEl) return;
@@ -86,7 +72,7 @@ window.initDefectTab = function initDefectTab() {
     const groups = new Map(); // key -> { key, defect_type_code, detail_text, source_type, rows: [] }
     rows.forEach(r => {
       if (r.status === 'FALSE_DEFECT') return; // 가성불량 제외
-      if (cat !== 'all' && (DEFECT_CATEGORY_MAP[r.defect_type_code] || '기타') !== cat) return;
+      if (cat !== 'all' && (r.category || '기타') !== cat) return;
       // source_type(공정/출하)도 키에 포함 — 같은 불량이라도 등록경로가 다르면 카드를 분리해
       // 배지로 보여줄 때 섞이지 않게 한다.
       const key = `${r.defect_type_code || ''}|${r.detail_text || ''}|${r.source_type || ''}`;
