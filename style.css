@@ -319,9 +319,9 @@ tr[style*="1e3264"] th{background:#1e3264!important;color:#fff!important}
 /* ── 사이드바 ── */
 .sidebar{width:220px;min-width:220px;flex-shrink:0;background:#fff;color:#111827;display:flex;flex-direction:column;overflow:hidden;box-shadow:2px 0 10px rgba(15,23,42,.12)}
 
-.sidebar-logo{padding:14px 14px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sidebar-logo{padding:14px 14px 12px;display:flex;flex-direction:column;align-items:center;gap:6px;border-bottom:1px solid var(--border);flex-shrink:0}
 .sidebar-logo-img{height:42px;width:auto;object-fit:contain;flex-shrink:0}
-.sidebar-logo-text{font-size:11px;font-weight:700;color:#374151;line-height:1.45;letter-spacing:-.1px}
+.sidebar-logo-text{font-size:12px;font-weight:700;color:#374151;line-height:1.3;letter-spacing:-.1px;text-align:center}
 
 .sidebar-car{padding:10px 12px 11px;border-bottom:1px solid var(--border);flex-shrink:0}
 .sidebar-car-label{font-size:10px;font-weight:600;color:#6b7280;text-transform:uppercase;letter-spacing:.7px;display:block;margin-bottom:5px}

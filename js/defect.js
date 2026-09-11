@@ -26,6 +26,10 @@ window.initDefectTab = function initDefectTab() {
   function formatLotNo(v) {
     return v ? String(v).replace(/\./g, '') : '';
   }
+  // 발생일 표시용 — 시간 부분은 잘라내고 날짜만 남긴다 ("2026-09-10 17:11:00" → "2026-09-10").
+  function dateOnly(v) {
+    return v ? String(v).slice(0, 10) : '';
+  }
 
   const lineBadge = paneEl.querySelector('#defect-line-badge');
   const dateInput = paneEl.querySelector('#defect-date');
@@ -84,7 +88,14 @@ window.initDefectTab = function initDefectTab() {
     });
     const list = Array.from(groups.values());
     list.forEach(g => g.rows.sort((a, b) => String(b.occurred_at || '').localeCompare(String(a.occurred_at || ''))));
-    list.sort((a, b) => String(b.rows[0]?.occurred_at || '').localeCompare(String(a.rows[0]?.occurred_at || '')));
+    // 공정불량 카드끼리, 출하불량 카드끼리 묶어서 보이도록 source_type 우선 정렬 후 최신순.
+    const SRC_ORDER = { '공정': 0, '출하': 1 };
+    list.sort((a, b) => {
+      const oa = SRC_ORDER[a.source_type] ?? 2;
+      const ob = SRC_ORDER[b.source_type] ?? 2;
+      if (oa !== ob) return oa - ob;
+      return String(b.rows[0]?.occurred_at || '').localeCompare(String(a.rows[0]?.occurred_at || ''));
+    });
     return list;
   }
 
@@ -126,11 +137,11 @@ window.initDefectTab = function initDefectTab() {
             <div><span style="color:#9ca3af">색상</span> ${esc(top.color || '-')}</div>
             <div><span style="color:#9ca3af">차종</span> ${esc(top.vehicle_model || '-')}</div>
           </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:6px;border-top:1px dashed #e5e7eb;gap:6px">
-            <span style="font-size:10.5px;color:#6b7280">발생일 ${esc(top.occurred_at || '')}${top.lot_no ? ' · LOT ' + esc(formatLotNo(top.lot_no)) : ''}</span>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:6px;border-top:1px dashed #e5e7eb;gap:6px;flex-wrap:nowrap">
+            <span style="font-size:10.5px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">발생일 ${esc(dateOnly(top.occurred_at))}${top.lot_no ? ' · LOT ' + esc(formatLotNo(top.lot_no)) : ''}</span>
             <span style="display:flex;gap:4px;flex-shrink:0">
-              <span style="font-size:10.5px;font-weight:700;color:#1e3264;background:#eef3ff;border:1px solid #c9d4e8;border-radius:10px;padding:2px 8px">오늘 ${todayCount}건</span>
-              <span style="font-size:10.5px;font-weight:700;color:#fff;background:#1e3264;border-radius:10px;padding:2px 8px">누적 ${allTimeCount}건</span>
+              <span style="font-size:10.5px;font-weight:700;color:#fff;background:#1e3264;border-radius:10px;padding:2px 8px;white-space:nowrap">누적 ${allTimeCount}건</span>
+              <span style="font-size:10.5px;font-weight:700;color:#1e3264;background:#eef3ff;border:1px solid #c9d4e8;border-radius:10px;padding:2px 8px;white-space:nowrap">오늘 ${todayCount}건</span>
             </span>
           </div>
         </div>
