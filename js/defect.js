@@ -136,13 +136,12 @@ window.initDefectTab = function initDefectTab() {
             <div><span style="color:#9ca3af">품명</span> ${esc(top.product_model || '-')}</div>
             <div><span style="color:#9ca3af">색상</span> ${esc(top.color || '-')}</div>
             <div><span style="color:#9ca3af">차종</span> ${esc(top.vehicle_model || '-')}</div>
+            <div><span style="color:#9ca3af">발생일</span> ${esc(dateOnly(top.occurred_at)) || '-'}</div>
+            <div><span style="color:#9ca3af">LOT</span> ${top.lot_no ? esc(formatLotNo(top.lot_no)) : '-'}</div>
           </div>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:6px;border-top:1px dashed #e5e7eb;gap:6px;flex-wrap:nowrap">
-            <span style="font-size:10.5px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">발생일 ${esc(dateOnly(top.occurred_at))}${top.lot_no ? ' · LOT ' + esc(formatLotNo(top.lot_no)) : ''}</span>
-            <span style="display:flex;gap:4px;flex-shrink:0">
-              <span style="font-size:10.5px;font-weight:700;color:#fff;background:#1e3264;border-radius:10px;padding:2px 6px;white-space:nowrap">누적 ${allTimeCount}건</span>
-              <span style="font-size:10.5px;font-weight:700;color:#1e3264;background:#eef3ff;border:1px solid #c9d4e8;border-radius:10px;padding:2px 6px;white-space:nowrap">오늘 ${todayCount}건</span>
-            </span>
+          <div style="display:flex;align-items:center;justify-content:flex-end;margin-top:auto;padding-top:6px;border-top:1px dashed #e5e7eb;gap:4px">
+            <span style="font-size:10.5px;font-weight:700;color:#fff;background:#1e3264;border-radius:10px;padding:2px 6px;white-space:nowrap">누적 ${allTimeCount}건</span>
+            <span style="font-size:10.5px;font-weight:700;color:#1e3264;background:#eef3ff;border:1px solid #c9d4e8;border-radius:10px;padding:2px 6px;white-space:nowrap">오늘 ${todayCount}건</span>
           </div>
         </div>
       </div>`;
