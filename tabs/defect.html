@@ -37,10 +37,12 @@
 
 <!-- 누적현황: 이 라인에서 지금까지 발생한 불량유형 이력 -->
 <div id="defect-view-dashboard" style="padding:16px;display:none">
-  <div id="dash-period-tabs" style="display:flex;gap:4px;margin-bottom:10px">
+  <div id="dash-period-tabs" style="display:flex;align-items:center;gap:4px;margin-bottom:10px;flex-wrap:wrap">
     <button data-period="all" class="proc-btn active" onclick="window._defectSetDashPeriod('all',this)">전체</button>
     <button data-period="month" class="proc-btn" onclick="window._defectSetDashPeriod('month',this)">월별</button>
     <button data-period="day" class="proc-btn" onclick="window._defectSetDashPeriod('day',this)">일별</button>
+    <input id="dash-month-picker" type="month" style="display:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit" onchange="window._defectDashDateChange()">
+    <input id="dash-date-picker" type="date" style="display:none;border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:12px;font-family:inherit" onchange="window._defectDashDateChange()">
   </div>
   <div id="dash-empty" style="display:none;text-align:center;padding:60px 0;color:#9ca3af;font-size:13px"></div>
   <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px">

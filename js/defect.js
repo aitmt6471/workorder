@@ -299,21 +299,39 @@ window.initDefectTab = function initDefectTab() {
   const dashEmpty = paneEl.querySelector('#dash-empty');
   const paretoEl = paneEl.querySelector('#dash-pareto');
   const paretoTitleEl = paneEl.querySelector('#dash-pareto-title');
+  const dashMonthPicker = paneEl.querySelector('#dash-month-picker');
+  const dashDatePicker  = paneEl.querySelector('#dash-date-picker');
   let dashPeriod = 'all';
-  function periodDays(p) {
-    if (p === 'day') return 1;
-    if (p === 'month') return new Date().getDate(); // 이번달 1일~오늘까지의 일수
-    return ALL_TIME_DAYS;
-  }
   function periodLabel(p) {
-    return p === 'day' ? '오늘' : p === 'month' ? '이번달' : '전체';
+    if (p === 'day') return dashDatePicker.value || '오늘';
+    if (p === 'month') return dashMonthPicker.value || '이번달';
+    return '전체';
   }
   window._defectSetDashPeriod = function (p, btn) {
     dashPeriod = p;
     paneEl.querySelectorAll('#dash-period-tabs .proc-btn').forEach(b => b.classList.remove('active'));
     if (btn) btn.classList.add('active');
+    dashMonthPicker.style.display = p === 'month' ? '' : 'none';
+    dashDatePicker.style.display  = p === 'day' ? '' : 'none';
+    if (p === 'month' && !dashMonthPicker.value) dashMonthPicker.value = todayStr().slice(0, 7);
+    if (p === 'day' && !dashDatePicker.value) dashDatePicker.value = todayStr();
     window._cumulativeLoad();
   };
+  window._defectDashDateChange = function () { window._cumulativeLoad(); };
+
+  // 기간 필터: trend-by-type은 "최근 N일" 단위만 지원하므로 넉넉히 통째로 받아온 뒤
+  // day(YYYY-MM-DD) 필드 기준으로 선택한 월/일에 맞게 클라이언트에서 걸러낸다.
+  function filterByPeriod(rows) {
+    if (dashPeriod === 'day') {
+      const d = dashDatePicker.value;
+      return d ? rows.filter(r => r.day === d) : rows;
+    }
+    if (dashPeriod === 'month') {
+      const m = dashMonthPicker.value; // YYYY-MM
+      return m ? rows.filter(r => String(r.day || '').startsWith(m)) : rows;
+    }
+    return rows;
+  }
 
   function buildTypeTotals(rows) {
     const groups = new Map(); // key -> { key, label, total }
@@ -362,8 +380,8 @@ window.initDefectTab = function initDefectTab() {
       return;
     }
     try {
-      const rows = (await AIT_API.getDefectTrendByType(line, periodDays(dashPeriod))) || [];
-      renderCumulative(buildTypeTotals(rows));
+      const rows = (await AIT_API.getDefectTrendByType(line, ALL_TIME_DAYS)) || [];
+      renderCumulative(buildTypeTotals(filterByPeriod(rows)));
     } catch (e) {
       console.warn('누적현황 로드 실패', e);
       paretoEl.innerHTML = '';
