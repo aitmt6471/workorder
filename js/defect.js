@@ -26,9 +26,9 @@ window.initDefectTab = function initDefectTab() {
   function formatLotNo(v) {
     return v ? String(v).replace(/\./g, '') : '';
   }
-  // 발생일 표시용 — 시간 제거 + yy.mm.dd로 압축 ("2026-09-10 17:11:00" → "26.09.10").
+  // 발생일 표시용 — 시간 제거 + yymmdd로 압축 ("2026-09-10 17:11:00" → "260910").
   function dateOnly(v) {
-    return v ? String(v).slice(2, 10).replace(/-/g, '.') : '';
+    return v ? String(v).slice(2, 10).replace(/-/g, '') : '';
   }
 
   const lineBadge = paneEl.querySelector('#defect-line-badge');
