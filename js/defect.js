@@ -26,9 +26,9 @@ window.initDefectTab = function initDefectTab() {
   function formatLotNo(v) {
     return v ? String(v).replace(/\./g, '') : '';
   }
-  // 발생일 표시용 — 시간 부분은 잘라내고 날짜만 남긴다 ("2026-09-10 17:11:00" → "2026-09-10").
+  // 발생일 표시용 — 시간 제거 + yy.mm.dd로 압축 ("2026-09-10 17:11:00" → "26.09.10").
   function dateOnly(v) {
-    return v ? String(v).slice(0, 10) : '';
+    return v ? String(v).slice(2, 10).replace(/-/g, '.') : '';
   }
 
   const lineBadge = paneEl.querySelector('#defect-line-badge');
@@ -140,8 +140,8 @@ window.initDefectTab = function initDefectTab() {
           <div style="display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:6px;border-top:1px dashed #e5e7eb;gap:6px;flex-wrap:nowrap">
             <span style="font-size:10.5px;color:#6b7280;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">발생일 ${esc(dateOnly(top.occurred_at))}${top.lot_no ? ' · LOT ' + esc(formatLotNo(top.lot_no)) : ''}</span>
             <span style="display:flex;gap:4px;flex-shrink:0">
-              <span style="font-size:10.5px;font-weight:700;color:#fff;background:#1e3264;border-radius:10px;padding:2px 8px;white-space:nowrap">누적 ${allTimeCount}건</span>
-              <span style="font-size:10.5px;font-weight:700;color:#1e3264;background:#eef3ff;border:1px solid #c9d4e8;border-radius:10px;padding:2px 8px;white-space:nowrap">오늘 ${todayCount}건</span>
+              <span style="font-size:10.5px;font-weight:700;color:#fff;background:#1e3264;border-radius:10px;padding:2px 6px;white-space:nowrap">누적 ${allTimeCount}건</span>
+              <span style="font-size:10.5px;font-weight:700;color:#1e3264;background:#eef3ff;border:1px solid #c9d4e8;border-radius:10px;padding:2px 6px;white-space:nowrap">오늘 ${todayCount}건</span>
             </span>
           </div>
         </div>
