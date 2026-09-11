@@ -43,6 +43,9 @@ body{font-family:system-ui,-apple-system,'Segoe UI',sans-serif;background:var(--
 .pane.active{display:block;flex:1;overflow:auto;min-height:0;padding:16px 20px}
 body.ait-customer-mode .nav-item[data-tab="defect"],
 body.ait-customer-mode #pane-defect{display:none!important}
+
+/* 전날 부적합품 서명 미완료 잠금 — 부적합품현황 외 메뉴 비활성화 */
+body.ait-defect-lock .nav-item:not([data-tab="defect"]){pointer-events:none;opacity:.35}
 #pane-daily.active,#pane-ws.active,#pane-ms.active,#pane-insp.active,#pane-qpoint.active{padding:0}
 #pane-ms.active{display:flex;flex-direction:column;overflow:hidden}
 #pane-ms .tab-toolbar,#ms-expire-banner,#ms-sample-tab-bar,#ms-empty-state{flex-shrink:0}

@@ -99,6 +99,21 @@ window.initDefectTab = function initDefectTab() {
     return list;
   }
 
+  const SIGN_ROLES = [['worker', '작업자'], ['leader', '담당조장'], ['manager', '담당반장']];
+  function signRowHtml(defectId, role, label, name, signedAt) {
+    if (signedAt) {
+      return `<div class="sign-row" data-role="${role}" style="display:flex;align-items:center;justify-content:space-between;font-size:10.5px">
+        <span style="color:#9ca3af">${label}</span>
+        <span style="color:#16a34a;font-weight:700">✓ ${esc(name)}</span>
+      </div>`;
+    }
+    return `<div class="sign-row" data-role="${role}" style="display:flex;align-items:center;gap:4px">
+      <span style="font-size:10.5px;color:#9ca3af;width:44px;flex-shrink:0">${label}</span>
+      <input type="text" placeholder="이름" style="flex:1;min-width:0;font-size:11px;padding:3px 6px;border:1px solid #d1d5db;border-radius:5px" onkeydown="if(event.key==='Enter'){event.preventDefault();window._defectSign(this);}">
+      <button style="font-size:10.5px;font-weight:700;color:#fff;background:#1e3264;border:none;border-radius:5px;padding:3px 8px;cursor:pointer;flex-shrink:0" onclick="window._defectSign(this)">서명</button>
+    </div>`;
+  }
+
   function renderCards(rows, allTimeMap) {
     const groups = groupForCards(rows);
     if (!groups.length) {
@@ -143,6 +158,11 @@ window.initDefectTab = function initDefectTab() {
             <span style="font-size:10.5px;font-weight:700;color:#fff;background:#1e3264;border-radius:10px;padding:2px 6px;white-space:nowrap">누적 ${allTimeCount}건</span>
             <span style="font-size:10.5px;font-weight:700;color:#1e3264;background:#eef3ff;border:1px solid #c9d4e8;border-radius:10px;padding:2px 6px;white-space:nowrap">오늘 ${todayCount}건</span>
           </div>
+          <div class="defect-sign-block" data-defect-id="${esc(top.defect_id)}" style="display:flex;flex-direction:column;gap:5px;padding-top:6px;border-top:1px dashed #e5e7eb">
+            ${signRowHtml(top.defect_id, SIGN_ROLES[0][0], SIGN_ROLES[0][1], top.worker_name, top.worker_signed_at)}
+            ${signRowHtml(top.defect_id, SIGN_ROLES[1][0], SIGN_ROLES[1][1], top.leader_name, top.leader_signed_at)}
+            ${signRowHtml(top.defect_id, SIGN_ROLES[2][0], SIGN_ROLES[2][1], top.manager_name, top.manager_signed_at)}
+          </div>
         </div>
       </div>`;
     }).join('');
@@ -186,13 +206,50 @@ window.initDefectTab = function initDefectTab() {
     }
   };
 
-  /* ── 누적현황: 이 라인에서 지금까지 발생한 불량유형 이력 (전체 기간 합계, 많은 순) ── */
+  /* ── 서명 ── */
+  window._defectSign = async function (el) {
+    const row = el.closest('.sign-row');
+    const block = el.closest('.defect-sign-block');
+    if (!row || !block) return;
+    const role = row.dataset.role;
+    const defectId = block.dataset.defectId;
+    const input = row.querySelector('input');
+    const name = (input && input.value || '').trim();
+    if (!name) { alert('이름을 입력하세요.'); if (input) input.focus(); return; }
+    const btn = row.querySelector('button');
+    if (btn) { btn.disabled = true; btn.textContent = '처리중…'; }
+    try {
+      await AIT_API.signDefect(defectId, role, name);
+      await window._defectRefresh();
+      if (typeof window._defectLockCheck === 'function') window._defectLockCheck();
+    } catch (e) {
+      alert('서명 실패: ' + (e.message || String(e)));
+      if (btn) { btn.disabled = false; btn.textContent = '서명'; }
+    }
+  };
+
+  /* ── 누적현황: 이 라인에서 지금까지 발생한 불량유형 이력 (전체/월별/일별, 많은 순) ── */
   // ponytail: "전체 기간"을 요청할 API 파라미터가 없어 넉넉한 상한(10년)으로 근사한다.
   // trend-by-type이 전체기간 조회를 지원하게 되면 days 파라미터 자체를 없앨 것.
   const ALL_TIME_DAYS = 3650;
   const dashEmpty = paneEl.querySelector('#dash-empty');
   const paretoEl = paneEl.querySelector('#dash-pareto');
   const paretoTitleEl = paneEl.querySelector('#dash-pareto-title');
+  let dashPeriod = 'all';
+  function periodDays(p) {
+    if (p === 'day') return 1;
+    if (p === 'month') return new Date().getDate(); // 이번달 1일~오늘까지의 일수
+    return ALL_TIME_DAYS;
+  }
+  function periodLabel(p) {
+    return p === 'day' ? '오늘' : p === 'month' ? '이번달' : '전체';
+  }
+  window._defectSetDashPeriod = function (p, btn) {
+    dashPeriod = p;
+    paneEl.querySelectorAll('#dash-period-tabs .proc-btn').forEach(b => b.classList.remove('active'));
+    if (btn) btn.classList.add('active');
+    window._cumulativeLoad();
+  };
 
   function buildTypeTotals(rows) {
     const groups = new Map(); // key -> { key, label, total }
@@ -213,7 +270,7 @@ window.initDefectTab = function initDefectTab() {
     }
     dashEmpty.style.display = 'none';
     const grandTotal = list.reduce((s, g) => s + g.total, 0) || 1;
-    paretoTitleEl.textContent = `전체 누적불량현황 (총 ${grandTotal}건)`;
+    paretoTitleEl.textContent = `${periodLabel(dashPeriod)} 누적불량현황 (총 ${grandTotal}건)`;
     const maxVal = list[0].total || 1;
     let cum = 0;
     paretoEl.innerHTML = list.map(g => {
@@ -241,7 +298,7 @@ window.initDefectTab = function initDefectTab() {
       return;
     }
     try {
-      const rows = (await AIT_API.getDefectTrendByType(line, ALL_TIME_DAYS)) || [];
+      const rows = (await AIT_API.getDefectTrendByType(line, periodDays(dashPeriod))) || [];
       renderCumulative(buildTypeTotals(rows));
     } catch (e) {
       console.warn('누적현황 로드 실패', e);
@@ -253,4 +310,40 @@ window.initDefectTab = function initDefectTab() {
 
   if (!dateInput.value) dateInput.value = todayStr();
   window._defectSetView('status', paneEl.querySelector('#defect-subtabs [data-view="status"]'));
+};
+
+/* ══════════════════════════════════════════════════════════════
+   전날 부적합품 서명 잠금 — 로그인/차종전환 시 현재 아이템 라인의
+   "전날" 부적합품이 1건이라도 있고 작업자/조장/반장 서명이 전부
+   끝나지 않았으면 부적합품현황 탭으로 강제 진입 + 다른 메뉴 잠금.
+   ══════════════════════════════════════════════════════════════ */
+window._defectLockCheck = async function () {
+  try {
+    const car = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
+    const line = car && car.linename;
+    if (!line) { window._defectSetLock(false); return; }
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    const pad = n => String(n).padStart(2, '0');
+    const yStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    const rows = (await AIT_API.getDefectStatus(line, yStr)) || [];
+    const relevant = rows.filter(r => r.status !== 'FALSE_DEFECT');
+    const unsigned = relevant.some(r => !r.worker_signed_at || !r.leader_signed_at || !r.manager_signed_at);
+    window._defectSetLock(relevant.length > 0 && unsigned, yStr);
+  } catch (e) {
+    console.warn('전날 부적합품 서명 확인 실패', e);
+  }
+};
+
+window._defectSetLock = function (locked, yStr) {
+  document.body.classList.toggle('ait-defect-lock', !!locked);
+  if (!locked) return;
+  (async () => {
+    if (typeof window.loadTab === 'function') await window.loadTab('defect');
+    const nav = document.querySelector('.nav-item[data-tab="defect"]');
+    if (nav && typeof window.showTab === 'function') window.showTab('defect', nav);
+    const dateInput = document.querySelector('#defect-date');
+    if (dateInput && yStr) dateInput.value = yStr;
+    if (typeof window._defectRefresh === 'function') window._defectRefresh();
+  })();
 };

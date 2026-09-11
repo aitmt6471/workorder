@@ -233,6 +233,7 @@ const AIT_API = (() => {
     /* ── 부적합품현황 / 대시보드 ─────────────── */
     getDefectStatus:  (line, date)        => _get('ait/defect/status', { line, date }),
     getDefectTrendByType: (line, days)    => _get('ait/defect/trend-by-type', { line, days }),
+    signDefect:       (defect_id, role, name) => _post('ait/defect/sign', { defect_id, role, name }),
 
     /* ── 고객모드 ──────────────────────────────── */
     getCustomerMode:  ()        => _get('ait/settings/customer-mode'),
@@ -406,6 +407,7 @@ const AIT_API = (() => {
     /* 부적합품현황 / 대시보드 */
     getDefectStatus:    (line, date)        => _real.getDefectStatus(line, date),
     getDefectTrendByType: (line, days)      => _real.getDefectTrendByType(line, days),
+    signDefect:         (defect_id, role, name) => _real.signDefect(defect_id, role, name),
     /* 고객모드 */
     getCustomerMode:    ()          => _real.getCustomerMode(),
     setCustomerMode:    (enabled)   => _real.setCustomerMode(enabled),

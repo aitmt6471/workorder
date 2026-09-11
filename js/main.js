@@ -48,6 +48,10 @@ function applyRoleUI() {
 
 /* ── 탭 전환 ── */
 function showTab(id, el) {
+  if (id !== 'defect' && document.body.classList.contains('ait-defect-lock')) {
+    alert('전날 부적합품 서명을 모두 완료해야 다른 메뉴로 이동할 수 있습니다.');
+    return;
+  }
   document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
   document.getElementById('pane-' + id).classList.add('active');
@@ -161,6 +165,7 @@ function onCarChange(sel) {
     const id = activePaneEl.id.replace('pane-', '');
     loadTab(id);
   }
+  if (typeof window._defectLockCheck === 'function') window._defectLockCheck();
 }
 
 /* ── 탭별 편집 모드 ── */
@@ -1092,6 +1097,7 @@ async function initCars() {
       ['cp','ws','daily','imf','ms','spec'].forEach(p => _refreshPaneRevisions(p, window.currentCar));
     }
   }
+  if (typeof window._defectLockCheck === 'function') window._defectLockCheck();
 }
 
 function renderCarSelect(cars) {
