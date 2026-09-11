@@ -233,7 +233,9 @@ const AIT_API = (() => {
     /* ── 부적합품현황 / 대시보드 ─────────────── */
     getDefectStatus:  (line, date)        => _get('ait/defect/status', { line, date }),
     getDefectTrendByType: (line, days)    => _get('ait/defect/trend-by-type', { line, days }),
-    signDefect:       (defect_id, role, name) => _post('ait/defect/sign', { defect_id, role, name }),
+    signDefect:       (defect_id, role, name, sign_img) => _post('ait/defect/sign', { defect_id, role, name, sign_img }),
+    getDefectDailyConfirm: (line, date)   => _get('ait/defect/daily-confirm', { line, date }),
+    saveDailyConfirm: (line, date, role, name, sign_img) => _post('ait/defect/daily-confirm', { line, date, role, name, sign_img }),
 
     /* ── 고객모드 ──────────────────────────────── */
     getCustomerMode:  ()        => _get('ait/settings/customer-mode'),
@@ -407,7 +409,9 @@ const AIT_API = (() => {
     /* 부적합품현황 / 대시보드 */
     getDefectStatus:    (line, date)        => _real.getDefectStatus(line, date),
     getDefectTrendByType: (line, days)      => _real.getDefectTrendByType(line, days),
-    signDefect:         (defect_id, role, name) => _real.signDefect(defect_id, role, name),
+    signDefect:         (defect_id, role, name, sign_img) => _real.signDefect(defect_id, role, name, sign_img),
+    getDefectDailyConfirm: (line, date)     => _real.getDefectDailyConfirm(line, date),
+    saveDailyConfirm:   (line, date, role, name, sign_img) => _real.saveDailyConfirm(line, date, role, name, sign_img),
     /* 고객모드 */
     getCustomerMode:    ()          => _real.getCustomerMode(),
     setCustomerMode:    (enabled)   => _real.setCustomerMode(enabled),
