@@ -2,6 +2,26 @@
    부적합품현황 탭 모듈 (하위 탭: 현황 / 누적현황)
    tabs/defect.html 이 로드될 때 initDefectTab() 을 호출한다.
    ══════════════════════════════════════════════════════════════ */
+// 카드 1장 = 서명 1건. 같은 (불량유형/상세/등록경로)로 묶인 원본 행이 여러 개여도
+// 실제로 서명 버튼이 붙는 건 대표행(최신) 하나뿐이므로, 게이트/잠금 판정도 원본 행이
+// 아니라 "카드" 단위(대표행)로 세야 한다 — 안 그러면 중복행 많은 유형은 전원 서명해도
+// 영원히 100%가 안 돼 조장/반장이 잠긴 채로 안 풀리는 버그가 생긴다.
+function _defectGroupReps(rows) {
+  const groups = new Map();
+  (rows || []).forEach(r => {
+    if (r.status === 'FALSE_DEFECT') return;
+    const key = `${r.defect_type_code || ''}|${r.detail_text || ''}|${r.source_type || ''}`;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(r);
+  });
+  const reps = [];
+  groups.forEach(arr => {
+    arr.sort((a, b) => String(b.occurred_at || '').localeCompare(String(a.occurred_at || '')));
+    reps.push(arr[0]);
+  });
+  return reps;
+}
+
 window.initDefectTab = function initDefectTab() {
   const paneEl = document.getElementById('pane-defect');
   if (!paneEl) return;
@@ -249,9 +269,9 @@ window.initDefectTab = function initDefectTab() {
   }
 
   function renderGate(rows) {
-    const relevant = (rows || []).filter(r => r.status !== 'FALSE_DEFECT');
-    const total = relevant.length;
-    const workerDone = relevant.filter(r => r.worker_signed_at).length;
+    const reps = _defectGroupReps(rows); // 카드 단위(대표행)로 집계 — 중복행은 1건으로
+    const total = reps.length;
+    const workerDone = reps.filter(r => r.worker_signed_at).length;
     if (!gateEl) return;
     if (total === 0) { gateEl.style.display = 'none'; return; }
     gateEl.style.display = '';
@@ -412,11 +432,11 @@ window._defectLockCheck = async function () {
       AIT_API.getDefectStatus(line, yStr),
       AIT_API.getDefectDailyConfirm ? AIT_API.getDefectDailyConfirm(line, yStr) : Promise.resolve([])
     ]);
-    const relevant = (rows || []).filter(r => r.status !== 'FALSE_DEFECT');
-    const workerUnsigned = relevant.some(r => !r.worker_signed_at);
+    const reps = _defectGroupReps(rows); // 카드 단위로 판정 — 중복행은 1건으로
+    const workerUnsigned = reps.some(r => !r.worker_signed_at);
     const confirmedRoles = new Set((confirmRows || []).map(r => r.role));
     const batchMissing = !confirmedRoles.has('leader') || !confirmedRoles.has('manager');
-    window._defectSetLock(relevant.length > 0 && (workerUnsigned || batchMissing), yStr);
+    window._defectSetLock(reps.length > 0 && (workerUnsigned || batchMissing), yStr);
   } catch (e) {
     console.warn('전날 부적합품 서명 확인 실패', e);
   }
