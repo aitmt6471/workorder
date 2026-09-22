@@ -540,7 +540,8 @@ function specRenderTable(){
       .filter(k=>_specMesMap[k].part_no===k)
       .map(k=>{
         const base=k.replace(/[A-Z]{2}[A-Z0-9]$/,'');
-        const cat=_specCatalog.find(c=>c.part_no===base)||_specCatalog.find(c=>c.part_no===k)||null;
+        // OC/OD가 같은 part_no를 공유하므로 현재 라인 행을 우선 매칭 (아니면 OC행이 먼저 잡혀 OD가 필터에서 탈락)
+        const cat=_specCatalog.find(c=>c.part_no===base&&(!ln||c.line_name===ln))||_specCatalog.find(c=>c.part_no===k&&(!ln||c.line_name===ln))||_specCatalog.find(c=>c.part_no===base)||_specCatalog.find(c=>c.part_no===k)||null;
         const mesData=_specMesMap[k]||{};
         return cat?{...cat,part_no:k,_base:base,bom_part_no:mesData.bom_part_no||k}:null;
       })
