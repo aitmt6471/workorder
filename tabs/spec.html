@@ -336,8 +336,11 @@ async function specLoadMes(dateStr){
     const res=await AIT_API.getSpecMes(dateStr,carModel,lineName); // lineName 우선, 없으면 carModel fallback (n8n에서 처리)
     // 응답 형식: [{data:[...]}] | {data:[...]} | [...] 모두 처리
     const payload=Array.isArray(res)?res[0]:res;
-    const items=Array.isArray(payload)?payload:((payload&&payload.data)||[]);
-    console.log('[specMES]',dateStr,'car:',carModel,'line:',lineName,'→ items:',items.length, items[0]||'(없음)');
+    const allItems=Array.isArray(payload)?payload:((payload&&payload.data)||[]);
+    // n8n 쿼리가 날짜만 필터하고 라인 필터가 없어 그날 모든 라인(OC/OD/OA 등)이 섮여 옴 → nm_opline으로 현재 라인만 남김
+    // (안 걸러내면 같은 품번이 여러 라인에 걸쳐 있을 때 마지막 처리된 라인 값으로 덛어씀져져 OC/OD가 동일하게 보임)
+    const items=lineName?allItems.filter(r=>!r.nm_opline||r.nm_opline===lineName):allItems;
+    console.log('[specMES]',dateStr,'car:',carModel,'line:',lineName,'→ items:',items.length,'/',allItems.length, items[0]||'(없음)');
     _specMesMap={};
     items.forEach(r=>{
       if(!r.part_no) return;
