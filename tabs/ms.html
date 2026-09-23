@@ -99,10 +99,10 @@
 
       <!-- 월 선택 -->
       <div style="padding:10px 16px;border-bottom:3px solid #fff;background:#1e3264;display:flex;align-items:center;gap:10px;flex-shrink:0">
-        <button class="btn btn-ghost btn-sm" onclick="prevMonth('ms');window.msRenderDayPicker()"
+        <button class="btn btn-ghost btn-sm" onclick="prevMonth('ms');window.msRenderDayPicker();window._msPreloadMonth()"
           style="color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.08)">&#x2039;</button>
         <span id="ms-month-label" style="font-weight:700;font-size:14px;min-width:90px;text-align:center;color:#fff">2026년 4월</span>
-        <button class="btn btn-ghost btn-sm" onclick="nextMonth('ms');window.msRenderDayPicker()"
+        <button class="btn btn-ghost btn-sm" onclick="nextMonth('ms');window.msRenderDayPicker();window._msPreloadMonth()"
           style="color:#fff;border-color:rgba(255,255,255,.3);background:rgba(255,255,255,.08)">&#x203A;</button>
         <span id="ms-sel-date" style="font-size:13px;font-weight:700;color:#fff;background:rgba(255,255,255,.15);padding:3px 12px;border-radius:6px;letter-spacing:.5px">날짜 선택</span>
         <div style="flex:1"></div>
@@ -718,6 +718,24 @@ function _msUpdateDayBtn(day){
   btn.style.background=s.bg; btn.style.color=s.col; btn.style.borderColor=s.bdr;
 }
 const _msDBLoadedDays = new Set();
+/* 클릭 없이도 이번 달 전체(모든 샘플×모든 날짜)를 백그라운드로 미리 조회.
+   요청 폭주 방지를 위해 동시 6개로 스로틀, 이미 로드된 날은 _msDBLoadedDays 가드로 스킵. */
+async function _msPreloadMonth() {
+  if (AIT_API.MOCK || !window.currentCarId || !MS_DATA.length) return;
+  const m = getTabMonth('ms'), daysInMonth = new Date(m.year, m.month, 0).getDate();
+  const days = Array.from({length: daysInMonth}, (_, i) => i + 1);
+  await Promise.all(MS_DATA.map((_, si) => _msLoadMonthStatus(si)));
+  const tasks = [];
+  MS_DATA.forEach((_, si) => days.forEach(day => {
+    const ck = `${si}_${day}_${m.year}_${m.month}`;
+    if (!_msDBLoadedDays.has(ck)) tasks.push(() => _msLoadResultsFromDB(si, day));
+  }));
+  const LIMIT = 6;
+  let ti = 0;
+  const worker = async () => { while (ti < tasks.length) { const c = ti++; try { await tasks[c](); } catch(_){} } };
+  await Promise.all(Array.from({length: Math.min(LIMIT, tasks.length)}, worker));
+  window.msRenderDayPicker && window.msRenderDayPicker();
+}
 async function _msLoadResultsFromDB(sampleIdx, day) {
   const sampleId = _msSampleIds[sampleIdx];
   if (!sampleId || !window.currentCarId || AIT_API.MOCK) return;
@@ -1174,6 +1192,7 @@ window.msSetEditable=function(on){
   if (MS_DATA.length > 0 && !_msHasLocalResults(curSample, curDay)) {
     _msLoadResultsFromDB(curSample, curDay);
   }
+  _msPreloadMonth(); // 클릭 없이도 이번 달 전체 데이터 백그라운드 선로딩
   if (typeof window._aitLoadAlarmState === 'function') window._aitLoadAlarmState();
 })();
 window._msGetCurDay        = () => curDay;
@@ -1197,6 +1216,7 @@ window._msPhotoCache          = _msPhotoCache;
 window._msSampleIds           = _msSampleIds;
 window._msLoadPhotosFromDb    = (sId) => _msLoadPhotosFromDb(sId);
 window._msLoadMonthStatus     = (idx) => _msLoadMonthStatus(idx);
+window._msPreloadMonth        = () => _msPreloadMonth();
 window._msHasDBData           = _msHasDBData;
 window._msDBLoadedDays        = _msDBLoadedDays;
 window._msLoadResultsFromDB   = (idx, day) => _msLoadResultsFromDB(idx, day);
@@ -1241,26 +1261,8 @@ window.print_ms = async function() {
   }
 
   // DB에서 이번 달 전체 결과 로드 (수동 클릭 없이도 모든 샘플×모든 날짜를 인쇄에 표시)
-  if (!AIT_API.MOCK && window.currentCarId) {
-    // 1) 일괄 조회: 샘플당 1회 월 상태 조회로 대부분의 날짜를 미리 파악
-    if (window._msLoadMonthStatus) {
-      await Promise.all(msData.map((_, si) => window._msLoadMonthStatus(si)));
-    }
-    // 2) 보강: 모든 샘플 × 그 달 모든 날짜(1~말일)를 직접 조회. 월 상태(month-status) 의존 제거 —
-    //    아직 안 채워진 날만 큐에 넣고 동시 실행 6개로 스로틀(요청 폭주로 인한 누락 방지).
-    //    데이터 없는 날은 _msLoadResultsFromDB가 그냥 무시. 이미 로드된 날은 _msDBLoadedDays 가드로 스킵.
-    if (window._msLoadResultsFromDB) {
-      const _loaded = window._msDBLoadedDays;
-      const tasks = [];
-      msData.forEach((_, si) => days.forEach(day => {
-        const ck = `${si}_${day}_${y}_${mo}`;
-        if (!_loaded.has(ck)) tasks.push(() => window._msLoadResultsFromDB(si, day));
-      }));
-      const LIMIT = 6;
-      let ti = 0;
-      const worker = async () => { while (ti < tasks.length) { const c = ti++; try { await tasks[c](); } catch(_){} } };
-      await Promise.all(Array.from({length: Math.min(LIMIT, tasks.length)}, worker));
-    }
+  if (!AIT_API.MOCK && window.currentCarId && window._msPreloadMonth) {
+    await window._msPreloadMonth();
   }
 
   const TD  =(v,style='')=>`<td style="border:1px solid #b8c4d8;padding:2px 3px;font-size:8px;vertical-align:middle;text-align:center;${style}">${v}</td>`;
