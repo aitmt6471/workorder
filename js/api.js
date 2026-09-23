@@ -124,7 +124,7 @@ const AIT_API = (() => {
     /* ── SPC(X-bar 관리도) — 기능검사기 측정값(대시보드 MySQL) ── */
     // n8n: ait/spc/meta → [{line_id,model_name,item_name,unit,n,lsl,usl}] (carId 주면 CP 특별특성 항목만 DB단에서 필터링)
     // 전체 검사기DB 집계 쿼리라 10~15초 걸릴 수 있어 타임아웃을 넉넉히 줌
-    getSpcMeta:       (line, carId) => _get('ait/spc/meta', Object.assign({}, line ? { line } : {}, carId ? { carId } : {}), 30000),
+    getSpcMeta:       (line, carId) => _get('ait/spc/meta', Object.assign({}, line ? { line } : {}, carId ? { carId } : {}), 60000),
     // n8n: ait/spc/series → {cl,ucl,lcl,sigma,cp,cpk,sub:[{i,mean,range,t}], ...}
     getSpcSeries:     (model, item, n = 5, groups = 80, line, from, to) => _get('ait/spc/series', { model, item, n, groups, line, from, to }),
 
