@@ -718,9 +718,16 @@ function _msUpdateDayBtn(day){
   btn.style.background=s.bg; btn.style.color=s.col; btn.style.borderColor=s.bdr;
 }
 const _msDBLoadedDays = new Set();
-/* 클릭 없이도 이번 달 전체(모든 샘플×모든 날짜)를 백그라운드로 미리 조회.
-   요청 폭주 방지를 위해 동시 6개로 스로틀, 이미 로드된 날은 _msDBLoadedDays 가드로 스킵. */
+/* 클릭 없이도 달력 색상(○/✕/부분)이 바로 보이도록, 샘플당 1회 가벼운 월상태 조회만 미리 실행.
+   (샘플×날짜 전체 상세조회는 무겁고 클릭 시 그때그때 로드해도 충분히 빠름 — 인쇄만 예외로 전체 preload) */
 async function _msPreloadMonth() {
+  if (AIT_API.MOCK || !window.currentCarId || !MS_DATA.length) return;
+  await Promise.all(MS_DATA.map((_, si) => _msLoadMonthStatus(si)));
+  window.msRenderDayPicker && window.msRenderDayPicker();
+}
+/* 인쇄용: 위와 달리 모든 샘플×모든 날짜 상세결과까지 전부 필요해서 무겁게 전체 로드.
+   동시 6개로 스로틀, 이미 로드된 날은 _msDBLoadedDays 가드로 스킵. */
+async function _msPreloadMonthFull() {
   if (AIT_API.MOCK || !window.currentCarId || !MS_DATA.length) return;
   const m = getTabMonth('ms'), daysInMonth = new Date(m.year, m.month, 0).getDate();
   const days = Array.from({length: daysInMonth}, (_, i) => i + 1);
@@ -1217,6 +1224,7 @@ window._msSampleIds           = _msSampleIds;
 window._msLoadPhotosFromDb    = (sId) => _msLoadPhotosFromDb(sId);
 window._msLoadMonthStatus     = (idx) => _msLoadMonthStatus(idx);
 window._msPreloadMonth        = () => _msPreloadMonth();
+window._msPreloadMonthFull    = () => _msPreloadMonthFull();
 window._msHasDBData           = _msHasDBData;
 window._msDBLoadedDays        = _msDBLoadedDays;
 window._msLoadResultsFromDB   = (idx, day) => _msLoadResultsFromDB(idx, day);
@@ -1261,8 +1269,8 @@ window.print_ms = async function() {
   }
 
   // DB에서 이번 달 전체 결과 로드 (수동 클릭 없이도 모든 샘플×모든 날짜를 인쇄에 표시)
-  if (!AIT_API.MOCK && window.currentCarId && window._msPreloadMonth) {
-    await window._msPreloadMonth();
+  if (!AIT_API.MOCK && window.currentCarId && window._msPreloadMonthFull) {
+    await window._msPreloadMonthFull();
   }
 
   const TD  =(v,style='')=>`<td style="border:1px solid #b8c4d8;padding:2px 3px;font-size:8px;vertical-align:middle;text-align:center;${style}">${v}</td>`;
