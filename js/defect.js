@@ -9,7 +9,7 @@
 function _defectGroupReps(rows) {
   const groups = new Map();
   (rows || []).forEach(r => {
-    if (r.status === 'FALSE_DEFECT') return;
+    if (r.status === 'FALSE_DEFECT' || r.source_type === '부품') return; // 가성불량·부품불량 제외(완제품 부적합만)
     const key = `${r.defect_type_code || ''}|${r.detail_text || ''}|${r.source_type || ''}`;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(r);
@@ -95,7 +95,7 @@ window.initDefectTab = function initDefectTab() {
   function groupForCards(rows) {
     const groups = new Map(); // key -> { key, defect_type_code, detail_text, source_type, rows: [] }
     rows.forEach(r => {
-      if (r.status === 'FALSE_DEFECT') return; // 가성불량 제외
+      if (r.status === 'FALSE_DEFECT' || r.source_type === '부품') return; // 가성불량·부품불량 제외(완제품 부적합만)
       if (cat !== 'all' && (r.category || '기타') !== cat) return;
       // source_type(공정/출하)도 키에 포함 — 같은 불량이라도 등록경로가 다르면 카드를 분리해
       // 배지로 보여줄 때 섞이지 않게 한다.
