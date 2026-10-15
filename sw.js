@@ -3,7 +3,7 @@ self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
 // 푸시 수신 → 최신 라인 조회 후 '{라인}의 새 출고요청이 도착했습니다' 알림
-const PUSH_LATEST_URL = 'https://aitkorea.bid/webhook/ait/spec/push-latest';
+const PUSH_LATEST_URL = 'https://aitkorea.app/webhook/ait/spec/push-latest';
 self.addEventListener('push', (e) => {
   e.waitUntil((async () => {
     let line = '';

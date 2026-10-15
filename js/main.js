@@ -198,7 +198,7 @@ async function toggleTabEditMode(pane, btn) {
     const pw = prompt('편집 모드 비밀번호를 입력하세요');
     if (pw === null) return;
     try {
-      const res = await fetch('https://aitkorea.bid/webhook/ait/auth/edit-pw', {
+      const res = await fetch('https://aitkorea.app/webhook/ait/auth/edit-pw', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...AIT_API.authHeaders() },
         body: JSON.stringify({ password: pw })
@@ -405,7 +405,7 @@ let _signsMap = {};
 
 function _signCell(grp, rev, role, fileId, name, liveMode) {
   if (fileId) {
-    const proxyUrl = `https://aitkorea.bid/webhook/ait/sign-img?fileId=${fileId}`;
+    const proxyUrl = `https://aitkorea.app/webhook/ait/sign-img?fileId=${fileId}`;
     const delBtn = liveMode
       ? `<button onclick="event.stopPropagation();removeSign('${grp}',${rev},'${role}')" title="서명 삭제"
            style="position:absolute;top:0;right:0;background:#ef4444;border:none;border-radius:3px;color:#fff;font-size:9px;padding:1px 4px;cursor:pointer;line-height:1.4">✕</button>`
@@ -970,7 +970,7 @@ function openSettingsModal() {
   if (getMyRole() !== 'admin') { alert('관리자 권한이 필요합니다.'); return; }
   const pw = prompt('설정에 접근하려면 현재 편집 모드 비밀번호를 입력하세요');
   if (pw === null) return;
-  fetch('https://aitkorea.bid/webhook/ait/auth/edit-pw', {
+  fetch('https://aitkorea.app/webhook/ait/auth/edit-pw', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...AIT_API.authHeaders() },
     body: JSON.stringify({ password: pw })
@@ -996,7 +996,7 @@ async function saveSettingsPw() {
   if (!pw1) { alert('새 비밀번호를 입력하세요.'); return; }
   if (pw1 !== pw2) { alert('비밀번호가 일치하지 않습니다.'); return; }
   try {
-    const res = await fetch('https://aitkorea.bid/webhook/ait/auth/edit-pw/update', {
+    const res = await fetch('https://aitkorea.app/webhook/ait/auth/edit-pw/update', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...AIT_API.authHeaders() },
       body: JSON.stringify({ new_password: pw1 })
@@ -1844,7 +1844,7 @@ function loadCarContent(pane) {
 window._aitAlarmValidate = async function(doc_type, parent_id, check_date, results, extra) {
   if (!parent_id || !check_date || !results || !results.length) return;
   try {
-    const res = await fetch('https://aitkorea.bid/webhook/ait/alarm/validate', {
+    const res = await fetch('https://aitkorea.app/webhook/ait/alarm/validate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...AIT_API.authHeaders() },
       body: JSON.stringify({ doc_type, parent_id, check_date, results, ...(extra || {}) })
@@ -1864,7 +1864,7 @@ window._aitAlarmValidate = async function(doc_type, parent_id, check_date, resul
 };
 
 /* ── 알람 설정 모달 (55_AIT_alarm_settings_POST webhook) ── */
-const _ALARM_SETTINGS_URL = 'https://aitkorea.bid/webhook/ait/alarm/settings';
+const _ALARM_SETTINGS_URL = 'https://aitkorea.app/webhook/ait/alarm/settings';
 let _alarmEnabled = null;
 let _alarmReceivers = [];
 
