@@ -232,9 +232,11 @@ function _cpMergeVariants(rows) {
     const rCommon = (r.variant || CP_COMMON) === CP_COMMON;
     if ((rCommon && !curCommon) || (rCommon === curCommon && Number(r.id) < Number(cur.id))) e.rep = r;
   });
+  const allVs = _cpVariantList(rows);   // 라인의 전체 차종 — 모든 차종에 있는 항목은 태그 생략
   return [...map.values()].map(e => {
     const vs = [...e.variants];
-    const tag = vs.includes(CP_COMMON) ? '' : vs.join(', ') + '만 해당';
+    const inAll = allVs.length > 0 && allVs.every(v => e.variants.has(v));
+    const tag = (vs.includes(CP_COMMON) || inAll) ? '' : vs.join(', ') + '만 해당';
     return Object.assign({}, e.rep, { _variantTag: tag });
   });
 }
