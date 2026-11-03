@@ -421,6 +421,7 @@ window.initDefectTab = function initDefectTab() {
    ══════════════════════════════════════════════════════════════ */
 window._defectLockCheck = async function () {
   try {
+    if (getMyRole() === 'admin') { window._defectSetLock(false); return; } // 전체관리자는 잠금 제외
     const car = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
     const line = car && car.linename;
     if (!line) { window._defectSetLock(false); return; }
