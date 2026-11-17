@@ -440,12 +440,13 @@ window._defectLockCheck = async function () {
     window._defectSetLock(reps.length > 0 && (workerUnsigned || batchMissing), yStr);
   } catch (e) {
     console.warn('전날 부적합품 서명 확인 실패', e);
+    if (typeof window._inspLockCheck === 'function') window._inspLockCheck();
   }
 };
 
 window._defectSetLock = function (locked, yStr) {
   document.body.classList.toggle('ait-defect-lock', !!locked);
-  if (!locked) return;
+  if (!locked) { if (typeof window._inspLockCheck === 'function') window._inspLockCheck(); return; }
   (async () => {
     if (typeof window.loadTab === 'function') await window.loadTab('defect');
     const nav = document.querySelector('.nav-item[data-tab="defect"]');
@@ -453,5 +454,37 @@ window._defectSetLock = function (locked, yStr) {
     const dateInput = document.querySelector('#defect-date');
     if (dateInput && yStr) dateInput.value = yStr;
     if (typeof window._defectRefresh === 'function') window._defectRefresh();
+  })();
+};
+
+/* ══════════════════════════════════════════════════════════════
+   공정검사기준서 오늘 서명 잠금 — 현재 아이템의 공정 중 오늘 서명이 없는
+   공정이 하나라도 있으면 공정검사기준서 탭으로 강제 진입 + 다른 메뉴 잠금.
+   부적합품 잠금이 걸려 있으면 그쪽을 먼저 처리(해제되면 이 검사가 이어서 실행됨).
+   조회 실패 시에는 잠그지 않는다(서버 지연으로 업무가 막히는 것 방지).
+   ══════════════════════════════════════════════════════════════ */
+window._inspLockCheck = async function () {
+  try {
+    if (AIT_API.MOCK || getMyRole() === 'admin') { window._inspSetLock(false); return; } // 전체관리자는 잠금 제외
+    const carId = window.currentCarId;
+    const car = (window._aitCars || []).find(c => String(c.id) === String(carId));
+    if (!car || (Array.isArray(car.enabled_docs) && !car.enabled_docs.includes('insp'))) { window._inspSetLock(false); return; }
+    const [doc, signs] = await Promise.all([AIT_API.getInspDoc(carId), AIT_API.getInspSigns(carId)]);
+    if (String(window.currentCarId) !== String(carId)) return; // 조회 중 차종이 바뀌면 무시
+    const procs = (doc && Array.isArray(doc.procs)) ? doc.procs : [];
+    const signed = new Set((Array.isArray(signs) ? signs : []).map(s => s.proc_id));
+    window._inspSetLock(procs.length > 0 && procs.some(p => !signed.has(p.id)));
+  } catch (e) {
+    console.warn('공정검사기준서 서명 확인 실패', e);
+  }
+};
+
+window._inspSetLock = function (locked) {
+  document.body.classList.toggle('ait-insp-lock', !!locked);
+  if (!locked || document.body.classList.contains('ait-defect-lock')) return;
+  (async () => {
+    if (typeof window.loadTab === 'function') await window.loadTab('insp');
+    const nav = document.querySelector('.nav-item[data-tab="insp"]');
+    if (nav && typeof window.showTab === 'function') window.showTab('insp', nav);
   })();
 };

@@ -383,6 +383,11 @@ window.inspSign=function(){
     _signs[pid].push({name:name,signed_at:r.signed_at});
     renderNav(); renderContent();
     if(typeof showToast==='function') showToast('서명되었습니다','success');
+    // 모든 공정이 오늘 서명되면 다른 메뉴 잠금 해제
+    if(typeof window._inspSetLock==='function' && _doc && _doc.procs){
+      var left=_doc.procs.filter(function(p){return !(_signs[p.id]&&_signs[p.id].length);}).length;
+      if(!left) window._inspSetLock(false);
+    }
   }).catch(function(){
     btn.textContent='확인했습니다'; btn.disabled=false;
     if(typeof showToast==='function') showToast('서명 저장에 실패했습니다. 다시 눌러주세요.','warning');

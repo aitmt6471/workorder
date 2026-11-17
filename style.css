@@ -46,6 +46,8 @@ body.ait-customer-mode #pane-defect{display:none!important}
 
 /* 전날 부적합품 서명 미완료 잠금 — 부적합품현황 외 메뉴 비활성화 */
 body.ait-defect-lock .nav-item:not([data-tab="defect"]){pointer-events:none;opacity:.35}
+/* 공정검사기준서 오늘 서명 미완료 잠금 — 부적합품 잠금이 걸려 있으면 그쪽이 우선 */
+body.ait-insp-lock:not(.ait-defect-lock) .nav-item:not([data-tab="insp"]){pointer-events:none;opacity:.35}
 #pane-daily.active,#pane-ws.active,#pane-ms.active,#pane-insp.active,#pane-qpoint.active{padding:0}
 #pane-ms.active{display:flex;flex-direction:column;overflow:hidden}
 #pane-ms .tab-toolbar,#ms-expire-banner,#ms-sample-tab-bar,#ms-empty-state{flex-shrink:0}

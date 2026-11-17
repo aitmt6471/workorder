@@ -52,6 +52,10 @@ function showTab(id, el) {
     alert('전날 부적합품 서명을 모두 완료해야 다른 메뉴로 이동할 수 있습니다.');
     return;
   }
+  if (id !== 'insp' && !document.body.classList.contains('ait-defect-lock') && document.body.classList.contains('ait-insp-lock')) {
+    alert('공정검사기준서에서 오늘 서명(이름 입력 후 확인했습니다)을 완료해야 다른 메뉴로 이동할 수 있습니다.');
+    return;
+  }
   document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
   document.getElementById('pane-' + id).classList.add('active');
