@@ -72,6 +72,7 @@ var _editMode = false;
 var _carKey   = '';
 var _doc      = null;
 var _procId   = null;
+var _signs    = {};   // 오늘 서명: { procId: [{name, signed_at}] }
 
 /* ── 유틸 ── */
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
@@ -136,9 +137,12 @@ function loadDoc(){
   if(typeof AIT_API!=='undefined' && !AIT_API.MOCK && window.currentCarId){
     Promise.all([
       AIT_API.getInspDoc(window.currentCarId),
-      AIT_API.getRevisions(window.currentCarId,'insp').catch(function(){return[];})
+      AIT_API.getRevisions(window.currentCarId,'insp').catch(function(){return[];}),
+      AIT_API.getInspSigns(window.currentCarId).catch(function(){return[];})
     ]).then(function(results){
       var res=results[0], revRows=results[1]||[];
+      _signs={};
+      (Array.isArray(results[2])?results[2]:[]).forEach(function(s){ (_signs[s.proc_id]=_signs[s.proc_id]||[]).push(s); });
       _doc=res||_emptyDoc();
       _fillPartFromCp();
       if(_procId===null && _doc.procs&&_doc.procs.length) _procId=_doc.procs[0].id;
@@ -179,7 +183,7 @@ function calcPhotoH(){
   if(!main) return 200;
   var mainH=main.clientHeight;
   var rows=2; // 항상 2행 기준으로 높이 계산
-  var reserved=212+(rows-1)*12; // 헤더테이블+마진+검사포인트바+패딩+행간격
+  var reserved=272+(rows-1)*12; // 헤더테이블+마진+검사포인트바+패딩+행간격
   var perRow=(mainH-reserved)/rows;
   return Math.max(80,Math.floor(perRow-64)); // 항목제목(30)+설명여유(34)
 }
@@ -206,7 +210,8 @@ function renderNav(){
   var html='';
   _doc.procs.forEach(function(p){
     var act=p.id===_procId;
-    html+='<button class="proc-btn'+(act?' active':'')+'" onclick="inspSelProc(\''+p.id+'\')">'+esc(p.proc_no)+'</button>';
+    var sg=(_signs[p.id]&&_signs[p.id].length)?' <span style="color:'+(act?'#86efac':'#16a34a')+';font-weight:900" title="오늘 서명 완료">&#x2713;</span>':'';
+    html+='<button class="proc-btn'+(act?' active':'')+'" onclick="inspSelProc(\''+p.id+'\')">'+esc(p.proc_no)+sg+'</button>';
   });
   if(_editMode) html+='<button class="proc-btn" style="border-style:dashed;color:#3b82f6;margin-left:6px" onclick="inspAddProc()">+</button>';
   nav.innerHTML=html;
@@ -266,6 +271,8 @@ function renderContent(){
     +'<td colspan="4" style="border:1px solid #c8d3e0;padding:4px 10px;text-align:right;vertical-align:middle">'+delProcBtn+'</td>'
     +'</tr>'
     +'</tbody></table></div>';
+
+  html+=inspSignBarHtml(proc);
 
   html+='<div style="background:#1e3264;color:#fff;padding:9px 16px;border-radius:4px 4px 0 0;font-weight:700;font-size:13px;display:flex;align-items:center;gap:10px">'
     +'<span>'+esc(proc.proc_no)+(proc.proc_name?' ('+esc(proc.proc_name)+')':'')+'  검사 포인트</span>'
@@ -338,6 +345,49 @@ window.inspLoadDoc=loadDoc;
 
 /* ── 공정 관리 ── */
 window.inspSelProc=function(id){ _procId=id; renderNav(); renderContent(); };
+
+/* ── 오늘 확인 서명 ── */
+function inspSignBarHtml(proc){
+  if(_editMode) return '';
+  var list=_signs[proc.id]||[];
+  var done=list.length>0;
+  var who=list.map(function(s){
+    var t=String(s.signed_at||'').slice(11,16);
+    return '<span style="font-weight:700;color:#166534">'+esc(s.name)+'</span> <span style="color:#6b7280">'+esc(t)+'</span>';
+  }).join(' &nbsp;·&nbsp; ');
+  return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;margin-bottom:14px;padding:12px 16px;border-radius:6px;'
+    +(done?'background:#ecfdf5;border:1px solid #86efac':'background:#fff;border:2px solid #1e3264')+'">'
+    +'<div style="font-size:13px;font-weight:700;color:'+(done?'#166534':'#1e3264')+'">'+(done?'&#x2713; 오늘 서명 완료':'오늘 서명이 필요합니다')+'</div>'
+    +(done?'<div style="font-size:13px;flex:1;min-width:0">'+who+'</div>':'<div style="flex:1"></div>')
+    +'<input id="insp-sign-name" type="text" maxlength="20" placeholder="이름을 적어주세요" autocomplete="off" '
+    +'oninput="document.getElementById(\'insp-sign-btn\').disabled=!this.value.trim()" '
+    +'onkeydown="if(event.key===\'Enter\')inspSign()" '
+    +'style="border:1px solid #d1d5db;border-radius:6px;padding:8px 12px;font-size:14px;font-family:inherit;width:160px;max-width:100%">'
+    +'<button id="insp-sign-btn" disabled onclick="inspSign()" '
+    +'style="border:none;background:#1e3264;color:#fff;border-radius:6px;padding:9px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;opacity:1" '
+    +'onmouseover="" >확인했습니다</button>'
+    +'</div>';
+}
+
+window.inspSign=function(){
+  var inp=document.getElementById('insp-sign-name'), btn=document.getElementById('insp-sign-btn');
+  if(!inp||!btn||btn.disabled||!_procId) return;
+  var name=inp.value.trim();
+  if(!name) return;
+  var pid=_procId;
+  btn.disabled=true; btn.textContent='저장 중...';
+  AIT_API.signInsp(window.currentCarId,pid,name).then(function(r){
+    if(!r||!r.ok) throw new Error('fail');
+    (_signs[pid]=_signs[pid]||[]);
+    _signs[pid]=_signs[pid].filter(function(s){return s.name!==name;});
+    _signs[pid].push({name:name,signed_at:r.signed_at});
+    renderNav(); renderContent();
+    if(typeof showToast==='function') showToast('서명되었습니다','success');
+  }).catch(function(){
+    btn.textContent='확인했습니다'; btn.disabled=false;
+    if(typeof showToast==='function') showToast('서명 저장에 실패했습니다. 다시 눌러주세요.','warning');
+  });
+};
 
 window.inspAddProc=function(){
   if(!_doc) return;

@@ -225,6 +225,8 @@ const AIT_API = (() => {
     /* ── 공정검사기준서 (JSON blob) ───────────── */
     getInspDoc:       (carId)        => _get('ait/insp/doc', { carId }),
     saveInspDoc:      (carId, doc)   => _post('ait/insp/doc', { carId, doc }),
+    getInspSigns:     (carId)        => _get('ait/insp/sign', { carId }),
+    signInsp:         (carId, procId, name) => _post('ait/insp/sign', { carId, procId, name }).then(r => Array.isArray(r) ? r[0] : r),
 
     /* ── Q-Point (JSON blob) ──────────────────── */
     getQpointList:    (carId)        => _get('ait/qpoint/list', { carId }),
@@ -404,6 +406,8 @@ const AIT_API = (() => {
     /* 공정검사기준서 / Q-Point */
     getInspDoc:         (carId)         => _real.getInspDoc(carId),
     saveInspDoc:        (carId, doc)    => _real.saveInspDoc(carId, doc),
+    getInspSigns:       (carId)         => _real.getInspSigns(carId),
+    signInsp:           (carId, procId, name) => _real.signInsp(carId, procId, name),
     getQpointList:      (carId)         => _real.getQpointList(carId),
     saveQpointList:     (carId, list)   => _real.saveQpointList(carId, list),
     /* 부적합품현황 / 대시보드 */
