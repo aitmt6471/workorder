@@ -73,6 +73,7 @@ var _carKey   = '';
 var _doc      = null;
 var _procId   = null;
 var _signs    = {};   // 오늘 서명: { procId: [{name, signed_at}] }
+var _loadTimer = null;
 
 /* ── 유틸 ── */
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
@@ -137,8 +138,18 @@ function loadDoc(){
   var el=document.getElementById('insp-content');
   if(el) el.innerHTML='<div style="padding:80px 20px;text-align:center;color:#9ca3af">'
     +'<div style="font-size:40px;margin-bottom:14px">&#x1F4CB;</div>'
-    +'<div style="font-size:14px;font-weight:600;color:#6b7280">로딩 중...</div>'
+    +'<div style="font-size:14px;font-weight:600;color:#6b7280">로딩 중... <span id="insp-load-sec"></span></div>'
+    +'<div id="insp-load-hint" style="font-size:12px;margin-top:8px"></div>'
     +'</div>';
+  // 경과 시간 표시 — 오래 걸려도 멈춘 것인지 진행 중인지 알 수 있게
+  clearInterval(_loadTimer);
+  var _t0=Date.now();
+  _loadTimer=setInterval(function(){
+    var s=document.getElementById('insp-load-sec'); if(!s){ clearInterval(_loadTimer); return; }
+    var n=Math.round((Date.now()-_t0)/1000); s.textContent='('+n+'초)';
+    var h=document.getElementById('insp-load-hint');
+    if(h&&n>=20) h.textContent='서버 응답이 늦습니다. 잠시 더 기다리거나 새로고침(Ctrl+F5) 해주세요.';
+  },1000);
 
   if(typeof AIT_API!=='undefined' && !AIT_API.MOCK && window.currentCarId){
     Promise.all([
@@ -164,10 +175,19 @@ function loadDoc(){
         if(typeof updateRevDisplay==='function') updateRevDisplay('insp');
       }
       render();
-    }).catch(function(){
-      _doc=_emptyDoc();
-      _fillPartFromCp();
-      render();
+    }).catch(function(e){
+      // 불러오기 실패 — 빈 기준서를 보여주면 편집·저장 시 기존 문서를 덮어쓸 수 있으므로 오류와 재시도를 보여준다
+      clearInterval(_loadTimer);
+      console.warn('기준서 로드 실패', e);
+      _doc=null;
+      var el2=document.getElementById('insp-content');
+      if(el2) el2.innerHTML='<div style="padding:70px 20px;text-align:center;color:#6b7280">'
+        +'<div style="font-size:14px;font-weight:700;margin-bottom:6px">공정검사기준서를 불러오지 못했습니다</div>'
+        +'<div style="font-size:12px;color:#9ca3af;margin-bottom:14px">'+esc(e&&e.message?e.message:'')+'</div>'
+        +'<button onclick="inspLoadDoc()" style="padding:9px 22px;background:#1e3264;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">다시 시도</button>'
+        +'</div>';
+      renderNav();
+      if(typeof window._inspSetLock==='function') window._inspSetLock(false); // 서명할 수 없는 상태에서 다른 메뉴까지 막지 않음
     });
     return;
   }
@@ -196,6 +216,7 @@ function calcPhotoH(){
 
 /* ── 렌더 ── */
 function render(){
+  clearInterval(_loadTimer);
   renderNav();
   renderContent();
 }

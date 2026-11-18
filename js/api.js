@@ -38,7 +38,8 @@ const AIT_API = (() => {
     const qs = new URLSearchParams(params).toString();
     const r  = await _fetchT(`${N8N}/${path}${qs ? '?' + qs : ''}`, { cache: 'no-store' }, ms);
     if (!r.ok) throw new Error(`GET ${path} ${r.status}`);
-    const txt = await r.text();
+    // 헤더 수신 후 본문이 멈추면 fetch 타임아웃이 이미 풀려 무한 대기하므로 본문 수신도 제한 시간을 둔다
+    const txt = await Promise.race([r.text(), new Promise((_, rej) => setTimeout(() => rej(new Error('응답 수신이 지연되어 중단했습니다')), ms))]);
     return txt ? JSON.parse(txt) : [];
   }
   async function _jsonOrOk(r, method, path) {
