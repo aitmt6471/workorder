@@ -239,6 +239,7 @@ const AIT_API = (() => {
     },
     saveInspDoc:      (carId, doc)   => { window.__inspDocCache = null; return _post('ait/insp/doc', { carId, doc }); },
     getInspSigns:     (carId)        => _get('ait/insp/sign', { carId }),
+    getInspSignRange: (carId, from, to) => _get('ait/insp/sign/range', { carId, from, to }),
     signInsp:         (carId, procId, name) => _post('ait/insp/sign', { carId, procId, name }).then(r => Array.isArray(r) ? r[0] : r),
 
     /* ── Q-Point (JSON blob) ──────────────────── */
@@ -420,6 +421,7 @@ const AIT_API = (() => {
     getInspDoc:         (carId)         => _real.getInspDoc(carId),
     saveInspDoc:        (carId, doc)    => _real.saveInspDoc(carId, doc),
     getInspSigns:       (carId)         => _real.getInspSigns(carId),
+    getInspSignRange:   (carId, from, to) => _real.getInspSignRange(carId, from, to),
     signInsp:           (carId, procId, name) => _real.signInsp(carId, procId, name),
     getQpointList:      (carId)         => _real.getQpointList(carId),
     saveQpointList:     (carId, list)   => _real.saveQpointList(carId, list),

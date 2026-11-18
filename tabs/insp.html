@@ -74,6 +74,10 @@ var _doc      = null;
 var _procId   = null;
 var _signs    = {};   // 오늘 서명: { procId: [{name, signed_at}] }
 var _loadTimer = null;
+var _ym = null;       // 날짜 선택: 보고 있는 달 {y,m}
+var _selD = 0;        // 선택한 날(일)
+var _msigns = {};     // 달별 서명 기록: { 'y-m': { procId: { day: [{name,signed_at}] } } }
+var _rangeErr = false;// 기간 조회 실패(서버 미배포 등)
 
 /* ── 유틸 ── */
 function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,5); }
@@ -173,6 +177,7 @@ function loadDoc(){
       (Array.isArray(results[2])?results[2]:[]).forEach(function(s){ (_signs[s.proc_id]=_signs[s.proc_id]||[]).push(s); });
       _doc=res||_emptyDoc();
       _fillPartFromCp();
+      var _t=_today(); _ym={y:_t.y,m:_t.m}; _selD=_t.d; _msigns={}; _rangeErr=false;
       if(_procId===null && visProcs().length) _procId=visProcs()[0].id;
       if(revRows.length){
         var rd={rev:0,history:[]};
@@ -186,6 +191,7 @@ function loadDoc(){
         if(typeof updateRevDisplay==='function') updateRevDisplay('insp');
       }
       render();
+      inspLoadMonth();
     }).catch(function(e){
       // 불러오기 실패 — 빈 기준서를 보여주면 편집·저장 시 기존 문서를 덮어쓸 수 있으므로 오류와 재시도를 보여준다
       clearInterval(_loadTimer);
@@ -286,7 +292,7 @@ function renderContent(){
 
   var delProcBtn=eMode?'<button onclick="inspDeleteProc(\''+proc.id+'\')" style="background:none;border:1px solid #fca5a5;color:#ef4444;border-radius:4px;padding:2px 9px;cursor:pointer;font-size:11px">공정 삭제</button>':'';
 
-  var html='<div style="background:#fff;border:1px solid #9aaabf;border-radius:6px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 4px rgba(15,23,42,.06)">'
+  var html=inspDateBarHtml()+'<div style="background:#fff;border:1px solid #9aaabf;border-radius:6px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 4px rgba(15,23,42,.06)">'
     +'<table style="width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed">'
     +'<colgroup><col style="width:58px"><col><col style="width:68px"><col><col style="width:68px"><col></colgroup>'
     +'<tbody>'
@@ -385,9 +391,128 @@ window.inspLoadDoc=loadDoc;
 /* ── 공정 관리 ── */
 window.inspSelProc=function(id){ _procId=id; renderNav(); renderContent(); };
 
+/* ── 날짜 선택 (설비일상점검표와 같은 월 이동 바 + 날짜 버튼 줄) ── */
+var KR_FIXED=['1-1','3-1','5-5','6-6','8-15','10-3','10-9','12-25'];
+var KR_EXTRA={
+  2025:['1-27','1-28','1-29','3-3','10-5','10-6','10-7','10-8'],
+  2026:['2-16','2-17','2-18','3-2','6-3','8-17','9-25','9-26','9-27','9-28','9-29','10-5']
+};
+var KR_NO_SUB={2026:['6-8']};
+var _subCache={};
+function _calcSubs(year){
+  var subs={};
+  [[1,1],[3,1],[5,5],[6,6],[8,15],[10,3],[10,9],[12,25]].forEach(function(a){
+    var dw=new Date(year,a[0]-1,a[1]).getDay(), off=dw===0?1:(dw===6?2:0);
+    if(off){ var s=new Date(year,a[0]-1,a[1]+off); subs[(s.getMonth()+1)+'-'+s.getDate()]=1; }
+  });
+  return subs;
+}
+function _isHol(y,m,d){   // 일요일·공휴일 (토요일 제외)
+  if(new Date(y,m-1,d).getDay()===0) return true;
+  var md=m+'-'+d;
+  if(KR_FIXED.indexOf(md)>=0) return true;
+  if((KR_EXTRA[y]||[]).indexOf(md)>=0) return true;
+  if(!_subCache[y]) _subCache[y]=_calcSubs(y);
+  return !!_subCache[y][md] && (KR_NO_SUB[y]||[]).indexOf(md)<0;
+}
+function _today(){ var t=new Date(); return {y:t.getFullYear(),m:t.getMonth()+1,d:t.getDate()}; }
+function _p2(n){ return (n<10?'0':'')+n; }
+function _ymd(y,m,d){ return y+'-'+_p2(m)+'-'+_p2(d); }
+function _cmpToday(y,m,d){ var t=_today(); return (y*10000+m*100+d)-(t.y*10000+t.m*100+t.d); }  // <0 지난 날, >0 앞으로의 날
+function _isToday(){ return !_ym || _cmpToday(_ym.y,_ym.m,_selD)===0; }
+var _DN=['일','월','화','수','목','금','토'];
+
+function _daySigns(pid,y,m,d){
+  if(_cmpToday(y,m,d)===0) return _signs[pid]||[];
+  var mm=_msigns[y+'-'+m];
+  return (mm&&mm[pid]&&mm[pid][d])||[];
+}
+
+function inspDateBarHtml(){
+  if(_editMode||!_ym||!_procId) return '';
+  var y=_ym.y, m=_ym.m, n=new Date(y,m,0).getDate(), loaded=!!_msigns[y+'-'+m], btns='';
+  for(var d=1;d<=n;d++){
+    var sat=new Date(y,m-1,d).getDay()===6, hol=_isHol(y,m,d), sel=d===_selD;
+    var bg='#fff', col='#1f2937', bd='#d1d5db', ex='';
+    if(sat||hol){ col=sat?'#f87171':'#f9a8d4'; bg='#fff0f3'; bd='#fecdd3'; if(sel) ex='outline:2px solid '+col+';outline-offset:1px;'; }
+    else if(sel){ bg='#1e3264'; col='#fff'; bd='#1e3264'; }
+    else if(_daySigns(_procId,y,m,d).length){ bg='#f0fdf4'; col='#16a34a'; bd='#86efac'; }
+    else if(loaded && _cmpToday(y,m,d)<0){ bg='#fff5f5'; col='#ef4444'; bd='#fca5a5'; }
+    btns+='<button onclick="inspSelDay('+d+')" aria-label="'+m+'월 '+d+'일" style="min-width:30px;height:30px;padding:0 4px;border:1px solid '+bd+';border-radius:6px;background:'+bg+';color:'+col+';font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;'+ex+'">'+d+'</button>';
+  }
+  var nb='border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#fff;border-radius:6px;padding:3px 11px;font-size:16px;cursor:pointer;line-height:1.2;font-family:inherit';
+  return '<div style="margin-bottom:14px;border-radius:6px;overflow:hidden;box-shadow:0 1px 4px rgba(15,23,42,.06)">'
+    +'<div style="padding:10px 16px;background:#1e3264;display:flex;align-items:center;gap:10px;flex-wrap:wrap;color:#fff">'
+    +'<button onclick="inspMonth(-1)" aria-label="이전 달" style="'+nb+'">&#x2039;</button>'
+    +'<span style="font-weight:700;font-size:14px;min-width:90px;text-align:center">'+y+'년 '+m+'월</span>'
+    +'<button onclick="inspMonth(1)" aria-label="다음 달" style="'+nb+'">&#x203A;</button>'
+    +'<span style="color:rgba(255,255,255,.35);margin:0 4px">|</span>'
+    +'<span style="font-size:13px;font-weight:700;background:rgba(255,255,255,.15);padding:3px 12px;border-radius:6px;letter-spacing:.5px">'+m+'월 '+_selD+'일 ('+_DN[new Date(y,m-1,_selD).getDay()]+')</span>'
+    +'<span style="margin-left:auto;font-size:12px;color:rgba(255,255,255,.8)">서명 기록</span></div>'
+    +'<div style="padding:12px 16px;background:#f4f7fc;border:1px solid #c8d3e0;border-top:none;display:flex;flex-wrap:wrap;gap:4px">'+btns+'</div></div>';
+}
+
+/* 다시 그리기 전후로 입력 중인 이름을 보존 */
+function _rerenderKeepName(){
+  var inp=document.getElementById('insp-sign-name'), v=inp?inp.value:'';
+  renderContent();
+  var i2=document.getElementById('insp-sign-name'), b2=document.getElementById('insp-sign-btn');
+  if(i2&&v){ i2.value=v; if(b2) b2.disabled=!v.trim(); }
+}
+
+window.inspSelDay=function(d){ _selD=d; _rerenderKeepName(); };
+window.inspMonth=function(k){
+  var m=_ym.m+k, y=_ym.y;
+  if(m<1){ m=12; y--; } if(m>12){ m=1; y++; }
+  _ym={y:y,m:m};
+  var t=_today(); _selD=(y===t.y&&m===t.m)?t.d:1;
+  _rerenderKeepName();
+  inspLoadMonth();
+};
+function inspLoadMonth(){
+  if(!_ym||typeof AIT_API==='undefined'||AIT_API.MOCK||!window.currentCarId||typeof AIT_API.getInspSignRange!=='function') return;
+  var y=_ym.y, m=_ym.m, key=y+'-'+m;
+  if(_msigns[key]) return;
+  var cid=window.currentCarId, last=new Date(y,m,0).getDate();
+  AIT_API.getInspSignRange(cid,_ymd(y,m,1),_ymd(y,m,last)).then(function(rows){
+    if(cid!==window.currentCarId) return;
+    var o={};
+    (Array.isArray(rows)?rows:[]).forEach(function(r){
+      var d=parseInt(String(r.sign_date||'').slice(8,10),10);
+      if(!r.proc_id||!d) return;
+      var byProc=(o[r.proc_id]=o[r.proc_id]||{});
+      (byProc[d]=byProc[d]||[]).push({name:r.name,signed_at:r.signed_at});
+    });
+    _msigns[key]=o; _rangeErr=false;
+    _rerenderKeepName();
+  }).catch(function(){ _rangeErr=true; _rerenderKeepName(); });
+}
+
+/* 오늘이 아닌 날을 선택했을 때: 그날 서명 기록(읽기 전용) */
+function inspPastBarHtml(proc){
+  var y=_ym.y, m=_ym.m, d=_selD, c=_cmpToday(y,m,d);
+  var ds=m+'월 '+d+'일 ('+_DN[new Date(y,m-1,d).getDay()]+')';
+  var box=function(bg,bd,ttl,sub,right){
+    return '<div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-bottom:14px;padding:12px 16px;border-radius:6px;background:'+bg+';border:1px solid '+bd+'">'
+      +'<div style="min-width:0;flex:1"><div style="font-size:13px;font-weight:700">'+ttl+'</div><div style="font-size:12px;color:#6b7280;margin-top:2px">'+sub+'</div></div>'+(right||'')+'</div>';
+  };
+  if(c>0) return box('#f4f7fc','#c8d3e0',esc(ds),'아직 오지 않은 날짜입니다.');
+  var list=_daySigns(proc.id,y,m,d);
+  if(list.length){
+    var who=list.map(function(s){
+      return '<span style="font-weight:700;color:#166534">'+esc(s.name)+'</span> <span style="color:#6b7280">'+esc(String(s.signed_at||'').slice(11,16))+'</span>';
+    }).join(' &nbsp;·&nbsp; ');
+    return box('#ecfdf5','#86efac','&#x2713; '+esc(ds)+' 서명 완료','지난 기록입니다. 읽기 전용입니다.','<div style="font-size:13px">'+who+'</div>');
+  }
+  if(!_msigns[y+'-'+m]) return box('#f4f7fc','#c8d3e0',esc(ds),_rangeErr?'서명 기록을 불러오지 못했습니다.':'서명 기록을 불러오는 중...');
+  if(new Date(y,m-1,d).getDay()===6||_isHol(y,m,d)) return box('#f4f7fc','#c8d3e0',esc(ds)+' 휴무','서명 기록이 없습니다.');
+  return box('#fff5f5','#fca5a5',esc(ds)+' 서명 없음','이 날은 '+esc(proc.proc_no)+' 서명 기록이 없습니다.');
+}
+
 /* ── 오늘 확인 서명 ── */
 function inspSignBarHtml(proc){
   if(_editMode) return '';
+  if(_ym && !_isToday()) return inspPastBarHtml(proc);
   var list=_signs[proc.id]||[];
   var done=list.length>0;
   var who=list.map(function(s){
