@@ -438,6 +438,24 @@
 <script src="js/print_cp_gentex.js?v=20260812revsplit1"></script>
 <script src="js/defect.js?v=20261118inspfast"></script>
 
+<!-- 새 버전 자동 반영: 오래 켜둔 화면(공장 PC)이 옛 파일로 계속 동작하는 것 방지. 배포 때 version.json 의 build 와 아래 BUILD 를 같이 올릴 것 -->
+<script>
+(function(){
+  var BUILD='20261119r1';
+  function chk(){
+    fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
+      if(!v||!v.build||v.build===BUILD) return;
+      var a=document.activeElement;
+      if(document.querySelector('.pane.active.edit-mode')||(a&&/^(INPUT|TEXTAREA)$/.test(a.tagName))) return; // 편집·입력 중이면 다음 확인 때
+      try{ if(sessionStorage.getItem('ait_build_reload')===v.build) return; sessionStorage.setItem('ait_build_reload',v.build); }catch(e){}
+      location.reload();
+    }).catch(function(){});
+  }
+  setTimeout(chk,5000);
+  setInterval(chk,10*60*1000);
+  document.addEventListener('visibilitychange',function(){ if(!document.hidden) chk(); });
+})();
+</script>
 <!-- 탭 콘텐츠 fetch 로드 -->
 <script>
 const TABS = ['cp','ws','daily','imf','spc','ms','spec','insp','qpoint','defect'];
