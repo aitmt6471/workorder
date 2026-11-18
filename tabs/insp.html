@@ -134,7 +134,22 @@ function _fillPartFromCp(){
   if(meta.partname) _doc.part_name=meta.partname;
 }
 
+var _started=false;   // loadDoc 가 한 번이라도 시작됐는지 (시작 안 된 채 "로딩 중" 고정 방지용 감시)
+var _lastErr='';
+window.addEventListener('error',function(e){ _lastErr=String((e&&e.message)||'').slice(0,80); });
+setTimeout(function(){
+  if(_started) return;
+  var el=document.getElementById('insp-content'); if(!el) return;
+  try{ loadDoc(); }
+  catch(e){
+    el.innerHTML='<div style="padding:70px 20px;text-align:center;color:#6b7280"><div style="font-size:14px;font-weight:700;margin-bottom:6px">공정검사기준서를 시작하지 못했습니다</div>'
+      +'<div style="font-size:12px;color:#9ca3af;margin-bottom:14px">'+esc(e&&e.message?e.message:'')+'</div>'
+      +'<button onclick="inspLoadDoc()" style="padding:9px 22px;background:#1e3264;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">다시 시도</button></div>';
+  }
+},8000);
+
 function loadDoc(){
+  _started=true;
   _carKey=carKey();
   if(!_carKey){ _doc=null; render(); return; }
 
@@ -163,14 +178,16 @@ function loadDoc(){
     var s=document.getElementById('insp-load-sec'); if(!s){ clearInterval(_loadTimer); return; }
     var n=Math.round((Date.now()-_t0)/1000); s.textContent='('+n+'초)';
     var h=document.getElementById('insp-load-hint');
-    if(h&&n>=20) h.textContent='서버 응답이 늦습니다. 잠시 더 기다리거나 새로고침(Ctrl+F5) 해주세요.';
+    if(h&&n>=5) h.textContent='문서 '+_st.d+' · 이력 '+_st.r+' · 서명 '+_st.s+(_lastErr?' · 오류: '+_lastErr:'')+(n>=20?' — 서버 응답이 늦습니다. 잠시 더 기다리거나 새로고침(Ctrl+F5) 해주세요.':'');
   },1000);
+  var _st={d:'…',r:'…',s:'…'};  // 단계별 진행 상태(…대기 ✓완료 ✕실패) — 멈췄을 때 어디서 멈췄는지 화면에서 확인용
+  function stage(k,p){ return p.then(function(v){_st[k]='✓';return v;}); }
 
   if(typeof AIT_API!=='undefined' && !AIT_API.MOCK && window.currentCarId){
     Promise.all([
-      AIT_API.getInspDoc(window.currentCarId),
-      AIT_API.getRevisions(window.currentCarId,'insp').catch(function(){return[];}),
-      AIT_API.getInspSigns(window.currentCarId).catch(function(){return[];})
+      stage('d',AIT_API.getInspDoc(window.currentCarId)),
+      stage('r',AIT_API.getRevisions(window.currentCarId,'insp')).catch(function(){_st.r='✕';return[];}),
+      stage('s',AIT_API.getInspSigns(window.currentCarId)).catch(function(){_st.s='✕';return[];})
     ]).then(function(results){
       var res=results[0], revRows=results[1]||[];
       _signs={};

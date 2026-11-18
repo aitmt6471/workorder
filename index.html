@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>공정문서 관리시스템</title>
   <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=20261117inspsign">
+<link rel="stylesheet" href="style.css?v=20261119twotab">
 <script>
   (function() {
     const token = localStorage.getItem('ait_token');
@@ -432,16 +432,16 @@
 
 <script src="js/api.js?v=20261119inspdate"></script>
 <script src="js/cp.js?v=20261008tagall"></script>
-<script src="js/main.js?v=20261117inspsign"></script>
+<script src="js/main.js?v=20261119twotab"></script>
 <script src="js/ws.js?v=20260523a"></script>
 <script src="js/spc.js?v=20260731ucl1"></script>
 <script src="js/print_cp_gentex.js?v=20260812revsplit1"></script>
-<script src="js/defect.js?v=20261118inspfast"></script>
+<script src="js/defect.js?v=20261119twotab"></script>
 
 <!-- 새 버전 자동 반영: 오래 켜둔 화면(공장 PC)이 옛 파일로 계속 동작하는 것 방지. 배포 때 version.json 의 build 와 아래 BUILD 를 같이 올릴 것 -->
 <script>
 (function(){
-  var BUILD='20261119r2';
+  var BUILD='20261119r3';
   var bd=document.getElementById('ait-build'); if(bd) bd.textContent='v'+BUILD;
   function chk(){
     fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){

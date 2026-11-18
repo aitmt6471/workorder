@@ -48,12 +48,9 @@ function applyRoleUI() {
 
 /* ── 탭 전환 ── */
 function showTab(id, el) {
-  if (id !== 'defect' && document.body.classList.contains('ait-defect-lock')) {
-    alert('전날 부적합품 서명을 모두 완료해야 다른 메뉴로 이동할 수 있습니다.');
-    return;
-  }
-  if (id !== 'insp' && !document.body.classList.contains('ait-defect-lock') && document.body.classList.contains('ait-insp-lock')) {
-    alert('공정검사기준서에서 오늘 서명(이름 입력 후 확인했습니다)을 완료해야 다른 메뉴로 이동할 수 있습니다.');
+  // 전날 부적합품 서명 / 오늘 기준서 서명이 남아 있으면 두 탭(부적합품현황·공정검사기준서)만 열어 둔다. 둘 다 끝나면 나머지 탭이 열림
+  if ((document.body.classList.contains('ait-defect-lock') || document.body.classList.contains('ait-insp-lock')) && id !== 'defect' && id !== 'insp') {
+    alert('부적합품현황 서명과 공정검사기준서 서명을 모두 완료해야 다른 메뉴로 이동할 수 있습니다.');
     return;
   }
   document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));

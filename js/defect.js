@@ -449,6 +449,8 @@ window._defectLockCheck = async function () {
 window._defectSetLock = function (locked, yStr) {
   document.body.classList.toggle('ait-defect-lock', !!locked);
   if (!locked) { if (typeof window._inspLockCheck === 'function') window._inspLockCheck(); return; }
+  // 부적합품 잠금 중에도 기준서 서명 여부를 같이 확인 — 두 탭(부적합품현황·공정검사기준서)을 함께 열고, 둘 다 끝나야 나머지 메뉴가 열림
+  if (typeof window._inspLockCheck === 'function') window._inspLockCheck();
   (async () => {
     if (typeof window.loadTab === 'function') await window.loadTab('defect');
     const nav = document.querySelector('.nav-item[data-tab="defect"]');
