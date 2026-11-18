@@ -430,35 +430,41 @@
   </div>
 </div>
 
-<script src="js/api.js?v=20261117inspsign"></script>
+<script src="js/api.js?v=20261118inspfast"></script>
 <script src="js/cp.js?v=20261008tagall"></script>
 <script src="js/main.js?v=20261117inspsign"></script>
 <script src="js/ws.js?v=20260523a"></script>
 <script src="js/spc.js?v=20260731ucl1"></script>
 <script src="js/print_cp_gentex.js?v=20260812revsplit1"></script>
-<script src="js/defect.js?v=20261117inspsign"></script>
+<script src="js/defect.js?v=20261118inspfast"></script>
 
 <!-- 탭 콘텐츠 fetch 로드 -->
 <script>
 const TABS = ['cp','ws','daily','imf','spc','ms','spec','insp','qpoint','defect'];
 const loaded = {};
-async function loadTab(id) {
-  if (loaded[id]) return;
-  try {
-    const res = await fetch(`tabs/${id}.html?v=${Date.now()}`);
-    const html = await res.text();
-    const pane = document.getElementById('pane-' + id);
-    pane.innerHTML = '';
-    const frag = document.createRange().createContextualFragment(html);
-    pane.appendChild(frag);
-    if (id === 'cp') initCpEventListeners();
-    loaded[id] = true;
-    if (typeof loadCarContent === 'function') loadCarContent(id);
-    updateMonthLabel(id);
-    updateRevDisplay(id);
-  } catch(e) {
-    console.warn('탭 로드 실패:', id, e);
-  }
+const _loadingTabs = {};   // 로드 중인 탭 — 같은 탭을 동시에 여러 번 불러와 화면을 덮어쓰는 것 방지
+function loadTab(id) {
+  if (loaded[id]) return Promise.resolve();
+  if (_loadingTabs[id]) return _loadingTabs[id];
+  return _loadingTabs[id] = (async () => {
+    try {
+      const res = await fetch(`tabs/${id}.html?v=${Date.now()}`);
+      const html = await res.text();
+      const pane = document.getElementById('pane-' + id);
+      pane.innerHTML = '';
+      const frag = document.createRange().createContextualFragment(html);
+      pane.appendChild(frag);
+      if (id === 'cp') initCpEventListeners();
+      loaded[id] = true;
+      if (typeof loadCarContent === 'function') loadCarContent(id);
+      updateMonthLabel(id);
+      updateRevDisplay(id);
+    } catch(e) {
+      console.warn('탭 로드 실패:', id, e);
+    } finally {
+      delete _loadingTabs[id];
+    }
+  })();
 }
 document.addEventListener('DOMContentLoaded', async () => {
   await initCars();

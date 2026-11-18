@@ -421,6 +421,8 @@ window.initDefectTab = function initDefectTab() {
    ══════════════════════════════════════════════════════════════ */
 window._defectLockCheck = async function () {
   try {
+    // 기준서 문서(수 MB)를 미리 받아 둔다 — 뒤이은 기준서 서명 검사·기준서 탭이 같은 응답을 재사용
+    if (getMyRole() !== 'admin' && window.currentCarId && AIT_API.getInspDoc) AIT_API.getInspDoc(window.currentCarId).catch(() => {});
     if (getMyRole() === 'admin') { window._defectSetLock(false); return; } // 전체관리자는 잠금 제외
     const car = (window._aitCars || []).find(c => String(c.id) === String(window.currentCarId));
     const line = car && car.linename;
@@ -463,15 +465,24 @@ window._defectSetLock = function (locked, yStr) {
    부적합품 잠금이 걸려 있으면 그쪽을 먼저 처리(해제되면 이 검사가 이어서 실행됨).
    조회 실패 시에는 잠그지 않는다(서버 지연으로 업무가 막히는 것 방지).
    ══════════════════════════════════════════════════════════════ */
+/* 공정명/공정번호에 '중금속' 또는 '수입검사'가 들어간 공정은 기준서 탭을 만들지 않으며 서명 대상에서도 제외 */
+window.inspProcHidden = function (p) {
+  return /중금속|수입검사/.test(String((p && p.proc_name) || '') + ' ' + String((p && p.proc_no) || ''));
+};
+
 window._inspLockCheck = async function () {
   try {
     if (AIT_API.MOCK || getMyRole() === 'admin') { window._inspSetLock(false); return; } // 전체관리자는 잠금 제외
     const carId = window.currentCarId;
     const car = (window._aitCars || []).find(c => String(c.id) === String(carId));
     if (!car || (Array.isArray(car.enabled_docs) && !car.enabled_docs.includes('insp'))) { window._inspSetLock(false); return; }
-    const [doc, signs] = await Promise.all([AIT_API.getInspDoc(carId), AIT_API.getInspSigns(carId)]);
+    // 서버가 느리면 잠그지 않고 포기(15초) — 업무가 막히는 것 방지
+    const [doc, signs] = await Promise.race([
+      Promise.all([AIT_API.getInspDoc(carId), AIT_API.getInspSigns(carId)]),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 15000))
+    ]);
     if (String(window.currentCarId) !== String(carId)) return; // 조회 중 차종이 바뀌면 무시
-    const procs = (doc && Array.isArray(doc.procs)) ? doc.procs : [];
+    const procs = ((doc && Array.isArray(doc.procs)) ? doc.procs : []).filter(p => !window.inspProcHidden(p));
     const signed = new Set((Array.isArray(signs) ? signs : []).map(s => s.proc_id));
     window._inspSetLock(procs.length > 0 && procs.some(p => !signed.has(p.id)));
   } catch (e) {

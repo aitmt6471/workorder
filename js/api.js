@@ -223,8 +223,20 @@ const AIT_API = (() => {
     syncMsItems:      (carId, items) => _post('ait/ms/items/sync', { carId, items }),
 
     /* ── 공정검사기준서 (JSON blob) ───────────── */
-    getInspDoc:       (carId)        => _get('ait/insp/doc', { carId }),
-    saveInspDoc:      (carId, doc)   => _post('ait/insp/doc', { carId, doc }),
+    // 문서가 수 MB라 같은 아이템 요청은 60초간 한 번만 받는다(서명 잠금 검사 + 기준서 탭 + 중복 로드 공유). 호출마다 복제본 반환.
+    getInspDoc:       (carId)        => {
+      const k = String(carId), c = window.__inspDocCache;
+      let p;
+      if (c && c.k === k && Date.now() - c.t < 60000) p = c.p;
+      else {
+        p = _get('ait/insp/doc', { carId }, 45000);
+        const e = { k, t: Date.now(), p };
+        window.__inspDocCache = e;
+        p.catch(() => { if (window.__inspDocCache === e) window.__inspDocCache = null; });
+      }
+      return p.then(d => (d && typeof structuredClone === 'function') ? structuredClone(d) : d);
+    },
+    saveInspDoc:      (carId, doc)   => { window.__inspDocCache = null; return _post('ait/insp/doc', { carId, doc }); },
     getInspSigns:     (carId)        => _get('ait/insp/sign', { carId }),
     signInsp:         (carId, procId, name) => _post('ait/insp/sign', { carId, procId, name }).then(r => Array.isArray(r) ? r[0] : r),
 

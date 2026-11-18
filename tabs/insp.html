@@ -88,6 +88,12 @@ function carKey(){
   return s?s.value:'';
 }
 
+/* 탭을 만들지 않는 공정(공정명에 '중금속'·'수입검사')을 뺀 목록 */
+function visProcs(){
+  if(!_doc||!_doc.procs) return [];
+  return _doc.procs.filter(function(p){ return !(window.inspProcHidden&&window.inspProcHidden(p)); });
+}
+
 function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 function compressImg(file,cb){
@@ -145,7 +151,7 @@ function loadDoc(){
       (Array.isArray(results[2])?results[2]:[]).forEach(function(s){ (_signs[s.proc_id]=_signs[s.proc_id]||[]).push(s); });
       _doc=res||_emptyDoc();
       _fillPartFromCp();
-      if(_procId===null && _doc.procs&&_doc.procs.length) _procId=_doc.procs[0].id;
+      if(_procId===null && visProcs().length) _procId=visProcs()[0].id;
       if(revRows.length){
         var rd={rev:0,history:[]};
         revRows.forEach(function(r){
@@ -201,14 +207,14 @@ function renderNav(){
     nav.innerHTML='<div style="color:#9ca3af;font-size:12px;padding:8px 4px">아이템을 선택하세요</div>';
     return;
   }
-  if(!_doc.procs.length){
+  if(!visProcs().length){
     nav.innerHTML='<div style="color:#9ca3af;font-size:12px;padding:8px 4px">'
       +(_editMode?'편집 모드에서 공정을 추가하세요':'공정 없음')+'</div>'
       +(_editMode?'<button class="proc-btn" style="border-style:dashed;color:#3b82f6" onclick="inspAddProc()">+ 공정 추가</button>':'');
     return;
   }
   var html='';
-  _doc.procs.forEach(function(p){
+  visProcs().forEach(function(p){
     var act=p.id===_procId;
     var sg=(_signs[p.id]&&_signs[p.id].length)?' <span style="color:'+(act?'#86efac':'#16a34a')+';font-weight:900" title="오늘 서명 완료">&#x2713;</span>':'';
     html+='<button class="proc-btn'+(act?' active':'')+'" onclick="inspSelProc(\''+p.id+'\')">'+esc(p.proc_no)+sg+'</button>';
@@ -228,7 +234,7 @@ function renderContent(){
       +'</div>';
     return;
   }
-  if(!_doc.procs.length){
+  if(!visProcs().length){
     el.innerHTML='<div style="padding:70px 20px;text-align:center;color:#9ca3af">'
       +'<div style="font-size:36px;margin-bottom:12px">&#x1F4C4;</div>'
       +'<div style="font-size:13px;font-weight:600;color:#6b7280">등록된 공정이 없습니다</div>'
@@ -238,8 +244,9 @@ function renderContent(){
   }
 
   var proc=null;
-  for(var pi=0;pi<_doc.procs.length;pi++){ if(_doc.procs[pi].id===_procId){proc=_doc.procs[pi];break;} }
-  if(!proc){ proc=_doc.procs[0]; }
+  var vp=visProcs();
+  for(var pi=0;pi<vp.length;pi++){ if(vp[pi].id===_procId){proc=vp[pi];break;} }
+  if(!proc){ proc=vp[0]; }
   _procId=proc.id;
 
   var cn=carName();
@@ -385,7 +392,7 @@ window.inspSign=function(){
     if(typeof showToast==='function') showToast('서명되었습니다','success');
     // 모든 공정이 오늘 서명되면 다른 메뉴 잠금 해제
     if(typeof window._inspSetLock==='function' && _doc && _doc.procs){
-      var left=_doc.procs.filter(function(p){return !(_signs[p.id]&&_signs[p.id].length);}).length;
+      var left=visProcs().filter(function(p){return !(_signs[p.id]&&_signs[p.id].length);}).length;
       if(!left) window._inspSetLock(false);
     }
   }).catch(function(){
@@ -460,7 +467,7 @@ function _createProc(no,nm){
 window.inspDeleteProc=function(id){
   if(!confirm('이 공정을 삭제하시겠습니까?')) return;
   _doc.procs=_doc.procs.filter(function(p){return p.id!==id;});
-  _procId=_doc.procs.length?_doc.procs[0].id:null;
+  _procId=visProcs().length?visProcs()[0].id:null;
   render();
 };
 
