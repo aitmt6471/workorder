@@ -79,7 +79,7 @@
     </nav>
 
     <div class="sidebar-user" style="padding:10px 12px;border-top:1px solid var(--border)">
-      <div id="sidebar-user-name" style="font-size:12px;font-weight:600;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+      <div id="sidebar-user-name" style="font-size:12px;font-weight:600;color:var(--text1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div><div id="ait-build" style="font-size:9px;color:#94a3b8;margin-top:2px"></div>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-top:3px">
         <span id="sidebar-user-role" style="font-size:10px;background:#eff6ff;color:#2563eb;border-radius:4px;padding:1px 6px;font-weight:600"></span>
         <button onclick="(function(){localStorage.removeItem('ait_token');localStorage.removeItem('ait_token_exp');localStorage.removeItem('ait_user');window.location.replace('login.html');})()" style="font-size:10px;color:#94a3b8;background:none;border:none;cursor:pointer;padding:0">로그아웃</button>
@@ -441,7 +441,8 @@
 <!-- 새 버전 자동 반영: 오래 켜둔 화면(공장 PC)이 옛 파일로 계속 동작하는 것 방지. 배포 때 version.json 의 build 와 아래 BUILD 를 같이 올릴 것 -->
 <script>
 (function(){
-  var BUILD='20261119r1';
+  var BUILD='20261119r2';
+  var bd=document.getElementById('ait-build'); if(bd) bd.textContent='v'+BUILD;
   function chk(){
     fetch('version.json?t='+Date.now(),{cache:'no-store'}).then(function(r){return r.json();}).then(function(v){
       if(!v||!v.build||v.build===BUILD) return;
