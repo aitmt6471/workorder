@@ -134,6 +134,17 @@ function loadDoc(){
   _carKey=carKey();
   if(!_carKey){ _doc=null; render(); return; }
 
+  // 브라우저에 옛 index.html/api.js가 캐시된 경우(서명 API 없음) — 한 번 새로고침해서 최신 파일을 받는다
+  if(typeof AIT_API!=='undefined' && !AIT_API.MOCK && typeof AIT_API.getInspSigns!=='function'){
+    var _rk='ait_insp_stale_reload';
+    try{
+      if(!sessionStorage.getItem(_rk)){ sessionStorage.setItem(_rk,'1'); location.reload(); return; }
+    }catch(e){}
+    var el0=document.getElementById('insp-content');
+    if(el0) el0.innerHTML='<div style="padding:70px 20px;text-align:center;color:#6b7280;font-size:14px;font-weight:600">브라우저에 옛 버전이 저장되어 있습니다.<br>Ctrl+Shift+Delete로 캐시를 지우거나 Ctrl+F5를 눌러주세요.</div>';
+    return;
+  }
+
   // 로딩 중 표시
   var el=document.getElementById('insp-content');
   if(el) el.innerHTML='<div style="padding:80px 20px;text-align:center;color:#9ca3af">'
