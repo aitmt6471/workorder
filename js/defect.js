@@ -467,9 +467,9 @@ window._defectSetLock = function (locked, yStr) {
    부적합품 잠금이 걸려 있으면 그쪽을 먼저 처리(해제되면 이 검사가 이어서 실행됨).
    조회 실패 시에는 잠그지 않는다(서버 지연으로 업무가 막히는 것 방지).
    ══════════════════════════════════════════════════════════════ */
-/* 공정명/공정번호에 '중금속' 또는 '수입검사'가 들어간 공정은 기준서 탭을 만들지 않으며 서명 대상에서도 제외 */
+/* 공정명/공정번호에 '중금속'·'수입검사'·'출하검사'가 들어간 공정은 기준서 탭을 만들지 않으며 서명 대상에서도 제외 */
 window.inspProcHidden = function (p) {
-  return /중금속|수입검사/.test(String((p && p.proc_name) || '') + ' ' + String((p && p.proc_no) || ''));
+  return /중금속|수입검사|출하검사/.test(String((p && p.proc_name) || '') + ' ' + String((p && p.proc_no) || ''));
 };
 
 window._inspLockCheck = async function () {
